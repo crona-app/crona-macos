@@ -4017,7 +4017,9 @@ extension CronaCompanionTests {
         NotificationCenter.default.post(name: .cronaDaemonEventReceived,
             object: CronaProtocolEvent(type: "session.history_changed", payload: nil))
         await waitForIssueCreator {
-            transport.methods.filter { $0 == "issue.today_summary" }.count > before && stats.calendarCacheRevision > revision
+            transport.methods.filter { $0 == "issue.today_summary" }.count > before
+                && stats.calendarCacheRevision > revision
+                && daily.snapshot.date == transport.logicalDate
         }
         XCTAssertEqual(daily.snapshot.date, transport.logicalDate)
     }

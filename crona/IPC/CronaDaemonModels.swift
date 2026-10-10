@@ -983,7 +983,7 @@ struct CronaTimerExtendRequest: Codable, Equatable {
     }
 }
 
-struct CronaEndSessionRequest: Codable, Equatable {
+struct CronaEndSessionRequest: Codable, Equatable, Sendable {
     let commitMessage: String
     var adhocResolution: CronaAdhocResolution? = nil
     var issueID: Int64? = nil

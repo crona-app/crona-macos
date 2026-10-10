@@ -123,8 +123,10 @@ final class AppUpdateService: NSObject, ObservableObject {
     }
 
     func setChannel(_ channel: AppReleaseChannel) {
-        guard selectedChannel != channel else { return }
-        preferences.preferences.appUpdateChannel = channel
+        guard preferences.preferences.appUpdateChannel != channel else { return }
+        var updatedPreferences = preferences.preferences
+        updatedPreferences.appUpdateChannel = channel
+        preferences.preferences = updatedPreferences
     }
 
     func setAutomaticallyChecksForUpdates(_ enabled: Bool) {

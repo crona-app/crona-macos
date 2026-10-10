@@ -1,6 +1,6 @@
 import Foundation
 
-enum CronaAdhocResolution: String, Codable, CaseIterable, Identifiable {
+enum CronaAdhocResolution: String, Codable, CaseIterable, Identifiable, Sendable {
     case attach, create, keep
     var id: String { rawValue }
     var title: String {
