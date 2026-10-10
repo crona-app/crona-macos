@@ -1610,7 +1610,8 @@ final class CompanionAppState: ObservableObject {
                     }
                     adhocAttribution.createdIssue = prepared
                 }
-                _ = try await daemonConnection.withClient { try await $0.timerEnd(request) }
+                let requestToEnd = request
+                _ = try await daemonConnection.withClient { try await $0.timerEnd(requestToEnd) }
                 await dailyFocusService.refresh()
                 await contextService.refresh()
                 await popoverStatsService.refresh()
