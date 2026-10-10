@@ -346,10 +346,14 @@ final class PopoverStatsService: ObservableObject {
 
     private func handle(event: CronaProtocolEvent) {
         switch event.type {
-        case "timer.state", "timer.break_deferral_warning", "timer.break_deferred",
+        case "session.history_changed", "timer.state", "timer.break_deferral_warning", "timer.break_deferred",
              "session.started", "session.stopped", "session.ended", "timer.extended", "timer.boundary",
              "context.issue.changed", "issue.created", "issue.updated", "issue.deleted",
              "habit.created", "habit.updated", "habit.deleted", "habit.completed", "habit.uncompleted":
+            if event.type == "session.history_changed" {
+                cache.removeAll()
+                calendarCacheRevision += 1
+            }
             cache[selectedDate] = nil
             let today = todayDate
             cache[today] = nil
@@ -357,6 +361,9 @@ final class PopoverStatsService: ObservableObject {
                 await refresh()
                 if selectedDate != today {
                     await refreshTodayMetrics()
+                }
+                if event.type == "session.history_changed", let month = calendarMonthDate {
+                    await prefetchCalendarDates(Self.monthRange(for: month, through: today))
                 }
             }
         default:

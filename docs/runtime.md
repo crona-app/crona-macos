@@ -34,6 +34,14 @@ It also derives the default socket path:
 
 If the discovery file is missing, the app still boots, but runtime-backed surfaces will not be fully available until the daemon becomes discoverable.
 
+## Protocol Compatibility
+
+The app requires daemon protocol `1.6`. Earlier or different protocol versions show a connection error before runtime-backed actions are enabled.
+
+Ad hoc timers preserve the daemon's active context. Completion can attach to an existing issue, create an issue and then attach, or keep a concluded ad hoc record. Issue creation and attachment are separate requests; a successful creation is retained in the session draft if attachment needs to be retried.
+
+Session history remains managed by other clients. The app responds to `session.history_changed` by refreshing daily totals and Stats, including calendar caches.
+
 ## Diagnostics Surface
 
 The diagnostics service reports:
@@ -58,7 +66,7 @@ The app currently ships with these base config values:
 - `CRONA_DAEMON_LABEL = crona`
 - `CRONA_KERNEL_EXECUTABLE = crona-daemon`
 - `CRONA_KERNEL_DEV_EXECUTABLE = crona-daemon-dev`
-- `CRONA_RELEASE_CHANNEL = stable`
-- `CRONA_RELEASE_VERSION = $(MARKETING_VERSION)`
+- `CRONA_RELEASE_CHANNEL = beta`
+- `CRONA_RELEASE_VERSION = 1.1.0-beta.1`
 
 Those values come from the Xcode config files in [`Config`](../Config).

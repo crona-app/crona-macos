@@ -13,7 +13,7 @@ where T.AllCases: RandomAccessCollection {
             ForEach(Array(T.allCases)) { item in
                 let isSelected = selection == item
                 Button {
-                    withAnimation(.spring(response: 0.24, dampingFraction: 0.9)) {
+                    withAnimation(SystemGlassSettings.shared.reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.9)) {
                         selection = item
                     }
                 } label: {
@@ -36,6 +36,7 @@ where T.AllCases: RandomAccessCollection {
                     .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
                 .background {
                     segmentBackground(isSelected: isSelected)
                 }

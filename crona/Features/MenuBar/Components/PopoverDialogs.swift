@@ -28,72 +28,79 @@ struct PlaceholderPanel: View {
 struct EndSessionSheetView: View {
     @ObservedObject var appState: CompanionAppState
 
-    var body: some View {
-        ZStack {
-            SheetGlassBackground()
+    @ViewBuilder var body: some View {
+        if appState.timerService.snapshot.adhoc {
+            AdhocAttributionView(appState: appState)
+                .frame(width: 392)
+                .background(SheetGlassBackground())
+        } else {
+            ZStack {
+                SheetGlassBackground()
 
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("End Session")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(PopupVisualTheme.primaryText)
-                    Text("Add the commit message that will be stored with this session.")
-                        .font(.subheadline)
-                        .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.66))
-                }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Commit Message")
-                        .font(.headline)
-                        .foregroundStyle(PopupVisualTheme.primaryText)
-
-                    StableMultilineTextField(
-                        text: $appState.endSessionCommitMessage,
-                        placeholder: "Describe what you completed",
-                        isEnabled: !appState.isSubmittingEndSession,
-                        focusRequest: appState.endSessionFocusRequest
-                    )
-                    .frame(height: 104)
-                    .popupInputSurface(cornerRadius: 12)
-
-                    if let error = appState.endSessionErrorMessage, !error.isEmpty {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.9))
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("End Session")
+                            .font(.title2.weight(.semibold))
+                            .foregroundStyle(PopupVisualTheme.primaryText)
+                        Text("Describe the work you completed in this session.")
+                            .font(.subheadline)
+                            .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.66))
                     }
-                }
 
-                HStack {
-                    Button("Cancel") {
-                        appState.cancelEndSession()
-                    }
-                    .keyboardShortcut(.cancelAction)
-                    .disabled(appState.isSubmittingEndSession)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Session Summary (required)")
+                            .font(.headline)
+                            .foregroundStyle(PopupVisualTheme.primaryText)
 
-                    Spacer()
+                        StableMultilineTextField(
+                            text: $appState.endSessionCommitMessage,
+                            placeholder: "Describe what you completed",
+                            isEnabled: !appState.isSubmittingEndSession,
+                            focusRequest: appState.endSessionFocusRequest
+                        )
+                        .frame(height: 104)
+                        .popupInputSurface(cornerRadius: 12)
 
-                    Button {
-                        appState.confirmEndSession()
-                    } label: {
-                        if appState.isSubmittingEndSession {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Text("End Session")
+                        if let error = appState.endSessionErrorMessage, !error.isEmpty {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.9))
                         }
                     }
-                    .keyboardShortcut(.return, modifiers: [.command])
-                    .buttonStyle(.borderedProminent)
-                    .disabled(appState.isSubmittingEndSession)
+
+                    HStack {
+                        Button("Cancel") {
+                            appState.cancelEndSession()
+                        }
+                        .keyboardShortcut(.cancelAction)
+                        .disabled(appState.isSubmittingEndSession)
+
+                        Spacer()
+
+                        Button {
+                            appState.confirmEndSession()
+                        } label: {
+                            if appState.isSubmittingEndSession {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Text(appState.endSessionActionTitle)
+                            }
+                        }
+                        .keyboardShortcut(.return, modifiers: [.command])
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!appState.canSubmitEndSession)
+                    }
                 }
+                .padding(.horizontal, 26)
+                .padding(.vertical, 24)
+                .frame(maxWidth: 384, alignment: .leading)
             }
-            .padding(.horizontal, 26)
-            .padding(.vertical, 24)
-            .frame(maxWidth: 384, alignment: .leading)
+            .frame(width: 360)
+            .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(width: 360)
-        .fixedSize(horizontal: false, vertical: true)
     }
+
 }
 
 struct MetricStripCard: View {
@@ -191,7 +198,7 @@ struct ReverseProgressBar: View {
             .overlay(
                 shape.strokeBorder(PopupVisualTheme.primaryText.opacity(0.09), lineWidth: 0.5)
             )
-            .animation(.easeOut(duration: 0.24), value: clampedProgress)
+            .animation(SystemGlassSettings.shared.reduceMotion ? nil : .easeOut(duration: 0.24), value: clampedProgress)
         }
     }
 }

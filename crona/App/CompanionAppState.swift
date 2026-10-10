@@ -49,6 +49,12 @@ struct IssueCreationSuccess: Equatable {
     let plannedForToday: Bool
 }
 
+enum IssueCreationFollowUp: Hashable {
+    case close
+    case more
+    case focus
+}
+
 #if DEBUG
     enum DeveloperPreviewKind: Equatable {
         case hardLimit
@@ -98,6 +104,10 @@ final class CompanionAppState: ObservableObject {
     private var lastWarningIndicatorKey: String?
     private var settingsSceneAction: (() -> Void)?
     @Published var popoverDetailsRoute: PopoverDetailRoute?
+    @Published var isAdhocStartSelected = false
+    @Published var isStartingFocus = false
+    @Published var focusStartError: String?
+    @Published var adhocAttribution = AdhocAttributionState()
     @Published var selectedFocusIssue: DailyFocusIssue?
     @Published var issueActionEditor: IssueActionEditor?
     @Published var habitActionEditor: HabitActionEditor?
@@ -123,9 +133,9 @@ final class CompanionAppState: ObservableObject {
     @Published var issueCreateTitle = ""
     @Published var issueCreateDescription = ""
     @Published var issueCreateEstimate = ""
-    @Published var issueCreateForToday = true
+    @Published var issueCreateDueDate: Date?
+    @Published private(set) var isSubmittingIssueCreator = false
     @Published var issueCreateDestinationID: Int64?
-    @Published var issueCreateShowsMoreOptions = false
     @Published private(set) var issueBeingEdited: DailyFocusIssue?
     @Published private(set) var habitBeingEdited: HabitRowModel?
     @Published var isHabitCreatorPresented = false
@@ -146,6 +156,7 @@ final class CompanionAppState: ObservableObject {
     @Published var endSessionCommitMessage = ""
     @Published var isSubmittingEndSession = false
     @Published var endSessionErrorMessage: String?
+    private var endSessionDraftSessionID: String?
     @Published private(set) var pendingEndSessionID: String?
     @Published private(set) var endSessionPresentationSource: EndSessionPresentationSource?
     @Published private(set) var endSessionFocusRequest = 0
@@ -166,12 +177,12 @@ final class CompanionAppState: ObservableObject {
         @Published var developerPreviewKind: DeveloperPreviewKind?
     #endif
 
-    init() {
+    init(daemonConnection injectedDaemonConnection: DaemonConnectionService? = nil) {
         let preferences = PreferencesService()
         let kernelDiscovery = KernelDiscoveryService(configLoader: CronaConfigLoader())
         let notificationService = NotificationService()
         let launchAtLoginService = LaunchAtLoginService()
-        let daemonConnection = DaemonConnectionService(kernelDiscovery: kernelDiscovery)
+        let daemonConnection = injectedDaemonConnection ?? DaemonConnectionService(kernelDiscovery: kernelDiscovery)
         let contextService = ContextService(daemonConnection: daemonConnection)
         let timerService = TimerService(daemonConnection: daemonConnection)
         let dailyFocusService = DailyFocusService(daemonConnection: daemonConnection)
@@ -362,13 +373,14 @@ final class CompanionAppState: ObservableObject {
         if daemonConnection.connectionState != .connected {
             return .disconnected
         }
-        if let issue = selectedFocusIssue {
+        if selectedFocusIssue != nil || isAdhocStartSelected {
+            let issue = selectedFocusIssue
             return .startConfig(
                 FocusStartConfigModel(
                     issue: issue,
                     state: FocusStartConfigState.defaultState(
-                        estimateMinutes: issue.estimateMinutes,
-                        workedSeconds: issue.workedSeconds
+                        estimateMinutes: issue?.estimateMinutes,
+                        workedSeconds: issue?.workedSeconds ?? 0
                     )
                 )
             )
@@ -780,13 +792,13 @@ final class CompanionAppState: ObservableObject {
         guard !isSubmittingEndSession else { return }
         #if DEBUG
             if developerPreviewKind == .inactivity {
-                clearEndSessionState()
+                clearEndSessionState(preserveDraft: timerService.snapshot.adhoc)
                 inactivityPopupPhase = .decision
                 windowService.updateInactivityPopup()
                 return
             }
         #endif
-        clearEndSessionState()
+        clearEndSessionState(preserveDraft: timerService.snapshot.adhoc)
         inactivityPopupPhase = .decision
         startInactivityPopupCountdown()
         windowService.updateInactivityPopup()
@@ -897,14 +909,14 @@ final class CompanionAppState: ObservableObject {
         guard !isSubmittingEndSession, !isSubmittingHardLimitAction else { return }
         #if DEBUG
             if developerPreviewKind == .hardLimit {
-                clearEndSessionState()
+                clearEndSessionState(preserveDraft: timerService.snapshot.adhoc)
                 hardLimitPopupErrorMessage = nil
                 hardLimitPopupPhase = .decision
                 windowService.updateHardLimitPopup()
                 return
             }
         #endif
-        clearEndSessionState()
+        clearEndSessionState(preserveDraft: timerService.snapshot.adhoc)
         hardLimitPopupErrorMessage = nil
         hardLimitPopupPhase = .decision
         startHardLimitDecisionCountdown()
@@ -915,12 +927,24 @@ final class CompanionAppState: ObservableObject {
         selectedFocusIssue = issue
     }
 
+    func beginAdhocStart() {
+        guard !hasActiveFocusSession, !todayIsAway, daemonConnection.connectionState == .connected else { return }
+        selectedFocusIssue = nil
+        isAdhocStartSelected = true
+        focusStartError = nil
+    }
+
     func dismissStartConfig() {
+        guard !isStartingFocus else { return }
+        isAdhocStartSelected = false
+        focusStartError = nil
         selectedFocusIssue = nil
     }
 
     func presentIssueCreator() {
         guard daemonConnection.connectionState == .connected,
+            !isSubmittingIssueCreator,
+            !isIssueCreatorPresented,
             !isEndSessionSheetPresented,
             issueActionEditor == nil
         else { return }
@@ -929,9 +953,8 @@ final class CompanionAppState: ObservableObject {
         issueCreateTitle = ""
         issueCreateDescription = ""
         issueCreateEstimate = ""
-        issueCreateForToday = true
+        issueCreateDueDate = defaultIssueCreateDate
         issueCreateDestinationID = contextService.snapshot.streamID
-        issueCreateShowsMoreOptions = false
         isIssueCreatorContentVisible = false
         isIssueCreatorPresented = true
         issueCreatorPresentationGeneration &+= 1
@@ -958,6 +981,7 @@ final class CompanionAppState: ObservableObject {
 
     func presentIssueEditor(for issue: DailyFocusIssue) {
         guard daemonConnection.connectionState == .connected,
+            !isSubmittingIssueCreator,
             !isEndSessionSheetPresented,
             issueActionEditor == nil,
             !isIssueCreatorPresented
@@ -967,9 +991,8 @@ final class CompanionAppState: ObservableObject {
         issueCreateTitle = issue.title
         issueCreateDescription = issue.description ?? ""
         issueCreateEstimate = issue.estimateMinutes.map(String.init) ?? ""
-        issueCreateForToday = issue.todoForDate == dailyFocusService.snapshot.date
+        issueCreateDueDate = issue.todoForDate.flatMap(CronaCalendarDate.date(from:))
         issueCreateDestinationID = issue.streamID
-        issueCreateShowsMoreOptions = false
         isIssueCreatorContentVisible = false
         isIssueCreatorPresented = true
         issueCreatorPresentationGeneration &+= 1
@@ -986,7 +1009,7 @@ final class CompanionAppState: ObservableObject {
     }
 
     func cancelIssueCreator() {
-        guard !issueCreationService.isCreating else { return }
+        guard !isSubmittingIssueCreator else { return }
         issueCreationService.clearError()
         issueBeingEdited = nil
         dismissIssueCreatorPresentation()
@@ -1128,7 +1151,12 @@ final class CompanionAppState: ObservableObject {
         habitsService.clearManagementError()
     }
 
-    func submitIssueCreator() {
+    func submitIssueCreator(followUp: IssueCreationFollowUp = .close) {
+        guard !isSubmittingIssueCreator,
+            !issueCreationService.isCreating,
+            issueActionsService.actionInFlightIssueID == nil,
+            followUp != .focus || !hasActiveFocusSession
+        else { return }
         let title = issueCreateTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         let description = issueCreateDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         let estimateText = issueCreateEstimate.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1138,20 +1166,18 @@ final class CompanionAppState: ObservableObject {
         else { return }
         guard case .success(let estimate) = FlexibleDurationParser.optionalMinutes(estimateText)
         else { return }
-        let logicalDate =
-            daemonConnection.currentDate.isEmpty
-            ? (dailyFocusService.snapshot.date.isEmpty
-                ? DailyFocusService.todayString() : dailyFocusService.snapshot.date)
-            : daemonConnection.currentDate
+        let logicalDate = issueCreateDueDate.map(CronaCalendarDate.string(from:))
+        isSubmittingIssueCreator = true
         if let issueBeingEdited {
             let issue = issueBeingEdited
             Task {
+                defer { isSubmittingIssueCreator = false }
                 let succeeded = await issueActionsService.updateIssue(
                     issue: issue,
                     title: title,
                     description: description.isEmpty ? nil : description,
                     estimateMinutes: estimate,
-                    todoForDate: issueCreateForToday ? logicalDate : nil
+                    todoForDate: logicalDate
                 )
                 if succeeded {
                     self.issueBeingEdited = nil
@@ -1166,9 +1192,10 @@ final class CompanionAppState: ObservableObject {
             title: title,
             description: description.isEmpty ? nil : description,
             estimateMinutes: estimate,
-            todoForDate: issueCreateForToday ? logicalDate : nil
+            todoForDate: logicalDate
         )
         Task {
+            defer { isSubmittingIssueCreator = false }
             guard let created = await issueCreationService.create(request) else { return }
             let issue = DailyFocusIssue(
                 id: created.id,
@@ -1184,12 +1211,46 @@ final class CompanionAppState: ObservableObject {
                 notes: created.notes,
                 pinnedDaily: created.pinnedDaily
             )
-            issueCreationSuccess = IssueCreationSuccess(
-                issue: issue, plannedForToday: issueCreateForToday)
-            await dismissIssueCreatorPresentationAndWait()
             await dailyFocusService.refresh()
-            scheduleIssueCreationSuccessDismissal()
+
+            switch followUp {
+            case .more:
+                issueCreationSuccess = nil
+                issueBeingEdited = nil
+                issueCreateTitle = ""
+                issueCreateDescription = ""
+                issueCreateEstimate = ""
+                issueCreateDestinationID = created.streamID
+            case .focus:
+                issueCreationSuccessDismissTask?.cancel()
+                issueCreationSuccess = nil
+                await dismissIssueCreatorPresentationAndWait()
+                if hasActiveFocusSession {
+                    issueCreationSuccess = IssueCreationSuccess(
+                        issue: issue, plannedForToday: created.todoForDate == issueCreatorLogicalDate)
+                    scheduleIssueCreationSuccessDismissal()
+                } else {
+                    selectedPopoverTab = .now
+                    selectedFocusIssue = issue
+                }
+            case .close:
+                issueCreationSuccess = IssueCreationSuccess(
+                    issue: issue, plannedForToday: created.todoForDate == issueCreatorLogicalDate)
+                await dismissIssueCreatorPresentationAndWait()
+                scheduleIssueCreationSuccessDismissal()
+            }
         }
+    }
+
+    private var issueCreatorLogicalDate: String {
+        guard let date = CronaCalendarDate.date(from: daemonConnection.currentDate),
+            CronaCalendarDate.string(from: date) == daemonConnection.currentDate
+        else { return DailyFocusService.todayString() }
+        return daemonConnection.currentDate
+    }
+
+    var defaultIssueCreateDate: Date {
+        CronaCalendarDate.date(from: issueCreatorLogicalDate) ?? Date()
     }
 
     func startFocusFromCreatedIssue() {
@@ -1426,9 +1487,17 @@ final class CompanionAppState: ObservableObject {
         }
         logger.debug(
             "Presenting end session flow from \(String(describing: source), privacy: .public)")
+        if endSessionDraftSessionID != sessionID {
+            adhocAttribution = .initial(
+                elapsedSeconds: adhocElapsedSeconds,
+                date: daemonConnection.currentDate,
+                streamID: contextService.snapshot.streamID
+            )
+            endSessionCommitMessage = ""
+        }
+        endSessionDraftSessionID = sessionID
         pendingEndSessionID = sessionID
         endSessionPresentationSource = source
-        endSessionCommitMessage = ""
         endSessionErrorMessage = nil
         isEndSessionSheetPresented = source == .menuPopover
         requestEndSessionFocus()
@@ -1440,16 +1509,18 @@ final class CompanionAppState: ObservableObject {
         endSessionFallbackTask?.cancel()
         endSessionFallbackTask = nil
         isEndSessionSheetPresented = false
-        clearEndSessionState()
+        clearEndSessionState(preserveDraft: timerService.snapshot.adhoc)
         if wasPresentedInHUD {
             windowService.setTimerHUDCommitPresented(false)
         }
     }
 
     func confirmEndSession() {
+        guard !isSubmittingEndSession else { return }
         let trimmedMessage = endSessionCommitMessage.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedMessage.isEmpty else {
-            endSessionErrorMessage = "A commit message is required."
+            endSessionErrorMessage = timerService.snapshot.adhoc ? "A session summary is required." : "A commit message is required."
+            requestEndSessionFocus()
             return
         }
         #if DEBUG
@@ -1464,32 +1535,106 @@ final class CompanionAppState: ObservableObject {
             return
         }
 
+        var request = CronaEndSessionRequest(commitMessage: trimmedMessage)
+        var creation: CronaCreateIssueRequest?
+        if timerService.snapshot.adhoc {
+            guard let resolution = adhocAttribution.resolution else {
+                endSessionErrorMessage = "Choose how to save this session."
+                return
+            }
+            request.adhocResolution = resolution
+            switch resolution {
+            case .keep: break
+            case .attach:
+                guard let id = adhocAttribution.selectedIssueID,
+                      let issue = adhocAttribution.issues.first(where: { $0.id == id }),
+                      ["planned", "ready", "in_progress"].contains(issue.status) else {
+                    endSessionErrorMessage = "Choose an eligible issue."
+                    return
+                }
+                request.issueID = id
+            case .create:
+                if let issue = adhocAttribution.createdIssue {
+                    request.adhocResolution = .attach
+                    request.issueID = issue.id
+                } else {
+                    guard let destination = issueCreationService.destinations.first(where: { $0.id == adhocAttribution.destinationID }),
+                          !adhocAttribution.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                        endSessionErrorMessage = "Choose a destination and enter an issue title."
+                        return
+                    }
+                    let date = adhocAttribution.date.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let formatter = DateFormatter()
+                    formatter.locale = Locale(identifier: "en_US_POSIX")
+                    formatter.dateFormat = "yyyy-MM-dd"
+                    formatter.isLenient = false
+                    guard date.isEmpty || (formatter.date(from: date).map { formatter.string(from: $0) == date } ?? false),
+                          adhocAttribution.estimateMinutes >= 0 else {
+                        endSessionErrorMessage = "Enter a valid date and nonnegative estimate."
+                        return
+                    }
+                    creation = CronaCreateIssueRequest(
+                        streamID: destination.streamID,
+                        title: adhocAttribution.title.trimmingCharacters(in: .whitespacesAndNewlines),
+                        description: optionalTrimmed(adhocAttribution.description),
+                        estimateMinutes: adhocAttribution.estimateMinutes > 0 ? adhocAttribution.estimateMinutes : nil,
+                        todoForDate: date.isEmpty ? nil : date
+                    )
+                }
+            }
+        }
         isSubmittingEndSession = true
         endSessionErrorMessage = nil
 
         Task {
             do {
-                _ = try await daemonConnection.withClient {
-                    try await $0.timerEnd(commitMessage: trimmedMessage)
+                if let creation {
+                    let issue = try await daemonConnection.withClient { try await $0.createIssue(creation) }
+                    guard pendingEndSessionID == sessionID, timerService.snapshot.sessionID == sessionID else {
+                        throw NSError(domain: "Crona", code: 1, userInfo: [NSLocalizedDescriptionKey: "The active session changed. The issue was created, but the session was not attached."])
+                    }
+                    adhocAttribution.createdIssue = issue
+                    request.adhocResolution = .attach
+                    request.issueID = issue.id
                 }
-                await MainActor.run {
-                    self.startEndSessionFallback(for: sessionID)
+                if let created = adhocAttribution.createdIssue, created.status == "backlog" {
+                    let issues = try await daemonConnection.withClient { try await $0.listAllIssues() }
+                    guard let latest = issues.first(where: { $0.id == created.id }) else {
+                        throw NSError(domain: "Crona", code: 1, userInfo: [NSLocalizedDescriptionKey: "The created issue is no longer available."])
+                    }
+                    let prepared = latest.status == "backlog"
+                        ? try await daemonConnection.withClient { try await $0.changeIssueStatus(issueID: latest.id, status: .ready, note: nil) }
+                        : latest
+                    guard pendingEndSessionID == sessionID, timerService.snapshot.sessionID == sessionID else {
+                        throw NSError(domain: "Crona", code: 1, userInfo: [NSLocalizedDescriptionKey: "The active session changed. The issue was created, but the session was not attached."])
+                    }
+                    adhocAttribution.createdIssue = prepared
+                }
+                _ = try await daemonConnection.withClient { try await $0.timerEnd(request) }
+                await dailyFocusService.refresh()
+                await contextService.refresh()
+                await popoverStatsService.refresh()
+                if pendingEndSessionID == sessionID {
+                    startEndSessionFallback(for: sessionID)
                 }
             } catch {
                 logger.error(
                     "Failed to end timer: \(error.localizedDescription, privacy: .private)")
-                await MainActor.run {
-                    self.isSubmittingEndSession = false
-                    self.endSessionErrorMessage = error.localizedDescription
-                }
+                guard pendingEndSessionID == sessionID else { return }
+                isSubmittingEndSession = false
+                endSessionErrorMessage = error.localizedDescription
             }
         }
     }
 
     func startSelectedFocusSession(using config: FocusStartConfigState) {
-        guard let issue = selectedFocusIssue else { return }
-        let request = config.startRequest(for: issue)
+        guard !isStartingFocus, !hasActiveFocusSession, !todayIsAway,
+              selectedFocusIssue != nil || isAdhocStartSelected else { return }
+        let request = config.startRequest(for: selectedFocusIssue)
+        isStartingFocus = true
+        focusStartError = nil
         Task {
+            defer { isStartingFocus = false }
             do {
                 _ = try await daemonConnection.withClient { try await $0.timerStart(request) }
                 await timerService.refresh()
@@ -1497,10 +1642,9 @@ final class CompanionAppState: ObservableObject {
                 await dailyFocusService.refresh()
                 await habitsService.refresh()
                 selectedFocusIssue = nil
+                isAdhocStartSelected = false
             } catch {
-                logger.error(
-                    "Failed to start focus session: \(error.localizedDescription, privacy: .private)"
-                )
+                focusStartError = error.localizedDescription
             }
         }
     }
@@ -2017,10 +2161,16 @@ final class CompanionAppState: ObservableObject {
         }
     }
 
-    private func clearEndSessionState() {
+    private func clearEndSessionState(preserveDraft: Bool = false) {
+        if !preserveDraft {
+            adhocAttribution = AdhocAttributionState()
+            endSessionDraftSessionID = nil
+            endSessionCommitMessage = ""
+        }
+        adhocAttribution.loadID = nil
+        adhocAttribution.isLoading = false
         pendingEndSessionID = nil
         endSessionPresentationSource = nil
-        endSessionCommitMessage = ""
         endSessionErrorMessage = nil
         isSubmittingEndSession = false
     }

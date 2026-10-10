@@ -20,8 +20,8 @@ struct IssuesTabView: View {
                 }
             } else if appState.todayIsAway {
                 AwayModeView(appState: appState)
-            } else if let issue = appState.selectedFocusIssue {
-                FocusStartConfigView(appState: appState, issue: issue)
+            } else if appState.selectedFocusIssue != nil || appState.isAdhocStartSelected {
+                fitOrScroll { FocusStartConfigView(appState: appState, issue: appState.selectedFocusIssue) }
             } else {
                 fitOrScroll {
                     IdleFocusView(appState: appState)
@@ -168,7 +168,9 @@ struct ActiveTimerView: View {
                 EndsAtRow(date: endDate)
             }
 
-            if hasContext {
+            if appState.timerService.snapshot.adhoc {
+                Text("Ad Hoc Focus").font(.headline)
+            } else if hasContext {
                 VStack(alignment: .center, spacing: 10) {
                     if let issue = appState.contextService.snapshot.issueTitle {
                         Label {
@@ -306,6 +308,22 @@ struct IdleFocusView: View {
                     .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.9))
             }
 
+            Button(action: appState.beginAdhocStart) {
+                HStack(spacing: 10) {
+                    Image(systemName: "timer").foregroundStyle(PopupVisualTheme.semantic(.focus))
+                    Text("Start Ad Hoc").font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(PopupVisualTheme.tertiaryText)
+                }
+                .foregroundStyle(PopupVisualTheme.primaryText)
+                .padding(14)
+                .background(subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 16))
+                .contentShape(RoundedRectangle(cornerRadius: 16))
+            }
+            .buttonStyle(GlassPressButtonStyle())
+
             if appState.dailyFocusService.snapshot.issues.isEmpty {
                 PlaceholderPanel(
                     icon: "checkmark.circle",
@@ -347,18 +365,18 @@ struct IdleFocusView: View {
 
 struct FocusStartConfigView: View {
     @ObservedObject var appState: CompanionAppState
-    let issue: DailyFocusIssue
+    let issue: DailyFocusIssue?
     @StateObject private var editor: FocusStartConfigEditor
     @State private var expandedControl: FocusConfigControl?
 
-    init(appState: CompanionAppState, issue: DailyFocusIssue) {
+    init(appState: CompanionAppState, issue: DailyFocusIssue?) {
         self.appState = appState
         self.issue = issue
         _editor = StateObject(
             wrappedValue: FocusStartConfigEditor(
                 initialState: FocusStartConfigState.defaultState(
-                    estimateMinutes: issue.estimateMinutes,
-                    workedSeconds: issue.workedSeconds
+                    estimateMinutes: issue?.estimateMinutes,
+                    workedSeconds: issue?.workedSeconds ?? 0
                 )
             ))
     }
@@ -383,7 +401,7 @@ struct FocusStartConfigView: View {
                 .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.55))
 
             Label {
-                Text(issue.title)
+                Text(issue?.title ?? "Ad Hoc Focus")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(PopupVisualTheme.primaryText)
                     .lineLimit(2)
@@ -446,7 +464,7 @@ struct FocusStartConfigView: View {
                     if editor.state.showsLongBreakControls {
                         ExpandablePresetRow(
                             icon: "moon.zzz.fill",
-                            tint: PopupVisualTheme.semantic(.review),
+                            tint: PopupVisualTheme.secondaryText,
                             title: "Long break",
                             displayValue: editor.longBreakDisplay,
                             choices: FocusStartConfigState.longBreakChoices,
@@ -468,7 +486,7 @@ struct FocusStartConfigView: View {
                     if editor.state.showsCycleControls {
                         ExpandableNumberRow(
                             icon: "repeat.circle.fill",
-                            tint: PopupVisualTheme.semantic(.warning),
+                            tint: PopupVisualTheme.secondaryText,
                             title: "Cycles",
                             displayValue: "\(editor.state.effectivePomodoroCycles)",
                             values: Array(1...12),
@@ -484,7 +502,7 @@ struct FocusStartConfigView: View {
                     if editor.state.showsLongBreakAfterControls {
                         ExpandableNumberRow(
                             icon: "arrow.trianglehead.2.clockwise.rotate.90.circle.fill",
-                            tint: .mint,
+                            tint: PopupVisualTheme.secondaryText,
                             title: "Long break after",
                             displayValue: "\(editor.state.effectiveCyclesBeforeLongBreak)",
                             values: Array(1...12),
@@ -516,23 +534,27 @@ struct FocusStartConfigView: View {
                     )
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: editor.state.breaksEnabled)
-            .animation(.easeInOut(duration: 0.2), value: editor.state.longBreakEnabled)
+            .animation(SystemGlassSettings.shared.reduceMotion ? nil : .easeInOut(duration: 0.2), value: editor.state.breaksEnabled)
+            .animation(SystemGlassSettings.shared.reduceMotion ? nil : .easeInOut(duration: 0.2), value: editor.state.longBreakEnabled)
 
             if let endDate = TimerEndProjection.startEndDate(config: editor.state) {
                 EndsAtRow(date: endDate)
             }
 
+            if let error = appState.focusStartError {
+                Text(error).font(.caption).foregroundStyle(.red)
+            }
             HStack {
                 Spacer()
                 actionPill(
-                    "Start Focus",
+                    appState.isStartingFocus ? "Starting…" : "Start Focus",
                     fill: PopupVisualTheme.primaryText.opacity(0.18),
                     shortcut: .defaultAction,
                     shortcutLabel: "↩"
                 ) {
                     appState.startSelectedFocusSession(using: editor.state)
                 }
+                .disabled(appState.isStartingFocus)
                 Spacer()
             }
         }
@@ -542,7 +564,7 @@ struct FocusStartConfigView: View {
     }
 
     private func toggle(_ control: FocusConfigControl) {
-        withAnimation(.easeInOut(duration: 0.18)) {
+        withAnimation(SystemGlassSettings.shared.reduceMotion ? nil : .easeInOut(duration: 0.18)) {
             expandedControl = expandedControl == control ? nil : control
         }
     }
@@ -633,7 +655,7 @@ struct FocusIssueRow: View {
                     )
                     .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                     .onHover { isActionsHovered = $0 }
-                    .animation(.easeOut(duration: 0.12), value: isActionsHovered)
+                    .animation(SystemGlassSettings.shared.reduceMotion ? nil : .easeOut(duration: 0.12), value: isActionsHovered)
                     .menuBarIconHitTarget()
             }
             .menuStyle(.borderlessButton)

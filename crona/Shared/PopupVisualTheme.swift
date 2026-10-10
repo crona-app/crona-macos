@@ -94,7 +94,7 @@ enum PopupVisualTheme {
     }
 
     static var tertiaryText: Color {
-        Color.secondary.opacity(0.72)
+        Color.secondary
     }
 
     static var surfaceFill: Color {

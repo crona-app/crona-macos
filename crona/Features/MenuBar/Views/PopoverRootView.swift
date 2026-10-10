@@ -16,7 +16,7 @@ enum PopoverModalKind: Equatable {
         case .statusNote: return 260
         case .endSession: return 360
         case .dueDate: return 430
-        case .issueCreate: return 560
+        case .issueCreate: return 600
         case .deleteIssue: return 280
         case .habitCreate: return 500
         case .deleteHabit: return 240
@@ -67,22 +67,17 @@ struct PopoverRootView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            visibleSurface
-
+        Group {
             if hasDashboardModal || appState.isIssueCreatorPresented || appState.isHabitCreatorPresented {
-                modalSurface
-                    .frame(
-                        width: StatusPopupSizing.width,
-                        height: StatusPopupSizing.viewportHeight,
-                        alignment: .center
-                    )
-                    .transition(
-                        .asymmetric(
-                            insertion: .opacity,
-                            removal: .opacity
-                        )
-                    )
+                ViewThatFits(in: .vertical) {
+                    modalSurface
+                    ScrollView(.vertical) {
+                        modalSurface
+                    }
+                    .frame(maxHeight: StatusPopupSizing.viewportHeight)
+                }
+            } else {
+                visibleSurface
             }
         }
         .frame(
@@ -105,11 +100,8 @@ struct PopoverRootView: View {
     private var visibleSurface: some View {
         ZStack(alignment: .top) {
             dashboardSurface
-                .offset(x: appState.isIssueCreatorContentVisible ? -420 : 0)
-                .allowsHitTesting(!appState.isIssueCreatorPresented)
         }
         .frame(width: StatusPopupSizing.width, alignment: .top)
-        .frame(minHeight: modalMinimumHeight, alignment: .top)
         .background {
             GeometryReader { proxy in
                 Color.clear.preference(
@@ -206,36 +198,12 @@ struct PopoverRootView: View {
         }
         .padding(14)
         .frame(width: StatusPopupSizing.width)
-        .opacity(hasDashboardModal ? 0.38 : 1)
-        .blur(radius: hasDashboardModal ? 3 : 0)
-        .scaleEffect(hasDashboardModal ? 0.985 : 1)
-        .allowsHitTesting(!hasDashboardModal)
-        .animation(.easeInOut(duration: 0.16), value: appState.isEndSessionSheetPresented)
-        .animation(.easeInOut(duration: 0.16), value: appState.issueActionEditor)
-        .animation(.easeInOut(duration: 0.16), value: appState.habitActionEditor)
+
     }
 
     @ViewBuilder
     private var modalSurface: some View {
-        ZStack {
-            PopoverGlassBackground()
-
-            if hasDashboardModal {
-                PopoverModalScrim {
-                    if appState.isEndSessionSheetPresented {
-                        if !appState.isSubmittingEndSession {
-                            appState.cancelEndSession()
-                        }
-                    } else {
-                        if appState.habitActionEditor != nil {
-                            appState.cancelHabitActionEditor()
-                        } else {
-                            appState.cancelIssueActionEditor()
-                        }
-                    }
-                }
-            }
-
+        Group {
             if appState.isEndSessionSheetPresented {
                 EndSessionSheetView(appState: appState)
                     .fixedSize(horizontal: false, vertical: true)
@@ -257,48 +225,31 @@ struct PopoverRootView: View {
                     .transition(.scale(scale: 0.96).combined(with: .opacity))
             } else if appState.isIssueCreatorPresented {
                 IssueCreatorView(appState: appState)
-                    .offset(x: appState.isIssueCreatorContentVisible ? 0 : 420)
-                    .allowsHitTesting(appState.isIssueCreatorContentVisible)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             } else if appState.isHabitCreatorPresented {
                 HabitCreatorView(appState: appState)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: StatusPopupSizing.width, alignment: .top)
+        .padding(.vertical, hasDashboardModal ? 14 : 0)
+        .background {
+            if appState.isIssueCreatorPresented || appState.isHabitCreatorPresented {
+                PopoverGlassBackground()
+            }
+        }
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(key: PopupSurfaceHeightKey.self, value: proxy.size.height)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 
     private var hasDashboardModal: Bool {
         appState.isEndSessionSheetPresented || appState.issueActionEditor != nil
             || appState.habitActionEditor != nil
-    }
-
-    private var modalMinimumHeight: CGFloat? {
-        if appState.isEndSessionSheetPresented {
-            return PopoverModalKind.endSession.minimumHeight
-        }
-        if appState.isIssueCreatorPresented {
-            return PopoverModalKind.issueCreate.minimumHeight
-        }
-        if appState.isHabitCreatorPresented {
-            return PopoverModalKind.habitCreate.minimumHeight
-        }
-        if case .delete = appState.habitActionEditor {
-            return PopoverModalKind.deleteHabit.minimumHeight
-        }
-        switch appState.issueActionEditor {
-        case .status:
-            return PopoverModalKind.statusNote.minimumHeight
-        case .dueDate:
-            return PopoverModalKind.dueDate.minimumHeight
-        case .manualSession:
-            return 560
-        case .delete:
-            return PopoverModalKind.deleteIssue.minimumHeight
-        case nil:
-            return nil
-        }
     }
 
     private var header: some View {
@@ -332,7 +283,7 @@ struct PopoverRootView: View {
                 {
                     Button {
                         if appState.isStatsCalendarPresented {
-                            withAnimation(.easeInOut(duration: 0.2)) {
+                            withAnimation(SystemGlassSettings.shared.reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                                 appState.isStatsCalendarPresented = false
                                 appState.popoverStatsService.endCalendar()
                             }
@@ -376,7 +327,7 @@ struct PopoverRootView: View {
                             || appState.isEndSessionSheetPresented
                             || appState.issueActionEditor != nil
                             || appState.isIssueCreatorPresented
-                            || appState.issueCreationService.isCreating
+                            || appState.isSubmittingIssueCreator
                     )
                 }
 

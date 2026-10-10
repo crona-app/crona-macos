@@ -6,6 +6,206 @@ import XCTest
 
 @MainActor
 final class CronaCompanionTests: XCTestCase {
+    func testIssueEditorPreservesAndClearsOptionalScheduling() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection)
+        let issue = DailyFocusIssue(id: 42, streamID: 7, title: "Original", status: "planned",
+            estimateMinutes: nil, workedSeconds: 0, todoForDate: nil)
+        appState.presentIssueEditor(for: issue)
+        XCTAssertNil(appState.issueCreateDueDate)
+        appState.issueCreateTitle = "Edited"
+        appState.submitIssueCreator()
+        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        XCTAssertEqual(transport.methods.filter { $0 == "issue.update" }.count, 1)
+        XCTAssertFalse(transport.methods.contains("issue.set_todo"))
+        XCTAssertFalse(transport.methods.contains("issue.clear_todo"))
+
+        let scheduled = DailyFocusIssue(id: 42, streamID: 7, title: "Scheduled", status: "planned",
+            estimateMinutes: nil, workedSeconds: 0, todoForDate: transport.logicalDate)
+        appState.presentIssueEditor(for: scheduled)
+        XCTAssertEqual(appState.issueCreateDueDate.map(CronaCalendarDate.string(from:)), transport.logicalDate)
+        appState.issueCreateDueDate = nil
+        appState.submitIssueCreator()
+        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        XCTAssertEqual(transport.methods.filter { $0 == "issue.clear_todo" }.count, 1)
+    }
+
+    func testIssueEditorOnlyWritesChangedScheduling() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let service = IssueActionsService(daemonConnection: connection,
+            dailyFocusService: DailyFocusService(daemonConnection: connection))
+        let issue = DailyFocusIssue(id: 42, streamID: 7, title: "Original", status: "planned",
+            estimateMinutes: nil, workedSeconds: 0, todoForDate: transport.logicalDate)
+        let unchanged = await service.updateIssue(issue: issue, title: "Edited", description: nil,
+            estimateMinutes: 30, todoForDate: transport.logicalDate)
+        XCTAssertTrue(unchanged)
+        XCTAssertFalse(transport.methods.contains("issue.set_todo"))
+        let changed = await service.updateIssue(issue: issue, title: "Edited", description: nil,
+            estimateMinutes: 30, todoForDate: "2001-02-04")
+        XCTAssertTrue(changed)
+        XCTAssertEqual(transport.requests.last { $0.method == "issue.set_todo" }?.params["date"]?.stringValue,
+            "2001-02-04")
+    }
+
+    func testIssueCreatorDefaultsAndSuccessUseDaemonLogicalDate() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection)
+        appState.presentIssueCreator()
+        XCTAssertNotEqual(transport.logicalDate, DailyFocusService.todayString())
+        XCTAssertEqual(appState.issueCreateDueDate.map(CronaCalendarDate.string(from:)), transport.logicalDate)
+        appState.issueCreateTitle = "New"
+        appState.issueCreateDestinationID = 7
+        appState.submitIssueCreator()
+        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        XCTAssertEqual(transport.requests.last { $0.method == "issue.create" }?.params["todoForDate"]?.stringValue,
+            transport.logicalDate)
+        XCTAssertEqual(appState.issueCreationSuccess?.plannedForToday, true)
+
+        appState.presentIssueCreator()
+        appState.issueCreateTitle = "Unscheduled"
+        appState.issueCreateDestinationID = 7
+        appState.issueCreateDueDate = nil
+        appState.submitIssueCreator()
+        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        XCTAssertNil(transport.requests.last { $0.method == "issue.create" }?.params["todoForDate"])
+        XCTAssertEqual(appState.issueCreationSuccess?.plannedForToday, false)
+    }
+
+    func testIssueCreatorLocksSubmissionThroughRefreshAndCreateMore() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection)
+        appState.presentIssueCreator()
+        await settleAsyncTasks()
+        appState.issueCreateTitle = "New"
+        appState.issueCreateDestinationID = 7
+        appState.issueCreateDueDate = CronaCalendarDate.date(from: "2001-02-04")
+        transport.suspendRefresh = true
+        appState.submitIssueCreator(followUp: .more)
+        XCTAssertTrue(appState.isSubmittingIssueCreator)
+        appState.submitIssueCreator(followUp: .more)
+        await waitForIssueCreator { transport.refreshContinuation != nil }
+        XCTAssertFalse(appState.issueCreationService.isCreating)
+        XCTAssertTrue(appState.isSubmittingIssueCreator)
+        appState.submitIssueCreator(followUp: .more)
+        appState.cancelIssueCreator()
+        XCTAssertTrue(appState.isIssueCreatorPresented)
+        XCTAssertEqual(appState.issueCreateTitle, "New")
+        XCTAssertEqual(transport.methods.filter { $0 == "issue.create" }.count, 1)
+        transport.resumeRefresh()
+        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        XCTAssertEqual(appState.issueCreateTitle, "")
+        XCTAssertEqual(appState.issueCreateDestinationID, 7)
+        XCTAssertEqual(appState.issueCreateDueDate.map(CronaCalendarDate.string(from:)), "2001-02-04")
+    }
+
+    func testIssueCreatorFailureReleasesSubmissionAndRetainsInputs() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection)
+        appState.issueCreateTitle = "Retry me"
+        appState.issueCreateDestinationID = 7
+        transport.failCreation = true
+        appState.submitIssueCreator()
+        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        XCTAssertEqual(appState.issueCreateTitle, "Retry me")
+        XCTAssertNotNil(appState.issueCreationService.lastErrorMessage)
+        transport.failCreation = false
+        appState.submitIssueCreator(followUp: .more)
+        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        XCTAssertEqual(transport.methods.filter { $0 == "issue.create" }.count, 2)
+    }
+
+    func testIssueCreatorKeepsSubmissionLockedDuringDismissal() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection)
+        appState.presentIssueCreator()
+        await settleAsyncTasks()
+        appState.issueCreateTitle = "New"
+        appState.issueCreateDestinationID = 7
+        transport.suspendRefresh = true
+        appState.submitIssueCreator()
+        await waitForIssueCreator { transport.refreshContinuation != nil }
+        transport.resumeRefresh()
+        await waitForIssueCreator { appState.issueCreationSuccess != nil }
+        XCTAssertTrue(appState.isSubmittingIssueCreator)
+        XCTAssertTrue(appState.isIssueCreatorPresented)
+        appState.submitIssueCreator()
+        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        XCTAssertFalse(appState.isIssueCreatorPresented)
+        XCTAssertEqual(transport.methods.filter { $0 == "issue.create" }.count, 1)
+    }
+
+    func testIssueCreatorFallsBackWhenDaemonLogicalDateIsInvalid() async throws {
+        let (connection, _) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection)
+        _ = connection.applyDayBoundary(CronaDayBoundaryEventPayload(kind: "start",
+            dateBefore: "", dateAfter: "", effectiveLocalTime: "", effectiveUTCTime: nil,
+            timezone: "Asia/Kolkata", occurrenceID: "invalid", logicalDate: "2001-13-40"))
+        XCTAssertEqual(CronaCalendarDate.string(from: appState.defaultIssueCreateDate), DailyFocusService.todayString())
+    }
+
+    func testIssueCreatorFocusGuardsActiveAndNewlyStartedSessions() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection)
+        appState.issueCreateTitle = "New"
+        appState.issueCreateDestinationID = 7
+        appState.timerService.snapshot = TimerSnapshot(state: "running", sessionID: "active")
+        appState.submitIssueCreator(followUp: .focus)
+        XCTAssertFalse(appState.isSubmittingIssueCreator)
+        XCTAssertFalse(transport.methods.contains("issue.create"))
+
+        appState.timerService.snapshot = TimerSnapshot(state: "idle")
+        transport.suspendRefresh = true
+        appState.submitIssueCreator(followUp: .focus)
+        await waitForIssueCreator { transport.refreshContinuation != nil }
+        appState.timerService.snapshot = TimerSnapshot(state: "running", sessionID: "active")
+        transport.resumeRefresh()
+        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        XCTAssertNil(appState.selectedFocusIssue)
+        XCTAssertNotNil(appState.issueCreationSuccess)
+        XCTAssertEqual(appState.timerService.snapshot.sessionID, "active")
+
+        appState.timerService.snapshot = TimerSnapshot(state: "idle")
+        appState.submitIssueCreator(followUp: .focus)
+        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        XCTAssertEqual(appState.selectedFocusIssue?.id, 42)
+    }
+
+    private func waitForIssueCreator(_ condition: () -> Bool) async {
+        for _ in 0..<200 {
+            if condition() { return }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("Issue creator operation did not complete")
+    }
+
+    private func issueCreatorConnection() async throws -> (DaemonConnectionService, IssueCreatorTestTransport) {
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        try Data(#"{"transport":"unix","endpoint":"/tmp/issue-creator-test.sock"}"#.utf8)
+            .write(to: directory.appendingPathComponent("kernel.json"))
+        let discovery = KernelDiscoveryService(configLoader: CronaConfigLoader(bundle: TestBundle.info([
+            "CRONA_APP_ENV": "development", "CRONA_DAEMON_LABEL": "crona",
+            "CRONA_RUNTIME_DIR": directory.path, "CRONA_KERNEL_EXECUTABLE": "crona-daemon",
+            "CRONA_KERNEL_DEV_EXECUTABLE": "crona-daemon-dev"
+        ]), environmentProvider: { [:] }))
+        let transport = IssueCreatorTestTransport()
+        let connection = DaemonConnectionService(kernelDiscovery: discovery,
+            clientFactory: { _ in CronaDaemonClient(transport: transport) })
+        connection.start()
+        await waitForIssueCreator { connection.connectionState == .connected }
+        await settleAsyncTasks()
+        return (connection, transport)
+    }
+
     func testTransientPopupCollectionBehaviorSupportsSpacesAndFullScreen() {
         let behavior = WindowService.transientPopupCollectionBehavior
 
@@ -54,19 +254,51 @@ final class CronaCompanionTests: XCTestCase {
         XCTAssertEqual(CronaIssueStatusPresentation.colorKey(for: "unknown"), .subtle)
     }
 
+    func testHUDProgressProjectsFractionalTimeAndFreezesWhenPaused() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        var snapshot = TimerSnapshot(
+            state: "running", hardLimitActive: true, hardLimitKind: .countdown,
+            hardLimitTotalSeconds: 100, hardLimitRemainingSeconds: 75, snapshotAppliedAt: now
+        )
+        XCTAssertEqual(TimerPresentation.elapsedProgressFraction(for: snapshot, at: now.addingTimeInterval(0.5)) ?? -1, 0.255, accuracy: 0.0001)
+        snapshot.state = "paused"
+        XCTAssertEqual(TimerPresentation.elapsedProgressFraction(for: snapshot, at: now.addingTimeInterval(30)) ?? -1, 0.25, accuracy: 0.0001)
+        snapshot.hardLimitActive = false
+        XCTAssertNil(TimerPresentation.elapsedProgressFraction(for: snapshot, at: now))
+    }
+
+    func testHUDProgressUsesPomodoroSegmentAndReadyState() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        var snapshot = TimerSnapshot(
+            state: "running", segmentType: "short_break", nextSegmentType: "work",
+            segmentStartTime: now.addingTimeInterval(-15.5), segmentElapsedOffsetSeconds: 5,
+            hardLimitActive: true, hardLimitKind: .pomodoro, hardLimitWorkSeconds: 100,
+            hardLimitBreakSeconds: 50
+        )
+        XCTAssertEqual(TimerPresentation.elapsedProgressFraction(for: snapshot, at: now) ?? -1, 0.41, accuracy: 0.0001)
+        XCTAssertEqual(TimerPresentation.elapsedProgressFraction(for: snapshot, at: now.addingTimeInterval(100)), 1)
+        snapshot.state = "ready"
+        XCTAssertEqual(TimerPresentation.elapsedProgressFraction(for: snapshot, at: now), 0)
+        snapshot.hardLimitExpired = true
+        XCTAssertEqual(TimerPresentation.elapsedProgressFraction(for: snapshot, at: now), 1)
+    }
+
     func testPreferencesDefaultFloatingTimerHUDOffAndPersistsOptIn() throws {
         let legacy = try JSONDecoder().decode(CompanionPreferences.self, from: Data("{}".utf8))
         XCTAssertFalse(legacy.showTimerHUD)
+        XCTAssertFalse(legacy.showTimerHUDProgress)
         XCTAssertEqual(legacy.timerHUDPosition, .bottomCenter)
         XCTAssertEqual(legacy.timerHUDSize, .spacious)
 
         var enabled = legacy
         enabled.showTimerHUD = true
+        enabled.showTimerHUDProgress = true
         let decoded = try JSONDecoder().decode(
             CompanionPreferences.self,
             from: JSONEncoder().encode(enabled)
         )
         XCTAssertTrue(decoded.showTimerHUD)
+        XCTAssertTrue(decoded.showTimerHUDProgress)
     }
 
     func testFloatingTimerPreferencesPersistPositionAndSize() throws {
@@ -3231,7 +3463,7 @@ final class CronaCompanionTests: XCTestCase {
         XCTAssertEqual(PopoverModalKind.statusNote.minimumHeight, 260)
         XCTAssertEqual(PopoverModalKind.endSession.minimumHeight, 360)
         XCTAssertEqual(PopoverModalKind.dueDate.minimumHeight, 430)
-        XCTAssertEqual(PopoverModalKind.issueCreate.minimumHeight, 560)
+        XCTAssertEqual(PopoverModalKind.issueCreate.minimumHeight, 600)
         XCTAssertLessThan(PopoverModalKind.issueCreate.minimumHeight, StatusPopupSizing.viewportHeight)
         XCTAssertLessThan(PopoverModalKind.dueDate.minimumHeight, StatusPopupSizing.viewportHeight)
     }
@@ -3539,6 +3771,90 @@ private final class SmartPauseMutableIdleProvider: SmartPauseIdleTimeProviding {
     }
 }
 
+private final class IssueCreatorTestTransport: CronaDaemonTransport {
+    let logicalDate = "2001-02-03"
+    private(set) var requests: [RequestWithParamsProbe] = []
+    var methods: [String] { requests.map(\.method) }
+    var suspendRefresh = false
+    var failCreation = false
+    var failEnd = false
+    var hasAdhocSession = false
+    var provideDestinations = false
+    var creationStatus = "planned"
+    var createdFixture: [String: Any]?
+    var failStatusChange = false
+    var refreshContinuation: CheckedContinuation<Void, Never>?
+
+    func resumeRefresh() {
+        suspendRefresh = false
+        refreshContinuation?.resume()
+        refreshContinuation = nil
+    }
+
+    func send(_ request: Data) async throws -> Data {
+        var object = try JSONSerialization.jsonObject(with: request) as! [String: Any]
+        object["params"] = object["params"] ?? [:]
+        let probe = try JSONDecoder().decode(RequestWithParamsProbe.self,
+            from: JSONSerialization.data(withJSONObject: object))
+        requests.append(probe)
+        let result: Any
+        switch probe.method {
+        case "health.get":
+            result = ["status": "ok", "db": true, "ok": 1, "uptime": 1,
+                "currentDate": logicalDate, "timezone": "Asia/Kolkata"] as [String: Any]
+        case "kernel.info.get":
+            result = ["pid": 1, "protocolVersion": CronaProtocolVersion.current.rawValue] as [String: Any]
+        case "issue.create", "issue.update", "issue.set_todo", "issue.clear_todo":
+            if probe.method == "issue.create", failCreation {
+                throw NSError(domain: "IssueCreatorTests", code: 1)
+            }
+            let issue: [String: Any] = ["id": 42, "streamId": 7, "title": "New", "status": creationStatus,
+                "workedSeconds": 0, "pinnedDaily": false,
+                "todoForDate": probe.params["todoForDate"]?.stringValue as Any? ?? NSNull()]
+            if probe.method == "issue.create" { createdFixture = issue }
+            result = issue
+        case "issue.today_summary":
+            if suspendRefresh {
+                await withCheckedContinuation { refreshContinuation = $0 }
+            }
+            result = ["date": logicalDate, "totalIssues": 0, "issues": [],
+                "totalEstimatedMinutes": 0, "completedIssues": 0,
+                "abandonedIssues": 0, "workedSeconds": 0] as [String: Any]
+        case "daily_plan.get":
+            result = ["id": "plan", "date": logicalDate, "createdAt": "", "updatedAt": "", "entries": []] as [String: Any]
+        case "timer.get_state":
+            if hasAdhocSession {
+                result = ["state": "running", "sessionId": "adhoc-test", "adhoc": true, "elapsedSeconds": 901] as [String: Any]
+            } else {
+                result = ["state": "idle"]
+            }
+        case "timer.end":
+            if failEnd { throw NSError(domain: "AdhocTests", code: 1) }
+            hasAdhocSession = false
+            result = ["state": "idle"]
+        case "issue.list_all":
+            result = createdFixture.map { [$0] } ?? []
+        case "issue.change_status":
+            if failStatusChange { throw NSError(domain: "AdhocTests", code: 2) }
+            var issue = createdFixture ?? [:]
+            issue["status"] = probe.params["status"]?.stringValue ?? "ready"
+            createdFixture = issue
+            result = issue
+        case "repo.list":
+            result = provideDestinations ? [["id": 3, "name": "Repo"]] : []
+        case "stream.list":
+            result = provideDestinations ? [["id": 7, "repoId": 3, "name": "Stream"]] : []
+        default:
+            result = NSNull()
+        }
+        return try JSONSerialization.data(withJSONObject: ["id": object["id"]!, "result": result])
+    }
+
+    func openEventStream(with request: Data) async throws -> AsyncThrowingStream<CronaProtocolEvent, Error> {
+        AsyncThrowingStream { $0.finish() }
+    }
+}
+
 private final class CapturingDaemonTransport: CronaDaemonTransport {
     let responseData: Data
     private(set) var requestData: Data?
@@ -3557,5 +3873,223 @@ private final class CapturingDaemonTransport: CronaDaemonTransport {
         return AsyncThrowingStream { continuation in
             continuation.finish()
         }
+    }
+}
+
+
+extension CronaCompanionTests {
+    func testAdhocStartRequestsKeepContextUnsetInEveryMode() throws {
+        for mode in [FocusSessionMode.stopwatch, .timer, .pomodoro] {
+            var config = FocusStartConfigState.defaultState(estimateMinutes: nil, workedSeconds: 0)
+            config.mode = mode
+            let request = config.startRequest(for: nil)
+            XCTAssertEqual(request.adhoc, true)
+            XCTAssertNil(request.issueID)
+            XCTAssertNil(request.repoID)
+            XCTAssertNil(request.streamID)
+            let object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any])
+            XCTAssertEqual(object["adhoc"] as? Bool, true)
+            XCTAssertNil(object["issueId"])
+            if mode == .timer { XCTAssertEqual(request.hardLimitKind, .countdown) }
+            if mode == .pomodoro { XCTAssertEqual(request.hardLimitKind, .pomodoro) }
+        }
+    }
+
+    func testAdhocTimerDecodingAndAttributionWireFields() throws {
+        let ordinary = try JSONDecoder().decode(CronaTimerState.self, from: Data(#"{"state":"idle"}"#.utf8))
+        XCTAssertFalse(TimerSnapshot.from(ordinary).adhoc)
+        let adhoc = try JSONDecoder().decode(CronaTimerState.self, from: Data(#"{"state":"running","adhoc":true,"sessionId":"s"}"#.utf8))
+        XCTAssertTrue(TimerSnapshot.from(adhoc).adhoc)
+        let request = CronaEndSessionRequest(commitMessage: "Work", adhocResolution: .attach, issueID: 42)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any])
+        XCTAssertEqual(object["adhocResolution"] as? String, "attach")
+        XCTAssertEqual(object["issueId"] as? Int, 42)
+        XCTAssertEqual(object["commitMessage"] as? String, "Work")
+        XCTAssertNil(object["newIssueTitle"])
+        XCTAssertEqual(CronaProtocolVersion.current.rawValue, "1.6")
+    }
+
+    func testAdhocPickerFiltersEligibilityAndLogicalDate() throws {
+        func issue(_ id: Int64, status: String, date: String?, pinned: Bool = false) -> CronaIssue {
+            CronaIssue(id: id, streamID: 7, title: "Issue", status: status, estimateMinutes: nil,
+                workedSeconds: 0, pinnedDaily: pinned, todoForDate: date)
+        }
+        var state = AdhocAttributionState.initial(elapsedSeconds: 901, date: "2001-02-03", streamID: 7)
+        XCTAssertEqual(state.estimateMinutes, 30)
+        XCTAssertEqual(state.date, "2001-02-03")
+        state.issues = [issue(1, status: "planned", date: state.date),
+            issue(2, status: "ready", date: "2001-02-02"),
+            issue(3, status: "in_progress", date: nil, pinned: true),
+            issue(4, status: "done", date: state.date), issue(5, status: "blocked", date: state.date)]
+        XCTAssertEqual(state.filteredIssues(today: state.date).map(\.id), [1])
+        state.filter = .overdue
+        XCTAssertEqual(state.filteredIssues(today: state.date).map(\.id), [2])
+        state.filter = .pinned
+        XCTAssertEqual(state.filteredIssues(today: state.date).map(\.id), [3])
+        state.filter = .all
+        XCTAssertEqual(state.filteredIssues(today: state.date).map(\.id), [1, 2, 3])
+    }
+
+    func testAdhocCreateRetriesCompletionWithoutCreatingAgain() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        transport.hasAdhocSession = true
+        transport.provideDestinations = true
+        let appState = CompanionAppState(daemonConnection: connection)
+        await appState.timerService.refresh()
+        appState.beginEndSession(source: .menuPopover)
+        await appState.loadAdhocAttribution()
+        XCTAssertEqual(appState.adhocAttribution.date, transport.logicalDate)
+        appState.adhocAttribution.resolution = .create
+        appState.adhocAttribution.destinationID = 7
+        appState.adhocAttribution.title = "Created work"
+        appState.endSessionCommitMessage = "Summary"
+        transport.failEnd = true
+        appState.confirmEndSession()
+        appState.confirmEndSession()
+        await waitForIssueCreator { !appState.isSubmittingEndSession }
+        XCTAssertEqual(transport.methods.filter { $0 == "issue.create" }.count, 1)
+        XCTAssertEqual(transport.methods.filter { $0 == "timer.end" }.count, 1)
+        XCTAssertEqual(appState.adhocAttribution.createdIssue?.id, 42)
+        XCTAssertNotNil(appState.endSessionErrorMessage)
+        appState.cancelEndSession()
+        appState.beginEndSession(source: .menuPopover)
+        XCTAssertEqual(appState.adhocAttribution.createdIssue?.id, 42)
+        XCTAssertEqual(appState.endSessionCommitMessage, "Summary")
+        transport.failEnd = false
+        appState.confirmEndSession()
+        await waitForIssueCreator { transport.methods.filter { $0 == "timer.end" }.count == 2 }
+        XCTAssertEqual(transport.methods.filter { $0 == "issue.create" }.count, 1)
+        let end = try XCTUnwrap(transport.requests.last(where: { $0.method == "timer.end" }))
+        XCTAssertEqual(end.params["adhocResolution"]?.stringValue, "attach")
+    }
+
+    func testAdhocCompletionRejectsMissingSummaryAndDestination() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        transport.hasAdhocSession = true
+        let appState = CompanionAppState(daemonConnection: connection)
+        await appState.timerService.refresh()
+        appState.beginEndSession(source: .menuPopover)
+        appState.adhocAttribution.resolution = .keep
+        let previousFocusRequest = appState.endSessionFocusRequest
+        appState.confirmEndSession()
+        XCTAssertNotNil(appState.endSessionErrorMessage)
+        XCTAssertGreaterThan(appState.endSessionFocusRequest, previousFocusRequest)
+        appState.endSessionCommitMessage = "Summary"
+        appState.adhocAttribution.resolution = .attach
+        appState.confirmEndSession()
+        XCTAssertFalse(transport.methods.contains("timer.end"))
+        appState.timerService.snapshot.sessionID = "another-session"
+        appState.confirmEndSession()
+        XCTAssertTrue(appState.endSessionErrorMessage?.contains("changed") == true)
+    }
+}
+
+
+extension CronaCompanionTests {
+    func testAdhocKeepCompletionUsesKeepResolution() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        transport.hasAdhocSession = true
+        let appState = CompanionAppState(daemonConnection: connection)
+        await appState.timerService.refresh()
+        appState.beginEndSession(source: .menuPopover)
+        XCTAssertFalse(appState.canSubmitEndSession)
+        appState.adhocAttribution.resolution = .keep
+        appState.endSessionCommitMessage = "Kept work"
+        XCTAssertTrue(appState.canSubmitEndSession)
+        appState.confirmEndSession()
+        await waitForIssueCreator { transport.methods.contains("timer.end") }
+        let request = try XCTUnwrap(transport.requests.first(where: { $0.method == "timer.end" }))
+        XCTAssertEqual(request.params["adhocResolution"]?.stringValue, "keep")
+        XCTAssertFalse(transport.methods.contains("issue.create"))
+    }
+
+    func testHistoryChangedEventRefreshesDailyAndStats() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let daily = DailyFocusService(daemonConnection: connection)
+        let stats = PopoverStatsService(daemonConnection: connection)
+        await settleAsyncTasks()
+        let before = transport.methods.filter { $0 == "issue.today_summary" }.count
+        let revision = stats.calendarCacheRevision
+        NotificationCenter.default.post(name: .cronaDaemonEventReceived,
+            object: CronaProtocolEvent(type: "session.history_changed", payload: nil))
+        await waitForIssueCreator {
+            transport.methods.filter { $0 == "issue.today_summary" }.count > before && stats.calendarCacheRevision > revision
+        }
+        XCTAssertEqual(daily.snapshot.date, transport.logicalDate)
+    }
+
+    func testAdhocDraftResetsWhenSessionChanges() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        transport.hasAdhocSession = true
+        let appState = CompanionAppState(daemonConnection: connection)
+        await appState.timerService.refresh()
+        appState.beginEndSession(source: .menuPopover)
+        appState.adhocAttribution.resolution = .create
+        appState.adhocAttribution.title = "Old draft"
+        appState.endSessionCommitMessage = "Old summary"
+        appState.cancelEndSession()
+        appState.timerService.snapshot.sessionID = "new-session"
+        appState.beginEndSession(source: .timerHUD)
+        XCTAssertNil(appState.adhocAttribution.resolution)
+        XCTAssertEqual(appState.adhocAttribution.title, "")
+        XCTAssertEqual(appState.endSessionCommitMessage, "")
+    }
+}
+
+
+extension CronaCompanionTests {
+    func testInvalidAdhocEstimateOnlyBlocksIssueCreation() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        transport.hasAdhocSession = true
+        let appState = CompanionAppState(daemonConnection: connection)
+        await appState.timerService.refresh()
+        appState.beginEndSession(source: .menuPopover)
+        appState.adhocAttribution.estimateMinutes = -1
+        appState.adhocAttribution.resolution = .create
+        XCTAssertFalse(appState.canSubmitEndSession)
+        appState.adhocAttribution.resolution = .keep
+        XCTAssertTrue(appState.canSubmitEndSession)
+        appState.adhocAttribution.resolution = .attach
+        XCTAssertTrue(appState.canSubmitEndSession)
+    }
+}
+
+
+extension CronaCompanionTests {
+    func testUnscheduledAdhocIssueIsPreparedAndRetainedAcrossRetry() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        transport.hasAdhocSession = true
+        transport.provideDestinations = true
+        transport.creationStatus = "backlog"
+        transport.failStatusChange = true
+        let appState = CompanionAppState(daemonConnection: connection)
+        await appState.timerService.refresh()
+        appState.beginEndSession(source: .menuPopover)
+        await appState.loadAdhocAttribution()
+        appState.adhocAttribution.resolution = .create
+        appState.adhocAttribution.destinationID = 7
+        appState.adhocAttribution.title = "Unscheduled work"
+        appState.adhocAttribution.date = ""
+        appState.endSessionCommitMessage = "Summary"
+        appState.confirmEndSession()
+        await waitForIssueCreator { !appState.isSubmittingEndSession }
+        XCTAssertEqual(appState.adhocAttribution.createdIssue?.status, "backlog")
+        XCTAssertFalse(transport.methods.contains("timer.end"))
+        transport.failStatusChange = false
+        appState.confirmEndSession()
+        await waitForIssueCreator { transport.methods.contains("timer.end") }
+        XCTAssertEqual(transport.methods.filter { $0 == "issue.create" }.count, 1)
+        XCTAssertEqual(appState.adhocAttribution.createdIssue?.status, "ready")
+        let creation = try XCTUnwrap(transport.requests.first(where: { $0.method == "issue.create" }))
+        XCTAssertNil(creation.params["todoForDate"]?.stringValue)
+        let status = try XCTUnwrap(transport.requests.last(where: { $0.method == "issue.change_status" }))
+        XCTAssertEqual(status.params["status"]?.stringValue, "ready")
     }
 }

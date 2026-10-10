@@ -35,14 +35,14 @@ struct WellbeingTabView: View {
             header
             ratingRow(
                 title: "Mood",
-                subtitle: "How are you feeling?",
+                subtitle: "Your mood today",
                 symbol: "face.smiling",
                 value: $mood,
                 tint: PopupVisualTheme.semantic(.mood)
             )
             ratingRow(
                 title: "Energy",
-                subtitle: "How energized do you feel?",
+                subtitle: "Your energy level",
                 symbol: "bolt.fill",
                 value: $energy,
                 tint: PopupVisualTheme.semantic(.energy)
@@ -175,7 +175,7 @@ struct WellbeingTabView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(PopupVisualTheme.primaryText)
                 Text(subtitle)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(PopupVisualTheme.secondaryText)
                     .lineLimit(1)
             }
@@ -190,6 +190,7 @@ struct WellbeingTabView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(title) \(rating) of 5")
+                .accessibilityAddTraits(value.wrappedValue == rating ? .isSelected : [])
             }
         }
         .padding(.horizontal, 12)
@@ -210,7 +211,7 @@ struct WellbeingTabView: View {
                 .frame(width: leadingRailWidth)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.subheadline.weight(.semibold))
-                Text(subtitle).font(.caption2).foregroundStyle(PopupVisualTheme.secondaryText)
+                Text(subtitle).font(.caption).foregroundStyle(PopupVisualTheme.secondaryText)
             }
             Spacer(minLength: 8)
             if isIncluded.wrappedValue {
@@ -239,7 +240,7 @@ struct WellbeingTabView: View {
                 .frame(width: leadingRailWidth)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Sleep score").font(.subheadline.weight(.semibold))
-                Text("Recovery quality, from 0 to 100").font(.caption2).foregroundStyle(PopupVisualTheme.secondaryText)
+                Text("Recovery quality, from 0 to 100").font(.caption).foregroundStyle(PopupVisualTheme.secondaryText)
             }
             Spacer(minLength: 8)
             if hasSleepScore {

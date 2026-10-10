@@ -55,6 +55,12 @@ Repository secrets:
 
 Generate the Sparkle key pair once with Sparkle's `generate_keys` tool. Store the public key in the repository variable and the private key in the repository secret. Keep the same key for future releases.
 
+## 1.1.0 beta preparation
+
+The metadata for `v1.1.0-beta.1` is marketing version `1.1.0`, build `19`, and semantic release version `1.1.0-beta.1`.
+
+Build numbers continue across marketing versions. Build `19` follows the 1.0.0 build `18` to preserve Sparkle appcast ordering.
+
 ## Cutting a Release
 
 1. Set `MARKETING_VERSION` to the tag's numeric `X.Y.Z` portion.

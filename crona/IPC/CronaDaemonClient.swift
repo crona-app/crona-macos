@@ -148,6 +148,14 @@ final class CronaDaemonClient {
         try await request(method: "timer.extend", params: AnyEncodable(input))
     }
 
+    func listAllIssues() async throws -> [CronaIssue] {
+        try await request(method: "issue.list_all")
+    }
+
+    func timerEnd(_ input: CronaEndSessionRequest) async throws -> CronaTimerState {
+        try await request(method: "timer.end", params: AnyEncodable(input))
+    }
+
     func timerEnd(commitMessage: String) async throws -> CronaTimerState {
         try await request(method: "timer.end", params: AnyEncodable(CronaEndSessionRequest(commitMessage: commitMessage)))
     }

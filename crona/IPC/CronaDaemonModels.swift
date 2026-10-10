@@ -507,6 +507,7 @@ struct CronaUpdateHabitRequest: Codable, Equatable {
 }
 
 struct CronaTimerState: Codable, Equatable {
+    var adhoc: Bool? = nil
     let state: String
     let sessionID: String?
     let sessionStartTime: String?
@@ -528,6 +529,7 @@ struct CronaTimerState: Codable, Equatable {
     let hardLimitCyclesBeforeLongBreak: Int?
 
     enum CodingKeys: String, CodingKey {
+        case adhoc
         case state = "state"
         case sessionID = "sessionId"
         case sessionStartTime = "sessionStartTime"
@@ -551,6 +553,7 @@ struct CronaTimerState: Codable, Equatable {
 }
 
 struct CronaIssue: Codable, Equatable, Identifiable {
+    var adhoc: Bool? = nil
     let id: Int64
     let streamID: Int64
     let title: String
@@ -599,6 +602,7 @@ struct CronaIssue: Codable, Equatable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
+        case adhoc
         case id = "id"
         case streamID = "streamId"
         case title = "title"
@@ -934,6 +938,7 @@ struct CronaFocusScoreRangeDay: Codable, Equatable, Identifiable {
 }
 
 struct CronaTimerStartRequest: Codable, Equatable {
+    var adhoc: Bool? = nil
     let repoID: Int64?
     let streamID: Int64?
     let issueID: Int64?
@@ -945,6 +950,7 @@ struct CronaTimerStartRequest: Codable, Equatable {
     let hardLimitCyclesBeforeLongBreak: Int?
 
     enum CodingKeys: String, CodingKey {
+        case adhoc
         case repoID = "repoId"
         case streamID = "streamId"
         case issueID = "issueId"
@@ -979,8 +985,17 @@ struct CronaTimerExtendRequest: Codable, Equatable {
 
 struct CronaEndSessionRequest: Codable, Equatable {
     let commitMessage: String
+    var adhocResolution: CronaAdhocResolution? = nil
+    var issueID: Int64? = nil
+    var repoID: Int64? = nil
+    var streamID: Int64? = nil
+    var newIssueTitle: String? = nil
 
     enum CodingKeys: String, CodingKey {
+        case adhocResolution, newIssueTitle
+        case issueID = "issueId"
+        case repoID = "repoId"
+        case streamID = "streamId"
         case commitMessage = "commitMessage"
     }
 }

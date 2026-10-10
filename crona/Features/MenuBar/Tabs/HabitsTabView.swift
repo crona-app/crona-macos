@@ -61,7 +61,7 @@ struct HabitsTabView: View {
                             onComplete: { appState.completeHabit(habit) },
                             onBeginLog: {
                                 logSeconds = max(60, (habit.targetMinutes ?? 1) * 60)
-                                withAnimation(.easeInOut(duration: 0.18)) {
+                                withAnimation(SystemGlassSettings.shared.reduceMotion ? nil : .easeInOut(duration: 0.18)) {
                                     loggingHabitID = habit.id
                                 }
                             },
@@ -71,12 +71,12 @@ struct HabitsTabView: View {
                                     durationMinutes: max(
                                         1, Int((Double(logSeconds) / 60).rounded()))
                                 )
-                                withAnimation(.easeInOut(duration: 0.18)) {
+                                withAnimation(SystemGlassSettings.shared.reduceMotion ? nil : .easeInOut(duration: 0.18)) {
                                     loggingHabitID = nil
                                 }
                             },
                             onCancelLog: {
-                                withAnimation(.easeInOut(duration: 0.18)) {
+                                withAnimation(SystemGlassSettings.shared.reduceMotion ? nil : .easeInOut(duration: 0.18)) {
                                     loggingHabitID = nil
                                 }
                             },
@@ -124,6 +124,7 @@ struct HabitRow: View {
             HStack(spacing: 12) {
                 statusBadge
 
+                Button(action: openDetails) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(habit.name)
                         .font(.headline)
@@ -138,9 +139,9 @@ struct HabitRow: View {
                         }
                     }
                 }
-                .onTapGesture {
-                    openDetails()
                 }
+                .buttonStyle(.plain)
+                .accessibilityHint("View habit details")
 
                 Spacer()
 
@@ -450,7 +451,7 @@ struct ExpandablePresetRow: View {
             )
         )
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .animation(.easeInOut(duration: 0.18), value: isExpanded)
+        .animation(SystemGlassSettings.shared.reduceMotion ? nil : .easeInOut(duration: 0.18), value: isExpanded)
     }
 }
 
@@ -504,7 +505,7 @@ struct ExpandableNumberRow: View {
             )
         )
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .animation(.easeInOut(duration: 0.18), value: isExpanded)
+        .animation(SystemGlassSettings.shared.reduceMotion ? nil : .easeInOut(duration: 0.18), value: isExpanded)
     }
 }
 

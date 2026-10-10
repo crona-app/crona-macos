@@ -32,9 +32,10 @@ struct StatsTabView: View {
                             } label: {
                                 Image(systemName: "chevron.left")
                                     .font(.system(size: 11, weight: .bold))
-                                    .frame(width: 22, height: 22)
+                                    .frame(width: 28, height: 28)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("Previous day")
 
                             Text(statsTitle(for: snapshot.date))
                                 .font(.subheadline.weight(.semibold))
@@ -46,10 +47,11 @@ struct StatsTabView: View {
                             } label: {
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 11, weight: .bold))
-                                    .frame(width: 22, height: 22)
+                                    .frame(width: 28, height: 28)
                             }
                             .buttonStyle(.plain)
                             .disabled(!appState.popoverStatsService.canShowNextDay())
+                            .accessibilityLabel("Next day")
                         }
                         .frame(height: 22)
                         .padding(.horizontal, 10)
@@ -112,8 +114,6 @@ struct StatsTabView: View {
                     scoreHero(score: score, message: snapshot.scoreMessage)
                         .transition(.opacity.combined(with: .scale(scale: 0.98)))
 
-                    statsDivider
-
                     LazyVGrid(
                         columns: [
                             GridItem(.flexible(), spacing: StatsLayout.gridSpacing),
@@ -147,14 +147,10 @@ struct StatsTabView: View {
                         )
                     }
 
-                    statsDivider
-
                     FocusRestBalanceView(
                         workedSeconds: metrics.workedSeconds,
                         restSeconds: metrics.restSeconds
                     )
-
-                    statsDivider
 
                     StatsOutcomeCard(
                         icon: "checkmark.circle.fill",
@@ -166,8 +162,6 @@ struct StatsTabView: View {
                             ("Abandoned", metrics.abandonedIssues),
                         ]
                     )
-
-                    statsDivider
 
                     StatsOutcomeCard(
                         icon: "checklist.checked",
@@ -195,8 +189,8 @@ struct StatsTabView: View {
                         .padding(.horizontal, 4)
                 }
             }
-            .animation(.easeOut(duration: 0.2), value: snapshot.date)
-            .animation(.easeOut(duration: 0.2), value: snapshot.focusScore?.score)
+            .animation(systemGlass.reduceMotion ? nil : .easeOut(duration: 0.2), value: snapshot.date)
+            .animation(systemGlass.reduceMotion ? nil : .easeOut(duration: 0.2), value: snapshot.focusScore?.score)
 
             if snapshot.isLoading && snapshot.focusScore == nil {
                 PlaceholderPanel(
@@ -295,7 +289,7 @@ struct StatsTabView: View {
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 11, weight: .bold))
-                        .frame(width: 22, height: 22)
+                        .frame(width: 28, height: 28)
                 }
                 .buttonStyle(.plain)
 
@@ -309,7 +303,7 @@ struct StatsTabView: View {
                 } label: {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .bold))
-                        .frame(width: 22, height: 22)
+                        .frame(width: 28, height: 28)
                 }
                 .buttonStyle(.plain)
                 .disabled(!appState.popoverStatsService.canShowNextCalendarMonth())
@@ -534,7 +528,9 @@ struct StatsTabView: View {
     private struct StatsDatePillSurfaceModifier: ViewModifier {
         @ViewBuilder
         func body(content: Content) -> some View {
-            if #available(macOS 26.0, *) {
+            if SystemGlassSettings.shared.reduceTransparency {
+                content.background(Capsule().fill(PopupVisualTheme.controlBackground))
+            } else if #available(macOS 26.0, *) {
                 content.glassEffect(.regular.interactive(), in: Capsule())
             } else {
                 content
@@ -694,7 +690,7 @@ struct StatsTabView: View {
         } else {
             semanticDate = formattedPopoverDate(resolvedDate, appState: appState)
         }
-        return "\(semanticDate)'s Focus Score"
+        return semanticDate
     }
 
     private var statsTodayDate: String {
@@ -764,7 +760,7 @@ private struct CompactScoreRing: View {
             }
             .foregroundStyle(PopupVisualTheme.primaryText)
         }
-        .animation(.easeOut(duration: 0.35), value: score)
+        .animation(SystemGlassSettings.shared.reduceMotion ? nil : .easeOut(duration: 0.35), value: score)
     }
 }
 
@@ -793,7 +789,7 @@ private struct StatsMetricTile: View {
         }
         .padding(StatsLayout.tilePadding)
         .frame(maxWidth: .infinity, minHeight: StatsLayout.tileHeight, alignment: .leading)
-        .background(subtleCardBackground(stroke: tint.opacity(0.14), cornerRadius: 16))
+        .background(StatsSectionBackground())
     }
 }
 
@@ -829,7 +825,7 @@ private struct FocusRestBalanceView: View {
             .frame(height: 6)
         }
         .padding(StatsLayout.cardPadding)
-        .background(subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 16))
+        .background(StatsSectionBackground())
     }
 }
 
@@ -854,8 +850,8 @@ private struct StatsOutcomeCard: View {
                             .foregroundStyle(PopupVisualTheme.primaryText)
                             .contentTransition(.numericText())
                         Text(value.0)
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.52))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(PopupVisualTheme.secondaryText)
                     }
                     .frame(maxWidth: .infinity)
 
@@ -868,6 +864,24 @@ private struct StatsOutcomeCard: View {
             }
         }
         .padding(StatsLayout.cardPadding)
-        .background(subtleCardBackground(stroke: tint.opacity(0.16), cornerRadius: 16))
+        .background(StatsSectionBackground())
+    }
+}
+
+private struct StatsSectionBackground: View {
+    @ObservedObject private var systemGlass = SystemGlassSettings.shared
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(PopupVisualTheme.surfaceFill)
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(
+                        systemGlass.increaseContrast
+                            ? PopupVisualTheme.primaryText.opacity(0.5)
+                            : PopupVisualTheme.border,
+                        lineWidth: systemGlass.increaseContrast ? 1.5 : 0.8
+                    )
+            }
     }
 }

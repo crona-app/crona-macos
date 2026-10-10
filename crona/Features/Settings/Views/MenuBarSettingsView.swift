@@ -77,6 +77,15 @@ struct MenuBarSettingsView: View {
                     )
                 )
 
+                SettingsToggleRow(
+                    title: "Progress Background",
+                    subtitle: "Show elapsed progress behind Pomodoro and Timer sessions.",
+                    isOn: Binding(
+                        get: { appState.preferences.preferences.showTimerHUDProgress },
+                        set: { appState.preferences.preferences.showTimerHUDProgress = $0 }
+                    )
+                )
+
                 TimerHUDPositionRow(
                     selection: Binding(
                         get: { appState.preferences.preferences.timerHUDPosition },
@@ -101,7 +110,8 @@ struct MenuBarSettingsView: View {
                     Text("Example")
                         .font(.subheadline.weight(.medium))
                     FloatingTimerSettingsPreview(
-                        size: appState.preferences.preferences.timerHUDSize)
+                        size: appState.preferences.preferences.timerHUDSize,
+                        showsProgress: appState.preferences.preferences.showTimerHUDProgress)
                 }
                 .padding(.vertical, 8)
             }
@@ -363,6 +373,7 @@ struct MenuBarSettingsPreview: View {
 
 struct FloatingTimerSettingsPreview: View {
     let size: TimerHUDSize
+    var showsProgress = false
 
     var body: some View {
         SettingsPreviewFrame {
@@ -391,9 +402,15 @@ struct FloatingTimerSettingsPreview: View {
             }
             .padding(.horizontal, size.horizontalPadding)
             .frame(width: size.contentSize.width, height: size.contentSize.height)
-            .background(
-                .regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-            )
+            .background {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous).fill(.regularMaterial)
+                    if showsProgress {
+                        TimerHUDProgressBackground(fraction: 0.4)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(
                     PopupVisualTheme.border, lineWidth: 0.75)

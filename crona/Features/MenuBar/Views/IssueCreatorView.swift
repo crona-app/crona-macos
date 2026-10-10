@@ -3,11 +3,11 @@ import SwiftUI
 struct IssueCreatorView: View {
     @ObservedObject var appState: CompanionAppState
     @FocusState private var focusedField: Field?
-    @State private var destinationPickerPresented = false
     @State private var selectedRepoID: Int64?
-    @State private var streamQuery = ""
+    @State private var selectedFollowUp: IssueCreationFollowUp?
+    @State private var isDueDatePickerPresented = false
 
-    private enum Field { case title, estimate, streamSearch, description }
+    private enum Field { case title, estimate, description }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -21,7 +21,7 @@ struct IssueCreatorView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .disabled(appState.issueCreationService.isCreating)
+                .disabled(appState.isSubmittingIssueCreator)
                 .accessibilityLabel("Back")
 
                 Text(appState.issueBeingEdited == nil ? "Create Issue" : "Edit Issue")
@@ -31,6 +31,7 @@ struct IssueCreatorView: View {
                 Spacer()
             }
 
+            Text("Title (required)").font(.caption.weight(.medium)).foregroundStyle(.secondary)
             TextField("What needs doing?", text: $appState.issueCreateTitle)
                 .textFieldStyle(.plain)
                 .focused($focusedField, equals: .title)
@@ -39,201 +40,223 @@ struct IssueCreatorView: View {
                 }
                 .creatorField(isFocused: focusedField == .title)
 
-            TextField("Estimate (e.g. 45m, 1h30m)", text: $appState.issueCreateEstimate)
+            Text("Description (optional)").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+            TextField("Add details or context", text: $appState.issueCreateDescription, axis: .vertical)
                 .textFieldStyle(.plain)
-                .focused($focusedField, equals: .estimate)
-                .creatorField(isFocused: focusedField == .estimate)
-
-            destinationField
-                .disabled(appState.issueBeingEdited != nil)
-
-            DisclosureGroup("More Options", isExpanded: moreOptionsBinding) {
-                TextField("Description (optional)", text: $appState.issueCreateDescription, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .lineLimit(2...4)
-                    .focused($focusedField, equals: .description)
-                    .onChange(of: appState.issueCreateDescription) { _, value in
-                        if value.count > 2_000 { appState.issueCreateDescription = String(value.prefix(2_000)) }
-                    }
-                    .creatorField(isFocused: focusedField == .description)
-                    .padding(.top, 8)
-            }
-
-            Spacer(minLength: 0)
-
-            if let error = validationMessage ?? appState.issueCreationService.lastErrorMessage {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(PopupVisualTheme.semantic(.warning))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            HStack(spacing: 12) {
-                Toggle(isOn: $appState.issueCreateForToday) {
-                    Label("Today", systemImage: "calendar")
+                .lineLimit(2...4)
+                .focused($focusedField, equals: .description)
+                .onChange(of: appState.issueCreateDescription) { _, value in
+                    if value.count > 2_000 { appState.issueCreateDescription = String(value.prefix(2_000)) }
                 }
-                .toggleStyle(.checkbox)
-                .help("Plan for today")
+                .creatorField(isFocused: focusedField == .description)
 
-                Spacer()
-                Button(
-                    appState.issueBeingEdited == nil
-                        ? (appState.issueCreationService.isCreating ? "Creating…" : "Create Issue")
-                        : (appState.issueActionsService.actionInFlightIssueID != nil ? "Saving…" : "Save Changes"),
-                    action: appState.submitIssueCreator
-                )
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(
-                        validationMessage != nil
-                            || appState.issueCreationService.isCreating
-                            || appState.issueActionsService.actionInFlightIssueID != nil
-                    )
+            Text("Estimate (optional) and scheduled date").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+            HStack(spacing: 10) {
+                TextField("Estimate (e.g. 45m, 1h30m)", text: $appState.issueCreateEstimate)
+                    .textFieldStyle(.plain)
+                    .focused($focusedField, equals: .estimate)
+                    .creatorField(isFocused: focusedField == .estimate)
+
+                Button {
+                    isDueDatePickerPresented.toggle()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "calendar")
+                            .foregroundStyle(PopupVisualTheme.secondaryText)
+                        Text(formattedDueDate)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .creatorField()
+                .popover(isPresented: $isDueDatePickerPresented, arrowEdge: .bottom) {
+                    VStack {
+                        DatePicker(
+                            "Due Date",
+                            selection: Binding(
+                                get: { appState.issueCreateDueDate ?? appState.defaultIssueCreateDate },
+                                set: { appState.issueCreateDueDate = $0 }
+                            ),
+                            displayedComponents: .date
+                        )
+                        .datePickerStyle(.graphical)
+                        .labelsHidden()
+                        if appState.issueCreateDueDate == nil {
+                            Button("Use selected date") {
+                                appState.issueCreateDueDate = appState.defaultIssueCreateDate
+                                isDueDatePickerPresented = false
+                            }
+                        }
+                        Button("No date") {
+                            appState.issueCreateDueDate = nil
+                            isDueDatePickerPresented = false
+                        }
+                    }
+                    .disabled(appState.isSubmittingIssueCreator)
+                    .padding(12)
+                }
+            }
+
+            if !appState.issueCreateEstimate.isEmpty,
+                case .failure = FlexibleDurationParser.optionalMinutes(appState.issueCreateEstimate) {
+                Text("Use a duration such as 45m or 1h30m.")
+                    .font(.caption)
+                    .foregroundStyle(PopupVisualTheme.semantic(.error))
+            }
+
+            Text("Destination (required)").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+            if appState.issueBeingEdited == nil {
+                destinationField
+            } else {
+                selectedDestinationField
+            }
+
+            Divider().padding(.vertical, 4)
+
+            VStack(alignment: .leading, spacing: 12) {
+                footerFeedback
+
+                if appState.issueBeingEdited == nil {
+                    Text("After creating")
+                        .font(.caption)
+                        .foregroundStyle(PopupVisualTheme.secondaryText)
+
+                    HStack(spacing: 18) {
+                        Toggle("Create More", isOn: createMoreBinding)
+                        Toggle("Start Focus", isOn: startFocusBinding)
+                            .disabled(appState.hasActiveFocusSession)
+                    }
+                    .toggleStyle(.checkbox)
+                    .controlSize(.regular)
+
+                    Button(action: submitCreateAction) {
+                        Text(createActionTitle)
+                            .frame(maxWidth: .infinity)
+                    }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(createActionDisabled)
+                } else {
+                    Button(action: { appState.submitIssueCreator(followUp: .close) }) {
+                        Text(
+                            appState.isSubmittingIssueCreator
+                                ? "Saving…" : "Save Changes"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(
+                            validationMessage != nil
+                                || appState.isSubmittingIssueCreator
+                                || appState.issueActionsService.actionInFlightIssueID != nil
+                        )
+                }
             }
         }
+        .disabled(appState.isSubmittingIssueCreator)
         .padding(20)
         .frame(width: 420)
-        .frame(minHeight: 560, maxHeight: 560, alignment: .top)
+        .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             selectedRepoID = selectedDestination?.repoID
             DispatchQueue.main.async { focusedField = .title }
         }
+        .onChange(of: appState.issueCreationService.destinations) { _, destinations in
+            guard selectedRepoID == nil,
+                let destinationID = appState.issueCreateDestinationID
+            else { return }
+            selectedRepoID = destinations.first { $0.streamID == destinationID }?.repoID
+        }
+        .onChange(of: selectedRepoID) { _, repoID in
+            guard let streamID = appState.issueCreateDestinationID,
+                appState.issueCreationService.destinations.first(where: { $0.streamID == streamID })?.repoID != repoID
+            else { return }
+            appState.issueCreateDestinationID = nil
+        }
         .onExitCommand {
-            if destinationPickerPresented {
-                destinationPickerPresented = false
-                streamQuery = ""
-                focusedField = .title
-            } else {
-                appState.cancelIssueCreator()
+            appState.cancelIssueCreator()
+        }
+        .onChange(of: appState.hasActiveFocusSession) { _, isActive in
+            if isActive, selectedFollowUp == .focus {
+                selectedFollowUp = nil
             }
         }
-        .animation(.easeInOut(duration: 0.24), value: appState.issueCreateShowsMoreOptions)
     }
 
     private var destinationField: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button {
-                selectedRepoID = selectedDestination?.repoID ?? repoGroups.first?.id
-                destinationPickerPresented.toggle()
-                if destinationPickerPresented {
-                    appState.issueCreateShowsMoreOptions = false
-                    DispatchQueue.main.async { focusedField = .streamSearch }
-                }
-            } label: {
-                HStack(spacing: 9) {
-                    Image(systemName: "folder")
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Destination").font(.caption2).foregroundStyle(.secondary)
-                        Text(selectedDestination?.label ?? "Choose repo and stream")
-                            .lineLimit(1)
-                            .foregroundStyle(selectedDestination == nil ? .secondary : PopupVisualTheme.primaryText)
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
+                Menu {
+                    Button("Choose repo") {
+                        selectedRepoID = nil
                     }
-                    Spacer()
-                    Image(systemName: destinationPickerPresented ? "chevron.up" : "chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .creatorField()
-
-            if destinationPickerPresented {
-                destinationDrillDown
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
-        .animation(.easeInOut(duration: 0.24), value: destinationPickerPresented)
-    }
-
-    private var destinationDrillDown: some View {
-        HStack(alignment: .top, spacing: 0) {
-            ScrollView {
-                LazyVStack(spacing: 3) {
                     ForEach(repoGroups) { repo in
-                        Button {
+                        Button(repo.name) {
                             selectedRepoID = repo.id
-                            streamQuery = ""
-                            focusedField = .streamSearch
-                        } label: {
-                            Text(repo.name)
-                                .lineLimit(1)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 7)
-                                .background(repo.id == selectedRepoID ? Color.accentColor.opacity(0.22) : .clear)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .frame(width: 105, height: 145)
-
-            Divider().padding(.horizontal, 8)
-
-            VStack(spacing: 7) {
-                TextField("Search streams", text: $streamQuery)
-                    .textFieldStyle(.plain)
-                    .focused($focusedField, equals: .streamSearch)
-                    .creatorField(isFocused: focusedField == .streamSearch)
-
-                if appState.issueCreationService.isLoadingDestinations {
-                    ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if repoGroups.isEmpty {
-                    emptyDestinationView
-                } else if filteredStreams.isEmpty {
-                    Text(streamQuery.isEmpty ? "No streams" : "No matches")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 3) {
-                            ForEach(filteredStreams) { destination in
-                                Button {
-                                    appState.issueCreateDestinationID = destination.streamID
-                                    selectedRepoID = destination.repoID
-                                    streamQuery = ""
-                                    destinationPickerPresented = false
-                                    focusedField = .title
-                                } label: {
-                                    HStack(spacing: 7) {
-                                        Image(systemName: destination.streamID == appState.issueCreateDestinationID
-                                            ? "checkmark.circle.fill" : "circle")
-                                            .foregroundStyle(destination.streamID == appState.issueCreateDestinationID ? PopupVisualTheme.semantic(.warning) : .secondary)
-                                        Text(destination.streamName).lineLimit(1)
-                                        Spacer(minLength: 0)
-                                    }
-                                    .padding(.horizontal, 6).padding(.vertical, 5)
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                            }
                         }
                     }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(selectedRepoName)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .background(Color.clear)
                 }
+                .menuStyle(.borderlessButton)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .creatorField()
             }
-            .frame(maxWidth: .infinity, minHeight: 145, maxHeight: 145)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Menu {
+                    Button("Choose stream") {
+                        appState.issueCreateDestinationID = nil
+                    }
+                    ForEach(filteredStreams) { destination in
+                        Button(destination.streamName) {
+                            appState.issueCreateDestinationID = destination.streamID
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(selectedStreamName)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .background(Color.clear)
+                }
+                .menuStyle(.borderlessButton)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .creatorField()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .disabled(selectedRepoID == nil)
+            .opacity(selectedRepoID == nil ? 0.58 : 1)
         }
-        .padding(8)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(PopupVisualTheme.divider.opacity(0.5))
-                .frame(height: 0.5)
-        }
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(PopupVisualTheme.surfaceStroke, lineWidth: 0.7))
     }
 
-    private var emptyDestinationView: some View {
-        VStack(spacing: 6) {
-            Text("Create a repo and stream in Crona first.")
-                .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            Button("Open Crona") {
-                appState.cancelIssueCreator()
-                appState.openTUI()
-            }
-            .buttonStyle(.link)
+    private var selectedDestinationField: some View {
+        HStack {
+            Label("Destination", systemImage: "folder")
+            Spacer()
+            Text(selectedDestination?.label ?? "Unknown")
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .creatorField()
     }
 
     private struct RepoGroup: Identifiable {
@@ -250,27 +273,76 @@ struct IssueCreatorView: View {
     }
 
     private var filteredStreams: [IssueDestination] {
-        let query = streamQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         return appState.issueCreationService.destinations.filter {
-            $0.repoID == selectedRepoID && (query.isEmpty || $0.streamName.localizedCaseInsensitiveContains(query))
+            $0.repoID == selectedRepoID
         }
+    }
+
+    private var selectedRepoName: String {
+        guard let selectedRepoID,
+            let repo = repoGroups.first(where: { $0.id == selectedRepoID })
+        else { return "Choose repo" }
+        return repo.name
+    }
+
+    private var selectedStreamName: String {
+        guard let selectedDestination else { return "Choose stream" }
+        return selectedDestination.streamName
     }
 
     private var selectedDestination: IssueDestination? {
         appState.issueCreationService.destinations.first { $0.streamID == appState.issueCreateDestinationID }
     }
 
-    private var moreOptionsBinding: Binding<Bool> {
+    private var createActionDisabled: Bool {
+        validationMessage != nil || appState.isSubmittingIssueCreator
+            || (selectedFollowUp == .focus && appState.hasActiveFocusSession)
+    }
+
+    private var footerFeedback: some View {
+        Group {
+            if let error = appState.issueCreationService.lastErrorMessage {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.95))
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Color.clear
+            }
+        }
+        .font(.caption)
+        .frame(maxWidth: .infinity, minHeight: 20, alignment: .leading)
+        .contentTransition(.opacity)
+    }
+
+    private var createMoreBinding: Binding<Bool> {
         Binding(
-            get: { appState.issueCreateShowsMoreOptions },
-            set: { expanded in
-                appState.issueCreateShowsMoreOptions = expanded
-                if expanded {
-                    destinationPickerPresented = false
-                    streamQuery = ""
-                }
+            get: { selectedFollowUp == .more },
+            set: { enabled in
+                selectedFollowUp = enabled ? .more : (selectedFollowUp == .more ? nil : selectedFollowUp)
             }
         )
+    }
+
+    private var startFocusBinding: Binding<Bool> {
+        Binding(
+            get: { selectedFollowUp == .focus },
+            set: { enabled in
+                selectedFollowUp = enabled ? .focus : (selectedFollowUp == .focus ? nil : selectedFollowUp)
+            }
+        )
+    }
+
+    private var createActionTitle: String {
+        switch selectedFollowUp {
+        case .some(.more): return "Create More"
+        case .some(.focus): return "Create & Focus"
+        case .some(.close): return "Create Issue"
+        case nil: return "Create Issue"
+        }
+    }
+
+    private func submitCreateAction() {
+        appState.submitIssueCreator(followUp: selectedFollowUp ?? .close)
     }
 
     private var validationMessage: String? {
@@ -283,14 +355,17 @@ struct IssueCreatorView: View {
         }
         return nil
     }
+
+    private var formattedDueDate: String {
+        appState.issueCreateDueDate?.formatted(date: .abbreviated, time: .omitted) ?? "No date"
+    }
 }
 
 struct HabitCreatorView: View {
     @ObservedObject var appState: CompanionAppState
-    @State private var destinationPickerPresented = false
     @State private var selectedRepoID: Int64?
-    @State private var streamQuery = ""
     @State private var scheduleSelection = "daily"
+    @FocusState private var nameFocused: Bool
 
     private let weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
@@ -298,17 +373,24 @@ struct HabitCreatorView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Button(action: appState.cancelHabitCreator) {
-                    Image(systemName: "chevron.left").frame(width: 30, height: 30)
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(PopupVisualTheme.controlBackground))
+                        .menuBarIconHitTarget()
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Back")
                 Text(appState.habitBeingEdited == nil ? "Create Habit" : "Edit Habit")
                     .font(.headline)
                 Spacer()
             }
 
+            Text("Name (required)").font(.caption.weight(.medium)).foregroundStyle(.secondary)
             TextField("Habit name", text: $appState.habitCreateName)
                 .textFieldStyle(.plain)
-                .creatorField()
+                .focused($nameFocused)
+                .creatorField(isFocused: nameFocused)
 
             if appState.habitBeingEdited == nil {
                 destinationField
@@ -338,7 +420,7 @@ struct HabitCreatorView: View {
                 Toggle("Active", isOn: $appState.habitCreateActive)
             }
 
-            Spacer(minLength: 0)
+            Divider().padding(.vertical, 4)
 
             if let error = appState.habitCreateError ?? appState.habitsService.lastManagementError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -346,17 +428,21 @@ struct HabitCreatorView: View {
                     .foregroundStyle(PopupVisualTheme.semantic(.warning))
             }
 
-            HStack {
-                Spacer()
-                Button(appState.habitsService.isManagingHabit ? "Saving…" : "Save", action: appState.submitHabitCreator)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(appState.habitsService.isManagingHabit)
+            Button(action: appState.submitHabitCreator) {
+                Text(appState.habitsService.isManagingHabit ? "Saving…" : (appState.habitBeingEdited == nil ? "Create Habit" : "Save Changes"))
+                    .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .keyboardShortcut(.defaultAction)
+            .disabled(appState.habitsService.isManagingHabit || appState.habitCreateName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding(20)
         .frame(width: 420)
-        .frame(minHeight: 500, maxHeight: 560, alignment: .top)
+        .fixedSize(horizontal: false, vertical: true)
+        .onExitCommand { appState.cancelHabitCreator() }
         .onAppear {
+            DispatchQueue.main.async { nameFocused = true }
             scheduleSelection = appState.habitCreateScheduleType
             selectedRepoID = selectedDestination?.repoID ?? appState.issueCreationService.destinations.first?.repoID
             Task { await appState.issueCreationService.loadDestinations() }
@@ -364,108 +450,52 @@ struct HabitCreatorView: View {
     }
 
     private var destinationField: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button {
-                selectedRepoID = selectedDestination?.repoID ?? selectedRepoID ?? repoGroups.first?.id
-                destinationPickerPresented.toggle()
-            } label: {
-                HStack(spacing: 9) {
-                    Image(systemName: "folder")
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Destination").font(.caption2).foregroundStyle(.secondary)
-                        Text(selectedDestination?.label ?? "Choose repo and stream")
-                            .lineLimit(1)
-                            .foregroundStyle(selectedDestination == nil ? .secondary : PopupVisualTheme.primaryText)
-                    }
-                    Spacer()
-                    Image(systemName: destinationPickerPresented ? "chevron.up" : "chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .creatorField()
-
-            if destinationPickerPresented {
-                destinationDrillDown
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
-        .animation(.easeInOut(duration: 0.2), value: destinationPickerPresented)
-    }
-
-    private var destinationDrillDown: some View {
-        HStack(alignment: .top, spacing: 0) {
-            ScrollView {
-                LazyVStack(spacing: 3) {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Destination (required)").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+            HStack(spacing: 10) {
+                Menu {
                     ForEach(repoGroups) { repo in
-                        Button {
+                        Button(repo.name) {
                             selectedRepoID = repo.id
-                            streamQuery = ""
-                        } label: {
-                            Text(repo.name)
-                                .lineLimit(1)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 7)
-                                .background(repo.id == selectedRepoID ? Color.accentColor.opacity(0.22) : .clear)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .frame(width: 105, height: 145)
-
-            Divider().padding(.horizontal, 8)
-
-            VStack(spacing: 7) {
-                TextField("Search streams", text: $streamQuery)
-                    .textFieldStyle(.plain)
-                    .creatorField()
-
-                if appState.issueCreationService.isLoadingDestinations {
-                    ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if repoGroups.isEmpty {
-                    Text("No repositories or streams available.")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if filteredStreams.isEmpty {
-                    Text(streamQuery.isEmpty ? "No streams" : "No matches")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 3) {
-                            ForEach(filteredStreams) { destination in
-                                Button {
-                                    appState.habitCreateDestinationID = destination.streamID
-                                    selectedRepoID = destination.repoID
-                                    streamQuery = ""
-                                    destinationPickerPresented = false
-                                } label: {
-                                    HStack(spacing: 7) {
-                                        Image(systemName: destination.streamID == appState.habitCreateDestinationID
-                                            ? "checkmark.circle.fill" : "circle")
-                                            .foregroundStyle(destination.streamID == appState.habitCreateDestinationID ? PopupVisualTheme.semantic(.warning) : .secondary)
-                                        Text(destination.streamName).lineLimit(1)
-                                        Spacer(minLength: 0)
-                                    }
-                                    .padding(.horizontal, 6).padding(.vertical, 5)
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
+                            if selectedDestination?.repoID != repo.id {
+                                appState.habitCreateDestinationID = nil
                             }
                         }
                     }
+                } label: {
+                    HStack {
+                        Text(repoGroups.first { $0.id == selectedRepoID }?.name ?? "Choose repo").lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
+                .menuStyle(.borderlessButton)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .creatorField()
+                .frame(maxWidth: .infinity)
+
+                Menu {
+                    ForEach(appState.issueCreationService.destinations.filter { $0.repoID == selectedRepoID }) { destination in
+                        Button(destination.streamName) {
+                            appState.habitCreateDestinationID = destination.streamID
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text(selectedDestination?.streamName ?? "Choose stream").lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .menuStyle(.borderlessButton)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .creatorField()
+                .frame(maxWidth: .infinity)
+                .disabled(selectedRepoID == nil)
             }
-            .frame(maxWidth: .infinity, minHeight: 145, maxHeight: 145)
         }
-        .padding(8)
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(PopupVisualTheme.surfaceStroke, lineWidth: 0.7))
     }
 
     private var scheduleSection: some View {
@@ -568,13 +598,7 @@ struct HabitCreatorView: View {
         }
     }
 
-    private var filteredStreams: [IssueDestination] {
-        let query = streamQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        return appState.issueCreationService.destinations.filter {
-            $0.repoID == selectedRepoID
-                && (query.isEmpty || $0.streamName.localizedCaseInsensitiveContains(query))
-        }
-    }
+
 }
 
 struct HabitDeleteConfirmationView: View {

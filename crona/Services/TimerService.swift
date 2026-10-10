@@ -3,6 +3,7 @@ import Foundation
 import OSLog
 
 struct TimerSnapshot: Equatable {
+    var adhoc = false
     var state = "disconnected"
     var sessionID: String?
     var issueID: Int64?
@@ -27,6 +28,7 @@ struct TimerSnapshot: Equatable {
 
     static func from(_ state: CronaTimerState) -> TimerSnapshot {
         TimerSnapshot(
+            adhoc: state.adhoc ?? false,
             state: state.state,
             sessionID: state.sessionID,
             issueID: state.issueID,
@@ -200,6 +202,32 @@ struct TimerPresentation: Equatable {
             ),
             upcomingSegment: upcomingSegment(for: snapshot, mode: mode)
         )
+    }
+
+    static func elapsedProgressFraction(for snapshot: TimerSnapshot, at now: Date) -> Double? {
+        guard snapshot.hardLimitActive else { return nil }
+        let duration: Int
+        if snapshot.hardLimitKind == .countdown {
+            duration = snapshot.hardLimitTotalSeconds
+        } else if let segment = activeSegment(for: snapshot) {
+            duration = segmentDuration(for: segment, snapshot: snapshot)
+        } else {
+            return nil
+        }
+        guard duration > 0 else { return nil }
+        if snapshot.hardLimitExpired { return 1 }
+        if snapshot.state == "ready" { return 0 }
+
+        let elapsed: Double
+        if snapshot.state != "running" {
+            elapsed = Double(duration - snapshot.hardLimitRemainingSeconds)
+        } else if snapshot.hardLimitKind != .countdown, let start = snapshot.segmentStartTime {
+            elapsed = max(0, now.timeIntervalSince(start)) + Double(snapshot.segmentElapsedOffsetSeconds)
+        } else {
+            elapsed = Double(duration - snapshot.hardLimitRemainingSeconds)
+                + max(0, now.timeIntervalSince(snapshot.snapshotAppliedAt))
+        }
+        return max(0, min(1, elapsed / Double(duration)))
     }
 
     static func activeSegment(for snapshot: TimerSnapshot) -> TimerSegmentKind? {
@@ -435,6 +463,8 @@ final class TimerService: ObservableObject {
     }
 
     static func parseDate(_ value: String) -> Date? {
-        ISO8601DateFormatter().date(from: value)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
     }
 }

@@ -10,6 +10,7 @@ This docs set covers the native macOS client only. It does not try to duplicate 
 - [Release](release.md): release tagging, signing, notarization, Sparkle, and GitHub Pages feed publication
 - [Troubleshooting](troubleshooting.md): common runtime, notification, and update issues
 - [Changelog](changelog.md): notable macOS app changes and release history
+- [1.1.0-beta.1 release notes](release-notes/v1.1.0-beta.1.md): ad hoc focus sessions, popup refinements, and floating timer progress
 
 ## Shared Crona Documentation
 

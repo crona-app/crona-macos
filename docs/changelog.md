@@ -4,7 +4,42 @@ All notable changes to **Crona for macOS** are documented here.
 
 ## Unreleased
 
-No unreleased changes.
+## [1.1.0-beta.1] - 2026-10-10
+
+The first 1.1.0 beta adds ad hoc focus sessions, updates core compatibility, and refines the menu-bar popup and floating timer.
+
+### Added
+
+- Start ad hoc Stopwatch, Pomodoro, or Timer sessions without selecting an issue.
+- Finish ad hoc sessions by attaching to an eligible issue, creating an issue, or keeping the session as ad hoc, with a required session summary.
+- Use the same attribution workflow from the menu-bar popup, floating timer, and timer alert popups.
+- Enable a subtle neutral progress background for Pomodoro and Timer sessions in the floating timer settings. The fill updates smoothly at 50 ms intervals, follows the current segment, and has a Settings preview.
+
+### Changed
+
+- Require daemon protocol `1.6` for compatibility with the new core timer and session contracts.
+- Replace layered popup scrims and background controls with direct form presentation.
+- Align issue and habit forms, destination pickers, and primary actions; clarify required fields and improve initial focus and overflow scrolling.
+- Improve Stats hierarchy with bordered metric and outcome sections, clearer date navigation, and readable supporting labels.
+- Improve Wellbeing labels, keyboard access, selected-state announcements, and reduced-motion behavior.
+- Continue gating other tabs while a focus session is active or today is Away.
+
+### Fixed
+
+- Preserve unscheduled issues when saving unrelated edits and allow issues to have no scheduled date.
+- Default new issue scheduling to the daemon's logical day.
+- Prevent duplicate issue submissions while creation, refresh, and follow-up actions complete.
+- Disable Create & Focus while a session is already active.
+- Retain created issues when retrying ad hoc completion so retries do not create duplicates.
+- Refresh daily totals and Stats when another client edits or deletes session history.
+- Focus the session summary field when completion is submitted without a summary.
+
+### Compatibility
+
+- Apple marketing version: `1.1.0`.
+- Build number: `19`.
+- Semantic release version: `1.1.0-beta.1`; beta release channel.
+- Required daemon protocol: `1.6`. Daemons reporting `1.5` are incompatible.
 
 ## [1.0.0] - 2026-09-13
 

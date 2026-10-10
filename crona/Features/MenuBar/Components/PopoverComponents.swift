@@ -94,7 +94,7 @@ struct PopoverDialogBackground: View {
 
         ZStack {
             if systemGlass.reduceTransparency {
-                shape.fill(PopupVisualTheme.elevatedBackground)
+                shape.fill(PopupVisualTheme.popoverBackground)
 
                 shape
                     .strokeBorder(PopupVisualTheme.border, lineWidth: 0.6)
@@ -113,9 +113,9 @@ struct PopoverDialogBackground: View {
 struct GlassPressButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .scaleEffect(configuration.isPressed && !SystemGlassSettings.shared.reduceMotion ? 0.97 : 1)
             .brightness(configuration.isPressed ? -0.03 : 0)
-            .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
+            .animation(SystemGlassSettings.shared.reduceMotion ? nil : .easeOut(duration: 0.14), value: configuration.isPressed)
     }
 }
 

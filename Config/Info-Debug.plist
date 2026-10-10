@@ -45,7 +45,7 @@
 	<key>CRONA_RELEASE_CHANNEL</key>
 	<string>development</string>
 	<key>CRONA_RELEASE_VERSION</key>
-	<string>$(MARKETING_VERSION)</string>
+	<string>$(CRONA_RELEASE_VERSION)</string>
 	<key>CRONA_UPDATES_ENABLED</key>
 	<false/>
 </dict>

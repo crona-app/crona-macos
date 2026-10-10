@@ -114,7 +114,7 @@ final class DailyFocusService: ObservableObject {
 
     private func handle(event: CronaProtocolEvent) {
         switch event.type {
-        case "session.started", "session.stopped", "session.ended", "timer.extended",
+        case "session.history_changed", "session.started", "session.stopped", "session.ended", "timer.extended",
             "timer.break_deferral_warning", "timer.break_deferred", "context.issue.changed",
             "issue.updated", "issue.created", "issue.deleted":
             Task { await refresh() }

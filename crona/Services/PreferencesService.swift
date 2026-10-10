@@ -256,6 +256,7 @@ struct CompanionPreferences: Codable, Equatable {
     var showMenuBarItem = true
     var settingsShortcut: SettingsShortcut?
     var showTimerHUD = false
+    var showTimerHUDProgress = false
     var timerHUDPosition: CompanionPopupPosition = .bottomCenter
     var timerHUDSize: TimerHUDSize = .spacious
     var smartPauseEnabled = false
@@ -311,6 +312,7 @@ extension CompanionPreferences {
         case showMenuBarItem
         case settingsShortcut
         case showTimerHUD
+        case showTimerHUDProgress
         case timerHUDPosition
         case timerHUDSize
         case smartPauseEnabled
@@ -355,6 +357,7 @@ extension CompanionPreferences {
             ?? .clock
         showMenuBarItem = try values.decodeIfPresent(Bool.self, forKey: .showMenuBarItem) ?? true
         settingsShortcut = try values.decodeIfPresent(SettingsShortcut.self, forKey: .settingsShortcut)
+        showTimerHUDProgress = try values.decodeIfPresent(Bool.self, forKey: .showTimerHUDProgress) ?? false
         showTimerHUD = try values.decodeIfPresent(Bool.self, forKey: .showTimerHUD) ?? false
         timerHUDPosition = try values.decodeIfPresent(CompanionPopupPosition.self, forKey: .timerHUDPosition) ?? .bottomCenter
         timerHUDSize = try values.decodeIfPresent(TimerHUDSize.self, forKey: .timerHUDSize) ?? .spacious
@@ -429,6 +432,7 @@ extension CompanionPreferences {
         try values.encode(showMenuBarItem, forKey: .showMenuBarItem)
         try values.encodeIfPresent(settingsShortcut, forKey: .settingsShortcut)
         try values.encode(showTimerHUD, forKey: .showTimerHUD)
+        try values.encode(showTimerHUDProgress, forKey: .showTimerHUDProgress)
         try values.encode(timerHUDPosition, forKey: .timerHUDPosition)
         try values.encode(timerHUDSize, forKey: .timerHUDSize)
         try values.encode(smartPauseEnabled, forKey: .smartPauseEnabled)

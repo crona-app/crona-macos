@@ -11,8 +11,9 @@ private enum HoverDismissPopupMetrics {
 enum HardLimitPopupSizing {
     static let contentWidth: CGFloat = 392
     static let panelWidth: CGFloat = 408
-    static func panelHeight(for phase: HardLimitPopupPhase?) -> CGFloat {
-        switch phase {
+    static func panelHeight(for phase: HardLimitPopupPhase?, adhoc: Bool = false, adhocHeight: CGFloat = 600) -> CGFloat {
+        if phase == .endSession && adhoc { return adhocHeight + 32 }
+        return switch phase {
         case .decision: 434
         case .endSession: 460
         case .extend: 560
@@ -128,7 +129,7 @@ struct HardLimitPopupRootView: View {
         }
         .frame(
             width: HardLimitPopupSizing.panelWidth,
-            height: HardLimitPopupSizing.panelHeight(for: appState.hardLimitPopupPhase),
+            height: HardLimitPopupSizing.panelHeight(for: appState.hardLimitPopupPhase, adhoc: appState.timerService.snapshot.adhoc, adhocHeight: appState.adhocCompletionHeight),
             alignment: .center
         )
         .companionAppearance(appState)
@@ -379,7 +380,7 @@ private struct InactivityDecisionView: View {
 
                 HStack(spacing: 10) {
                     meta(icon: "timer", text: elapsedText)
-                    if let repo = appState.contextService.snapshot.repoName {
+                    if !appState.timerService.snapshot.adhoc, let repo = appState.contextService.snapshot.repoName {
                         meta(icon: "folder.fill", text: repo)
                     }
                 }
@@ -498,17 +499,17 @@ private struct HardLimitDecisionView: View {
 
     private var contextCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let issue = appState.contextService.snapshot.issueTitle {
+            if let issue = appState.activeFocusTitle {
                 Label(issue, systemImage: "record.circle.fill")
                     .font(.headline)
                     .foregroundStyle(PopupVisualTheme.primaryText)
             }
 
             HStack(spacing: 14) {
-                if let repo = appState.contextService.snapshot.repoName {
+                if !appState.timerService.snapshot.adhoc, let repo = appState.contextService.snapshot.repoName {
                     meta(icon: "folder.fill", text: repo)
                 }
-                if let stream = appState.contextService.snapshot.streamName {
+                if !appState.timerService.snapshot.adhoc, let stream = appState.contextService.snapshot.streamName {
                     meta(icon: "arrow.triangle.branch", text: stream)
                 }
             }
@@ -558,61 +559,66 @@ private struct PopupEndSessionForm: View {
     let timeContextIntent: HardLimitTimeContextIntent?
     let onBack: () -> Void
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            header(symbol: "checkmark.circle", title: "End Session", subtitle: subtitle)
+    @ViewBuilder var body: some View {
+        if appState.timerService.snapshot.adhoc {
+            AdhocAttributionView(appState: appState, onCancel: onBack)
+        } else {
+            VStack(alignment: .leading, spacing: 12) {
+                header(symbol: "checkmark.circle", title: "End Session", subtitle: subtitle)
 
-            if let timeSummary, let timeContextIntent {
-                HardLimitTimeContextView(summary: timeSummary, intent: timeContextIntent)
-            }
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("What did you complete?")
-                    .font(.headline)
-                    .foregroundStyle(PopupVisualTheme.primaryText)
-
-                StableMultilineTextField(
-                    text: $appState.endSessionCommitMessage,
-                    placeholder: "e.g. Updated the install docs and verified the Linux steps",
-                    isEnabled: !appState.isSubmittingEndSession,
-                    focusRequest: appState.endSessionFocusRequest
-                )
-                .frame(height: 104)
-                .popupInputSurface(cornerRadius: 12)
-
-                if let error = appState.endSessionErrorMessage, !error.isEmpty {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.92))
+                if let timeSummary, let timeContextIntent {
+                    HardLimitTimeContextView(summary: timeSummary, intent: timeContextIntent)
                 }
-            }
 
-            VStack(spacing: 8) {
-                Button {
-                    appState.confirmEndSession()
-                } label: {
-                    popupButtonLabel(
-                        title: appState.isSubmittingEndSession ? "Ending Session" : "End Session",
-                        shortcut: "⌘↩",
-                        isLoading: appState.isSubmittingEndSession
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("What did you complete?")
+                        .font(.headline)
+                        .foregroundStyle(PopupVisualTheme.primaryText)
+
+                    StableMultilineTextField(
+                        text: $appState.endSessionCommitMessage,
+                        placeholder: "e.g. Updated the install docs and verified the Linux steps",
+                        isEnabled: !appState.isSubmittingEndSession,
+                        focusRequest: appState.endSessionFocusRequest
                     )
-                }
-                .buttonStyle(PopupFullWidthButtonStyle(style: .primary))
-                .keyboardShortcut(.return, modifiers: [.command])
-                .disabled(appState.isSubmittingEndSession)
+                    .frame(height: 104)
+                    .popupInputSurface(cornerRadius: 12)
 
-                Button {
-                    onBack()
-                } label: {
-                    popupButtonLabel(title: "Back", shortcut: "esc")
+                    if let error = appState.endSessionErrorMessage, !error.isEmpty {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.92))
+                    }
                 }
-                .buttonStyle(PopupFullWidthButtonStyle(style: .secondary))
-                .keyboardShortcut(.cancelAction)
-                .disabled(appState.isSubmittingEndSession)
+
+                VStack(spacing: 8) {
+                    Button {
+                        appState.confirmEndSession()
+                    } label: {
+                        popupButtonLabel(
+                            title: appState.isSubmittingEndSession ? "Ending Session" : appState.endSessionActionTitle,
+                            shortcut: "⌘↩",
+                            isLoading: appState.isSubmittingEndSession
+                        )
+                    }
+                    .buttonStyle(PopupFullWidthButtonStyle(style: .primary))
+                    .keyboardShortcut(.return, modifiers: [.command])
+                    .disabled(!appState.canSubmitEndSession)
+
+                    Button {
+                        onBack()
+                    } label: {
+                        popupButtonLabel(title: "Back", shortcut: "esc")
+                    }
+                    .buttonStyle(PopupFullWidthButtonStyle(style: .secondary))
+                    .keyboardShortcut(.cancelAction)
+                    .disabled(appState.isSubmittingEndSession)
+                }
             }
+            .padding(10)
         }
-        .padding(10)
     }
+
 }
 
 private struct HardLimitExtendView: View {

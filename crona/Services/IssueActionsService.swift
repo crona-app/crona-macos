@@ -124,10 +124,12 @@ final class IssueActionsService: ObservableObject {
                         estimateMinutes: estimateMinutes
                     )
                 )
-                if let todoForDate, !todoForDate.isEmpty {
-                    _ = try await $0.setIssueTodo(issueID: issue.id, date: todoForDate)
-                } else {
-                    _ = try await $0.clearIssueTodo(issueID: issue.id)
+                if todoForDate != issue.todoForDate {
+                    if let todoForDate {
+                        _ = try await $0.setIssueTodo(issueID: issue.id, date: todoForDate)
+                    } else {
+                        _ = try await $0.clearIssueTodo(issueID: issue.id)
+                    }
                 }
                 return true
             }

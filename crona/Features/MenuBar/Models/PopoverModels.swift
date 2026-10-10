@@ -47,7 +47,7 @@ struct IdleFocusPopoverModel: Equatable {
 }
 
 struct FocusStartConfigModel: Equatable {
-    let issue: DailyFocusIssue
+    let issue: DailyFocusIssue?
     let state: FocusStartConfigState
 }
 
@@ -296,13 +296,14 @@ struct FocusStartConfigState: Equatable {
         mode == .pomodoro && longBreakEnabled
     }
 
-    func startRequest(for issue: DailyFocusIssue) -> CronaTimerStartRequest {
+    func startRequest(for issue: DailyFocusIssue?) -> CronaTimerStartRequest {
         switch mode {
         case .stopwatch:
             return CronaTimerStartRequest(
+                adhoc: issue == nil ? true : nil,
                 repoID: nil,
-                streamID: issue.streamID,
-                issueID: issue.id,
+                streamID: issue?.streamID,
+                issueID: issue?.id,
                 hardLimitTotalSeconds: nil,
                 hardLimitWorkSeconds: nil,
                 hardLimitBreakSeconds: nil,
@@ -312,9 +313,10 @@ struct FocusStartConfigState: Equatable {
         case .pomodoro:
             let values = pomodoroValues
             return CronaTimerStartRequest(
+                adhoc: issue == nil ? true : nil,
                 repoID: nil,
-                streamID: issue.streamID,
-                issueID: issue.id,
+                streamID: issue?.streamID,
+                issueID: issue?.id,
                 hardLimitKind: .pomodoro,
                 hardLimitTotalSeconds: values.totalSeconds,
                 hardLimitWorkSeconds: values.focusSeconds,
@@ -325,9 +327,10 @@ struct FocusStartConfigState: Equatable {
         case .timer:
             let totalSeconds = max(1, resolvedCountdownMinutes) * 60
             return CronaTimerStartRequest(
+                adhoc: issue == nil ? true : nil,
                 repoID: nil,
-                streamID: issue.streamID,
-                issueID: issue.id,
+                streamID: issue?.streamID,
+                issueID: issue?.id,
                 hardLimitKind: .countdown,
                 hardLimitTotalSeconds: totalSeconds,
                 hardLimitWorkSeconds: nil,

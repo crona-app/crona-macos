@@ -78,7 +78,7 @@ struct TimerHUDRootView: View {
                         .contentTransition(.numericText(countsDown: presentation.mode != .stopwatch))
                         .animation(reduceMotion ? nil : .snappy(duration: 0.22), value: presentation.displaySeconds)
                     if size != .compact {
-                        Text(appState.contextService.snapshot.issueTitle ?? presentation.phaseTitle)
+                        Text(appState.activeFocusTitle ?? presentation.phaseTitle)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -89,7 +89,16 @@ struct TimerHUDRootView: View {
             }
             .padding(.horizontal, size.horizontalPadding)
             .frame(width: size.contentSize.width, height: size.contentSize.height)
-            .background(PopoverGlassBackground(cornerRadius: 20, showsShadow: false))
+            .background {
+                ZStack(alignment: .leading) {
+                    PopoverGlassBackground(cornerRadius: 20, showsShadow: false)
+                    if appState.preferences.preferences.showTimerHUDProgress,
+                        presentation.mode != .stopwatch {
+                        TimerHUDLiveProgressBackground(snapshot: appState.timerService.snapshot)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .strokeBorder(PopupVisualTheme.surfaceStroke, lineWidth: 0.8)
@@ -152,72 +161,79 @@ struct TimerHUDRootView: View {
         }
     }
 
-    private var commitView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(PopupVisualTheme.semantic(.success))
-                    .frame(width: 30, height: 30)
-                    .background(PopupVisualTheme.semantic(.success).opacity(0.14), in: Circle())
+    @ViewBuilder private var commitView: some View {
+        if appState.timerService.snapshot.adhoc {
+            AdhocAttributionView(appState: appState)
+                .frame(width: 380)
+                .background(PopoverGlassBackground(cornerRadius: 22, showsShadow: false))
+                .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(PopupVisualTheme.surfaceStroke, lineWidth: 0.8))
+        } else {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(PopupVisualTheme.semantic(.success))
+                        .frame(width: 30, height: 30)
+                        .background(PopupVisualTheme.semantic(.success).opacity(0.14), in: Circle())
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Finish session")
-                        .font(.title3.weight(.semibold))
-                Text(appState.contextService.snapshot.issueTitle ?? "Add a short note about what you completed.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Commit message")
-                    .font(.subheadline.weight(.semibold))
-                StableMultilineTextField(
-                    text: $appState.endSessionCommitMessage,
-                    placeholder: "Describe what you completed",
-                    isEnabled: !appState.isSubmittingEndSession,
-                    focusRequest: appState.endSessionFocusRequest
-                )
-                .frame(height: 116)
-                .popupInputSurface(cornerRadius: 12)
-            }
-
-            if let error = appState.endSessionErrorMessage, !error.isEmpty {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.9))
-                    .lineLimit(2)
-            }
-
-            Spacer(minLength: 0)
-
-            HStack {
-                Button("Cancel") { appState.cancelEndSession() }
-                    .keyboardShortcut(.cancelAction)
-                    .disabled(appState.isSubmittingEndSession)
-                Spacer()
-                Button {
-                    appState.confirmEndSession()
-                } label: {
-                    if appState.isSubmittingEndSession {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Text("End Session")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Finish session")
+                            .font(.title3.weight(.semibold))
+                    Text(appState.activeFocusTitle ?? "Add a short note about what you completed.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
                     }
                 }
-                .keyboardShortcut(.return, modifiers: [.command])
-                .buttonStyle(.borderedProminent)
-                .disabled(appState.isSubmittingEndSession)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Commit message")
+                        .font(.subheadline.weight(.semibold))
+                    StableMultilineTextField(
+                        text: $appState.endSessionCommitMessage,
+                        placeholder: "Describe what you completed",
+                        isEnabled: !appState.isSubmittingEndSession,
+                        focusRequest: appState.endSessionFocusRequest
+                    )
+                    .frame(height: 116)
+                    .popupInputSurface(cornerRadius: 12)
+                }
+
+                if let error = appState.endSessionErrorMessage, !error.isEmpty {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.9))
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 0)
+
+                HStack {
+                    Button("Cancel") { appState.cancelEndSession() }
+                        .keyboardShortcut(.cancelAction)
+                        .disabled(appState.isSubmittingEndSession)
+                    Spacer()
+                    Button {
+                        appState.confirmEndSession()
+                    } label: {
+                        if appState.isSubmittingEndSession {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Text(appState.endSessionActionTitle)
+                        }
+                    }
+                    .keyboardShortcut(.return, modifiers: [.command])
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!appState.canSubmitEndSession)
+                }
             }
-        }
-        .padding(20)
-        .frame(width: 380, height: 322, alignment: .topLeading)
-        .background(PopoverGlassBackground(cornerRadius: 22, showsShadow: false))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(PopupVisualTheme.surfaceStroke, lineWidth: 0.8)
+            .padding(20)
+            .frame(width: 380, height: 322, alignment: .topLeading)
+            .background(PopoverGlassBackground(cornerRadius: 22, showsShadow: false))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(PopupVisualTheme.surfaceStroke, lineWidth: 0.8)
+            }
         }
     }
 
@@ -231,5 +247,54 @@ struct TimerHUDRootView: View {
         .buttonStyle(.plain)
         .help(title)
         .accessibilityLabel(title)
+    }
+}
+
+struct TimerHUDProgressBackground: View {
+    let fraction: Double
+
+    var body: some View {
+        GeometryReader { geometry in
+            Rectangle()
+                .fill(PopupVisualTheme.primaryText.opacity(0.06))
+                .frame(width: geometry.size.width * max(0, min(1, fraction)))
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct TimerHUDLiveProgressBackground: View {
+    let snapshot: TimerSnapshot
+    @State private var now = Date.now
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var isRunning: Bool {
+        snapshot.state == "running" && !snapshot.hardLimitExpired
+    }
+
+    var body: some View {
+        Group {
+            if let fraction = TimerPresentation.elapsedProgressFraction(for: snapshot, at: now) {
+                TimerHUDProgressBackground(fraction: fraction)
+                    .animation(
+                        reduceMotion || !isRunning ? nil : .linear(duration: 0.05),
+                        value: fraction
+                    )
+            }
+        }
+        .task(id: isRunning) {
+            now = .now
+            guard isRunning else { return }
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .milliseconds(reduceMotion ? 1000 : 50))
+                } catch {
+                    return
+                }
+                now = .now
+            }
+        }
+        .onChange(of: snapshot) { _, _ in now = .now }
     }
 }
