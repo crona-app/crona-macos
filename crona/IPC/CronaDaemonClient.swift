@@ -14,12 +14,15 @@ nonisolated private let ipcLogger = Logger(subsystem: "com.crona.macos", categor
 
 struct CronaUnixDomainSocketTransport: CronaDaemonTransport {
     let endpoint: String
+    var responseTimeout: TimeInterval = 30
 
     func send(_ request: Data) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    continuation.resume(returning: try sendOverUnixSocket(request, endpoint: endpoint))
+                    continuation.resume(
+                        returning: try sendOverUnixSocket(request, endpoint: endpoint, timeout: responseTimeout)
+                    )
                 } catch {
                     continuation.resume(throwing: error)
                 }
@@ -30,10 +33,17 @@ struct CronaUnixDomainSocketTransport: CronaDaemonTransport {
     func openEventStream(with request: Data) async throws -> AsyncThrowingStream<CronaProtocolEvent, Error> {
         AsyncThrowingStream { continuation in
             let endpoint = endpoint
+            let streamSocket = EventStreamSocket()
+            continuation.onTermination = { _ in streamSocket.terminate() }
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     ipcLogger.debug("Opening daemon event stream for endpoint: \(endpoint, privacy: .private(mask: .hash))")
                     let descriptor = try connectSocket(endpoint: endpoint)
+                    guard streamSocket.attach(descriptor) else {
+                        close(descriptor)
+                        continuation.finish()
+                        return
+                    }
                     try writeAll(descriptor, requestWithNewline(request))
                     var pending = Data()
                     var buffer = [UInt8](repeating: 0, count: 4096)
@@ -43,14 +53,14 @@ struct CronaUnixDomainSocketTransport: CronaDaemonTransport {
                         guard bytesRead >= 0 else {
                             let error = CronaConnectionFailure.transport("Failed to read from the daemon socket.")
                             ipcLogger.error("Daemon event stream read failed for endpoint: \(endpoint, privacy: .private(mask: .hash))")
-                            close(descriptor)
+                            streamSocket.close()
                             continuation.finish(throwing: error)
                             return
                         }
 
                         guard bytesRead > 0 else {
                             ipcLogger.debug("Daemon event stream closed by peer for endpoint: \(endpoint, privacy: .private(mask: .hash))")
-                            close(descriptor)
+                            streamSocket.close()
                             continuation.finish()
                             return
                         }
@@ -81,6 +91,39 @@ struct CronaUnixDomainSocketTransport: CronaDaemonTransport {
                     continuation.finish(throwing: error)
                 }
             }
+        }
+    }
+}
+
+/// Lets stream termination wake the blocked reader without racing its close of the descriptor.
+nonisolated private final class EventStreamSocket: @unchecked Sendable {
+    private let lock = NSLock()
+    private var descriptor: Int32?
+    private var isTerminated = false
+
+    func attach(_ descriptor: Int32) -> Bool {
+        lock.withLock {
+            guard !isTerminated else { return false }
+            self.descriptor = descriptor
+            return true
+        }
+    }
+
+    func terminate() {
+        lock.withLock {
+            isTerminated = true
+            if let descriptor {
+                shutdown(descriptor, SHUT_RDWR)
+            }
+        }
+    }
+
+    func close() {
+        lock.withLock {
+            if let descriptor {
+                Darwin.close(descriptor)
+            }
+            descriptor = nil
         }
     }
 }
@@ -480,9 +523,15 @@ nonisolated private func requestWithNewline(_ request: Data) -> Data {
 }
 
 #if os(macOS)
-nonisolated private func sendOverUnixSocket(_ request: Data, endpoint: String) throws -> Data {
+nonisolated private func sendOverUnixSocket(_ request: Data, endpoint: String, timeout: TimeInterval) throws -> Data {
     let descriptor = try connectSocket(endpoint: endpoint)
     defer { close(descriptor) }
+    var socketTimeout = timeval(
+        tv_sec: Int(timeout),
+        tv_usec: Int32((timeout - timeout.rounded(.down)) * 1_000_000)
+    )
+    setsockopt(descriptor, SOL_SOCKET, SO_RCVTIMEO, &socketTimeout, socklen_t(MemoryLayout<timeval>.size))
+    setsockopt(descriptor, SOL_SOCKET, SO_SNDTIMEO, &socketTimeout, socklen_t(MemoryLayout<timeval>.size))
     try writeAll(descriptor, requestWithNewline(request))
     return try readLine(descriptor)
 }
@@ -492,6 +541,10 @@ nonisolated private func connectSocket(endpoint: String) throws -> Int32 {
     guard fileDescriptor >= 0 else {
         throw CronaConnectionFailure.transport("Failed to create socket.")
     }
+
+    // Report writes to a closed daemon socket as EPIPE instead of terminating the app.
+    var noSigPipe: Int32 = 1
+    setsockopt(fileDescriptor, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, socklen_t(MemoryLayout<Int32>.size))
 
     var address = sockaddr_un()
     address.sun_family = sa_family_t(AF_UNIX)
@@ -536,6 +589,9 @@ nonisolated private func writeAll(_ fileDescriptor: Int32, _ data: Data) throws 
         while bytesRemaining > 0 {
             let bytesWritten = write(fileDescriptor, cursor, bytesRemaining)
             guard bytesWritten >= 0 else {
+                if errno == EAGAIN {
+                    throw CronaConnectionFailure.transport("Timed out writing to the daemon socket.")
+                }
                 throw CronaConnectionFailure.transport("Failed to write to the daemon socket.")
             }
             bytesRemaining -= bytesWritten
@@ -551,6 +607,9 @@ nonisolated private func readLine(_ fileDescriptor: Int32) throws -> Data {
     while true {
         let bytesRead = read(fileDescriptor, &buffer, buffer.count)
         guard bytesRead >= 0 else {
+            if errno == EAGAIN {
+                throw CronaConnectionFailure.transport("Timed out waiting for the daemon to respond.")
+            }
             throw CronaConnectionFailure.transport("Failed to read from the daemon socket.")
         }
         guard bytesRead > 0 else {
