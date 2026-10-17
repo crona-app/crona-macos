@@ -233,8 +233,7 @@ final class NotificationService: NSObject, ObservableObject, UNUserNotificationC
                 daemonConnection?.alertStatus = try? await client.alertsStatusGet()
                 for try await event in stream {
                     if Task.isCancelled { break }
-                    guard event.type == "alert.delivery" else { continue }
-                    let delivery = try event.decodePayload(CronaAlertDelivery.self)
+                    guard let delivery = Self.alertDelivery(from: event) else { continue }
                     await handle(delivery, client: client)
                 }
             } catch is CancellationError {
@@ -248,6 +247,18 @@ final class NotificationService: NSObject, ObservableObject, UNUserNotificationC
             deliveryTask = nil
             daemonConnection?.alertStatus = try? await client.alertsStatusGet()
             scheduleRetry()
+        }
+    }
+
+    /// Skips a malformed delivery instead of failing the stream, so one bad payload cannot block later alerts.
+    static func alertDelivery(from event: CronaProtocolEvent) -> CronaAlertDelivery? {
+        guard event.type == "alert.delivery" else { return nil }
+        do {
+            return try event.decodePayload(CronaAlertDelivery.self)
+        } catch {
+            Logger(subsystem: "com.crona.macos", category: "notifications")
+                .error("Skipping malformed alert delivery: \(error.localizedDescription, privacy: .private)")
+            return nil
         }
     }
 

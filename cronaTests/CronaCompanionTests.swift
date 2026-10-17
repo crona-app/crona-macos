@@ -1154,6 +1154,30 @@ final class CronaCompanionTests: XCTestCase {
         XCTAssertEqual(delivery.actions?.first?.path, "/tmp/report.md")
     }
 
+    func testAlertDeliveryParsingSkipsMalformedPayloadsWithoutThrowing() throws {
+        let malformed = try JSONDecoder().decode(
+            CronaProtocolEvent.self,
+            from: Data(#"{"type":"alert.delivery","payload":{"id":"alert-3"}}"#.utf8)
+        )
+        let unrelated = try JSONDecoder().decode(
+            CronaProtocolEvent.self,
+            from: Data(#"{"type":"alerts.status_changed","payload":{}}"#.utf8)
+        )
+        let valid = try JSONDecoder().decode(
+            CronaProtocolEvent.self,
+            from: Data(#"""
+            {"type":"alert.delivery","payload":{"id":"alert-4",
+              "alert":{"kind":"timer.work_complete","title":"Done","body":"","urgency":"low",
+                "iconEnabled":true,"playSound":false},
+              "deliverNotification":true,"playSound":false}}
+            """#.utf8)
+        )
+
+        XCTAssertNil(NotificationService.alertDelivery(from: malformed))
+        XCTAssertNil(NotificationService.alertDelivery(from: unrelated))
+        XCTAssertEqual(NotificationService.alertDelivery(from: valid)?.alert.kind, "timer.work_complete")
+    }
+
     func testDaemonClientBuildsAlertDeliveryAckRequest() async throws {
         let response = """
         {"id":"response-1","result":{"ok":true}}
