@@ -25,7 +25,7 @@ SwiftUI does not propagate changes from a nested `ObservableObject` to its paren
 God objects and god files must not come back. Keep each type and file to one clear responsibility, and split by responsibility, not by technical layer.
 
 - **500 lines is the limit.** A file over 500 lines has to earn that allowance: it must hold one cohesive concept that would be harder to follow if split (for example, a catalog of daemon wire models), and the pull request that takes it over the limit must say why. Size alone is never the justification.
-- **Do not grow files that are already over the limit.** When a change touches one, extract the part being changed into its own type or file instead of adding to it. The existing oversized files are legacy debt, not precedent.
+- **Existing large files are not refactor targets.** Do not split or restructure a working file just to reduce its size; regression risk outweighs the cleanup. When adding new behavior to one, put the new code in a new type or file where that is straightforward rather than growing the large file further. The existing oversized files are legacy, not precedent.
 - **New feature state goes into a new model**, not an existing coordinator, service, or view.
 - The same rules apply to test files: one test file per feature, no catch-all test class.
 
