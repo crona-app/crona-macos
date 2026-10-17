@@ -829,11 +829,29 @@ final class CompanionAppState: ObservableObject {
             publisher
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] _ in
-                    self?.objectWillChange.send()
                     self?.statusBarService.updateStatusItem()
                     self?.endSession.reconcile()
                     self?.popups.reconcile()
                     self?.windowService.reconcileTimerHUD()
+                }
+                .store(in: &cancellables)
+        }
+
+        // Only services read by CompanionAppState's own view-facing properties are forwarded;
+        // views observe every other service directly.
+        [
+            preferences.objectWillChange.eraseToAnyPublisher(),
+            coreSettingsService.objectWillChange.eraseToAnyPublisher(),
+            daemonConnection.objectWillChange.eraseToAnyPublisher(),
+            timerService.objectWillChange.eraseToAnyPublisher(),
+            contextService.objectWillChange.eraseToAnyPublisher(),
+            dailyFocusService.objectWillChange.eraseToAnyPublisher(),
+        ]
+        .forEach { publisher in
+            publisher
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    self?.objectWillChange.send()
                 }
                 .store(in: &cancellables)
         }

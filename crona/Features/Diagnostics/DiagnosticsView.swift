@@ -2,34 +2,40 @@ import SwiftUI
 
 struct DiagnosticsView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var diagnosticsService: DiagnosticsService
+
+    init(appState: CompanionAppState) {
+        self.appState = appState
+        self.diagnosticsService = appState.diagnosticsService
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Form {
                 LabeledContent("Connection State") {
-                    Text(appState.diagnosticsService.snapshot.connectionState)
+                    Text(diagnosticsService.snapshot.connectionState)
                 }
                 LabeledContent("Protocol Version") {
-                    Text(appState.diagnosticsService.snapshot.protocolVersion)
+                    Text(diagnosticsService.snapshot.protocolVersion)
                 }
                 LabeledContent("Kernel Version") {
-                    Text(appState.diagnosticsService.snapshot.kernelVersion)
+                    Text(diagnosticsService.snapshot.kernelVersion)
                 }
                 LabeledContent("Runtime Directory") {
-                    Text(appState.diagnosticsService.snapshot.runtimeDirectory)
+                    Text(diagnosticsService.snapshot.runtimeDirectory)
                         .multilineTextAlignment(.trailing)
                 }
                 LabeledContent("Health") {
-                    Text(appState.diagnosticsService.snapshot.healthSummary)
+                    Text(diagnosticsService.snapshot.healthSummary)
                 }
                 LabeledContent("Last Reconnect") {
-                    Text(appState.diagnosticsService.snapshot.lastReconnect)
+                    Text(diagnosticsService.snapshot.lastReconnect)
                 }
             }
 
             HStack {
                 Button("Copy Diagnostics") {
-                    appState.diagnosticsService.copyToPasteboard()
+                    diagnosticsService.copyToPasteboard()
                 }
                 Button("Manual Reconnect") {
                     appState.manualReconnect()
@@ -40,7 +46,7 @@ struct DiagnosticsView: View {
         }
         .padding()
         .onAppear {
-            Task { await appState.diagnosticsService.refresh() }
+            Task { await diagnosticsService.refresh() }
         }
     }
 }

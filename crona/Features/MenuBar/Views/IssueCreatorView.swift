@@ -2,6 +2,8 @@ import SwiftUI
 
 struct IssueCreatorView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var issueActionsService: IssueActionsService
+    @ObservedObject private var issueCreationService: IssueCreationService
     @ObservedObject var issueCreator: IssueCreatorModel
     @FocusState private var focusedField: Field?
     @State private var selectedRepoID: Int64?
@@ -9,6 +11,13 @@ struct IssueCreatorView: View {
     @State private var isDueDatePickerPresented = false
 
     private enum Field { case title, estimate, description }
+
+    init(appState: CompanionAppState, issueCreator: IssueCreatorModel) {
+        self.appState = appState
+        self.issueCreator = issueCreator
+        self.issueActionsService = appState.issueActionsService
+        self.issueCreationService = appState.issueCreationService
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -154,7 +163,7 @@ struct IssueCreatorView: View {
                         .disabled(
                             validationMessage != nil
                                 || issueCreator.isSubmitting
-                                || appState.issueActionsService.actionInFlightIssueID != nil
+                                || issueActionsService.actionInFlightIssueID != nil
                         )
                 }
             }
@@ -167,7 +176,7 @@ struct IssueCreatorView: View {
             selectedRepoID = selectedDestination?.repoID
             DispatchQueue.main.async { focusedField = .title }
         }
-        .onChange(of: appState.issueCreationService.destinations) { _, destinations in
+        .onChange(of: issueCreationService.destinations) { _, destinations in
             guard selectedRepoID == nil,
                 let destinationID = issueCreator.destinationID
             else { return }
@@ -175,7 +184,7 @@ struct IssueCreatorView: View {
         }
         .onChange(of: selectedRepoID) { _, repoID in
             guard let streamID = issueCreator.destinationID,
-                appState.issueCreationService.destinations.first(where: { $0.streamID == streamID })?.repoID != repoID
+                issueCreationService.destinations.first(where: { $0.streamID == streamID })?.repoID != repoID
             else { return }
             issueCreator.destinationID = nil
         }
@@ -267,14 +276,14 @@ struct IssueCreatorView: View {
 
     private var repoGroups: [RepoGroup] {
         var seen = Set<Int64>()
-        return appState.issueCreationService.destinations.compactMap { destination in
+        return issueCreationService.destinations.compactMap { destination in
             guard seen.insert(destination.repoID).inserted else { return nil }
             return RepoGroup(id: destination.repoID, name: destination.repoName)
         }
     }
 
     private var filteredStreams: [IssueDestination] {
-        return appState.issueCreationService.destinations.filter {
+        return issueCreationService.destinations.filter {
             $0.repoID == selectedRepoID
         }
     }
@@ -292,7 +301,7 @@ struct IssueCreatorView: View {
     }
 
     private var selectedDestination: IssueDestination? {
-        appState.issueCreationService.destinations.first { $0.streamID == issueCreator.destinationID }
+        issueCreationService.destinations.first { $0.streamID == issueCreator.destinationID }
     }
 
     private var createActionDisabled: Bool {
@@ -302,7 +311,7 @@ struct IssueCreatorView: View {
 
     private var footerFeedback: some View {
         Group {
-            if let error = appState.issueCreationService.lastErrorMessage {
+            if let error = issueCreationService.lastErrorMessage {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.95))
                     .fixedSize(horizontal: false, vertical: true)
@@ -364,12 +373,21 @@ struct IssueCreatorView: View {
 
 struct HabitCreatorView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var habitsService: HabitsService
+    @ObservedObject private var issueCreationService: IssueCreationService
     @ObservedObject var habitEditor: HabitEditorModel
     @State private var selectedRepoID: Int64?
     @State private var scheduleSelection = "daily"
     @FocusState private var nameFocused: Bool
 
     private let weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+    init(appState: CompanionAppState, habitEditor: HabitEditorModel) {
+        self.appState = appState
+        self.habitEditor = habitEditor
+        self.habitsService = appState.habitsService
+        self.issueCreationService = appState.issueCreationService
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -424,20 +442,20 @@ struct HabitCreatorView: View {
 
             Divider().padding(.vertical, 4)
 
-            if let error = habitEditor.error ?? appState.habitsService.lastManagementError {
+            if let error = habitEditor.error ?? habitsService.lastManagementError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(PopupVisualTheme.semantic(.warning))
             }
 
             Button(action: habitEditor.submit) {
-                Text(appState.habitsService.isManagingHabit ? "Saving…" : (habitEditor.habitBeingEdited == nil ? "Create Habit" : "Save Changes"))
+                Text(habitsService.isManagingHabit ? "Saving…" : (habitEditor.habitBeingEdited == nil ? "Create Habit" : "Save Changes"))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .keyboardShortcut(.defaultAction)
-            .disabled(appState.habitsService.isManagingHabit || habitEditor.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(habitsService.isManagingHabit || habitEditor.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding(20)
         .frame(width: 420)
@@ -446,8 +464,8 @@ struct HabitCreatorView: View {
         .onAppear {
             DispatchQueue.main.async { nameFocused = true }
             scheduleSelection = habitEditor.scheduleType
-            selectedRepoID = selectedDestination?.repoID ?? appState.issueCreationService.destinations.first?.repoID
-            Task { await appState.issueCreationService.loadDestinations() }
+            selectedRepoID = selectedDestination?.repoID ?? issueCreationService.destinations.first?.repoID
+            Task { await issueCreationService.loadDestinations() }
         }
     }
 
@@ -478,7 +496,7 @@ struct HabitCreatorView: View {
                 .frame(maxWidth: .infinity)
 
                 Menu {
-                    ForEach(appState.issueCreationService.destinations.filter { $0.repoID == selectedRepoID }) { destination in
+                    ForEach(issueCreationService.destinations.filter { $0.repoID == selectedRepoID }) { destination in
                         Button(destination.streamName) {
                             habitEditor.destinationID = destination.streamID
                         }
@@ -580,7 +598,7 @@ struct HabitCreatorView: View {
     }
 
     private var selectedDestination: IssueDestination? {
-        appState.issueCreationService.destinations.first { $0.streamID == habitEditor.destinationID }
+        issueCreationService.destinations.first { $0.streamID == habitEditor.destinationID }
     }
 
     private var destinationLabel: String {
@@ -594,7 +612,7 @@ struct HabitCreatorView: View {
 
     private var repoGroups: [RepoGroup] {
         var seen = Set<Int64>()
-        return appState.issueCreationService.destinations.compactMap { destination in
+        return issueCreationService.destinations.compactMap { destination in
             guard seen.insert(destination.repoID).inserted else { return nil }
             return RepoGroup(id: destination.repoID, name: destination.repoName)
         }
@@ -605,8 +623,16 @@ struct HabitCreatorView: View {
 
 struct HabitDeleteConfirmationView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var habitsService: HabitsService
     @ObservedObject var habitEditor: HabitEditorModel
     let habit: HabitRowModel
+
+    init(appState: CompanionAppState, habitEditor: HabitEditorModel, habit: HabitRowModel) {
+        self.appState = appState
+        self.habitEditor = habitEditor
+        self.habit = habit
+        self.habitsService = appState.habitsService
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -615,14 +641,14 @@ struct HabitDeleteConfirmationView: View {
                 .foregroundStyle(PopupVisualTheme.semantic(.error))
             Text("Delete \"\(habit.name)\"? This cannot be undone.")
                 .fixedSize(horizontal: false, vertical: true)
-            if let error = appState.habitsService.lastManagementError {
+            if let error = habitsService.lastManagementError {
                 Text(error).font(.caption).foregroundStyle(PopupVisualTheme.semantic(.error))
             }
             HStack {
                 Button("Cancel", action: habitEditor.cancelActionEditor)
                 Spacer()
                 Button("Delete", role: .destructive, action: habitEditor.submitActionEditor)
-                    .disabled(appState.habitsService.isManagingHabit)
+                    .disabled(habitsService.isManagingHabit)
             }
         }
         .padding(20)

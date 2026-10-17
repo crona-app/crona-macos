@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AdhocAttributionView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var issueCreationService: IssueCreationService
     @ObservedObject var endSession: EndSessionModel
     var onCancel: (() -> Void)? = nil
     @FocusState private var focusedField: Field?
@@ -9,6 +10,13 @@ struct AdhocAttributionView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private enum Field { case title, description, estimate }
+
+    init(appState: CompanionAppState, endSession: EndSessionModel, onCancel: (() -> Void)? = nil) {
+        self.appState = appState
+        self.endSession = endSession
+        self.onCancel = onCancel
+        self.issueCreationService = appState.issueCreationService
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -287,7 +295,7 @@ struct AdhocAttributionView: View {
         }
     }
 
-    private var destinations: [IssueDestination] { appState.issueCreationService.destinations }
+    private var destinations: [IssueDestination] { issueCreationService.destinations }
     private var selectedDestination: IssueDestination? { destinations.first { $0.id == endSession.adhocAttribution.destinationID } }
     private var activeRepoID: Int64? { endSession.adhocAttribution.repoID ?? selectedDestination?.repoID }
     private var repoIDs: [Int64] { Array(Set(destinations.map(\.repoID))).sorted() }

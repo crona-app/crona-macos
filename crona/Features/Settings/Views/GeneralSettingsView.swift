@@ -4,6 +4,12 @@ import UserNotifications
 
 struct GeneralSettingsView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var launchAtLoginService: LaunchAtLoginService
+
+    init(appState: CompanionAppState) {
+        self.appState = appState
+        self.launchAtLoginService = appState.launchAtLoginService
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionSpacing) {
@@ -12,8 +18,8 @@ struct GeneralSettingsView: View {
                     title: "Launch at Login",
                     subtitle: "Open Crona when you sign in.",
                     isOn: Binding(
-                        get: { appState.launchAtLoginService.isEnabled },
-                        set: { appState.launchAtLoginService.setEnabled($0) }
+                        get: { launchAtLoginService.isEnabled },
+                        set: { launchAtLoginService.setEnabled($0) }
                     )
                 )
 
@@ -28,7 +34,7 @@ struct GeneralSettingsView: View {
                     )
                 )
 
-                if let error = appState.launchAtLoginService.lastError, !error.isEmpty {
+                if let error = launchAtLoginService.lastError, !error.isEmpty {
                     settingsFootnote(error)
                 }
             }

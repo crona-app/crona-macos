@@ -206,8 +206,15 @@ struct ReverseProgressBar: View {
 
 struct IssueActionEditorView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var issueActionsService: IssueActionsService
     @ObservedObject var issueActions: IssueActionEditorModel
     @FocusState private var noteIsFocused: Bool
+
+    init(appState: CompanionAppState, issueActions: IssueActionEditorModel) {
+        self.appState = appState
+        self.issueActions = issueActions
+        self.issueActionsService = appState.issueActionsService
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -410,14 +417,14 @@ struct IssueActionEditorView: View {
                 issueActions.submit()
             } label: {
                 Label(
-                    appState.issueActionsService.actionInFlightIssueID == issue.id
+                    issueActionsService.actionInFlightIssueID == issue.id
                         ? "Deleting…" : "Delete Issue",
                     systemImage: "trash"
                 )
             }
             .buttonStyle(.borderedProminent)
             .tint(PopupVisualTheme.semantic(.error))
-            .disabled(appState.issueActionsService.actionInFlightIssueID != nil)
+            .disabled(issueActionsService.actionInFlightIssueID != nil)
         }
     }
 
@@ -504,7 +511,7 @@ struct IssueActionEditorView: View {
 
     @ViewBuilder
     private var editorError: some View {
-        if let error = issueActions.manualSessionError ?? appState.issueActionsService.lastErrorMessage
+        if let error = issueActions.manualSessionError ?? issueActionsService.lastErrorMessage
         {
             Label(error, systemImage: "exclamationmark.triangle.fill")
                 .font(.caption)
@@ -568,7 +575,7 @@ struct IssueActionEditorView: View {
             .keyboardShortcut(.defaultAction)
             .disabled(
                 submitDisabled
-                    || appState.issueActionsService.actionInFlightIssueID != nil
+                    || issueActionsService.actionInFlightIssueID != nil
             )
         }
     }

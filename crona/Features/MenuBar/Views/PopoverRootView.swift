@@ -52,6 +52,8 @@ func formattedPopoverDate(_ date: String, appState: CompanionAppState) -> String
 
 struct PopoverRootView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var appUpdateService: AppUpdateService
+    @ObservedObject private var popoverStatsService: PopoverStatsService
     @ObservedObject private var issueCreator: IssueCreatorModel
     @ObservedObject private var endSession: EndSessionModel
     @ObservedObject private var habitEditor: HabitEditorModel
@@ -66,6 +68,8 @@ struct PopoverRootView: View {
         onVisibleSurfaceHeightChange: ((CGFloat) -> Void)? = nil
     ) {
         self.appState = appState
+        self.appUpdateService = appState.appUpdateService
+        self.popoverStatsService = appState.popoverStatsService
         self.issueCreator = appState.issueCreator
         self.endSession = appState.endSession
         self.habitEditor = appState.habitEditor
@@ -132,7 +136,7 @@ struct PopoverRootView: View {
                     IssueCreationSuccessView(appState: appState, success: success)
                 }
 
-                if appState.appUpdateService.hasAvailableUpdate,
+                if appUpdateService.hasAvailableUpdate,
                     !appState.isUpdatePresentationBlocked
                 {
                     Button(action: appState.checkForAppUpdates) {
@@ -140,7 +144,7 @@ struct PopoverRootView: View {
                             Image(systemName: "arrow.down.circle.fill")
                                 .foregroundStyle(PopupVisualTheme.semantic(.info))
                             Text(
-                                "Crona \(appState.appUpdateService.snapshot.latestVersion ?? "") is ready"
+                                "Crona \(appUpdateService.snapshot.latestVersion ?? "") is ready"
                             )
                             .font(.subheadline.weight(.semibold))
                             Spacer()
@@ -293,10 +297,10 @@ struct PopoverRootView: View {
                         if appState.isStatsCalendarPresented {
                             withAnimation(SystemGlassSettings.shared.reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                                 appState.isStatsCalendarPresented = false
-                                appState.popoverStatsService.endCalendar()
+                                popoverStatsService.endCalendar()
                             }
                         } else if appState.selectedPopoverTab == .stats {
-                            appState.popoverStatsService.beginCalendar()
+                            popoverStatsService.beginCalendar()
                             appState.isStatsCalendarPresented.toggle()
                         } else if appState.selectedPopoverTab == .habits {
                             habitEditor.presentCreator()
@@ -351,12 +355,12 @@ struct PopoverRootView: View {
                     }
 
                     Button(
-                        appState.appUpdateService.hasAvailableUpdate
+                        appUpdateService.hasAvailableUpdate
                             ? "Update Available…"
                             : "Check for Updates…",
                         action: appState.checkForAppUpdates
                     )
-                    .disabled(!appState.appUpdateService.canCheckForUpdates)
+                    .disabled(!appUpdateService.canCheckForUpdates)
 
                     Divider()
 

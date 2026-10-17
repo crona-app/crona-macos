@@ -4,23 +4,29 @@ import UserNotifications
 
 struct RuntimeSettingsView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var kernelDiscovery: KernelDiscoveryService
+
+    init(appState: CompanionAppState) {
+        self.appState = appState
+        self.kernelDiscovery = appState.kernelDiscovery
+    }
 
     var body: some View {
         SettingsCard("Discovery") {
             SettingsValueRow(
                 title: "Runtime Directory",
                 subtitle: "See where Crona looks for the running kernel.",
-                value: appState.kernelDiscovery.loadedRuntime.config.runtimeDirectoryPath
+                value: kernelDiscovery.loadedRuntime.config.runtimeDirectoryPath
             )
             SettingsValueRow(
                 title: "Discovery File",
                 subtitle: "kernel.json used for discovery.",
-                value: appState.kernelDiscovery.loadedRuntime.config.discoveryFilePath
+                value: kernelDiscovery.loadedRuntime.config.discoveryFilePath
             )
             SettingsValueRow(
                 title: "Endpoint",
                 subtitle: "Socket used by the current connection.",
-                value: appState.daemonConnection.kernelInfo?.endpoint ?? appState.kernelDiscovery
+                value: appState.daemonConnection.kernelInfo?.endpoint ?? kernelDiscovery
                     .loadedRuntime.resolvedDiscovery?.endpoint ?? "Unavailable"
             )
 
@@ -35,6 +41,12 @@ struct RuntimeSettingsView: View {
 
 struct DiagnosticsSettingsView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var diagnosticsService: DiagnosticsService
+
+    init(appState: CompanionAppState) {
+        self.appState = appState
+        self.diagnosticsService = appState.diagnosticsService
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionSpacing) {
@@ -42,32 +54,32 @@ struct DiagnosticsSettingsView: View {
                 SettingsValueRow(
                     title: "Connection State",
                     subtitle: "Whether this app can reach the engine.",
-                    value: appState.diagnosticsService.snapshot.connectionState
+                    value: diagnosticsService.snapshot.connectionState
                 )
                 SettingsValueRow(
                     title: "Protocol Version",
                     subtitle: "Protocol shared by the app and engine.",
-                    value: appState.diagnosticsService.snapshot.protocolVersion
+                    value: diagnosticsService.snapshot.protocolVersion
                 )
                 SettingsValueRow(
                     title: "Kernel Version",
                     subtitle: "Engine build currently running.",
-                    value: appState.diagnosticsService.snapshot.kernelVersion
+                    value: diagnosticsService.snapshot.kernelVersion
                 )
                 SettingsValueRow(
                     title: "Runtime Directory",
                     subtitle: "Active Crona runtime location.",
-                    value: appState.diagnosticsService.snapshot.runtimeDirectory
+                    value: diagnosticsService.snapshot.runtimeDirectory
                 )
                 SettingsValueRow(
                     title: "Health",
                     subtitle: "Latest engine health report.",
-                    value: appState.diagnosticsService.snapshot.healthSummary
+                    value: diagnosticsService.snapshot.healthSummary
                 )
                 SettingsValueRow(
                     title: "Last Reconnect",
                     subtitle: "When the app last found the kernel again.",
-                    value: appState.diagnosticsService.snapshot.lastReconnect
+                    value: diagnosticsService.snapshot.lastReconnect
                 )
             }
 
@@ -76,7 +88,7 @@ struct DiagnosticsSettingsView: View {
                     SettingsActionButton(
                         "Copy Diagnostics", systemImage: "doc.on.doc", prominent: false
                     ) {
-                        appState.diagnosticsService.copyToPasteboard()
+                        diagnosticsService.copyToPasteboard()
                     }
 
                     SettingsActionButton("Reconnect", systemImage: "arrow.clockwise") {
@@ -86,15 +98,21 @@ struct DiagnosticsSettingsView: View {
             }
         }
         .onAppear {
-            Task { await appState.diagnosticsService.refresh() }
+            Task { await diagnosticsService.refresh() }
         }
     }
 }
 
 struct UpdatesSettingsView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var appUpdateService: AppUpdateService
 
-    private var service: AppUpdateService { appState.appUpdateService }
+    private var service: AppUpdateService { appUpdateService }
+
+    init(appState: CompanionAppState) {
+        self.appState = appState
+        self.appUpdateService = appState.appUpdateService
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionSpacing) {
@@ -209,6 +227,12 @@ struct UpdatesSettingsView: View {
 
 struct AboutSettingsView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var appUpdateService: AppUpdateService
+
+    init(appState: CompanionAppState) {
+        self.appState = appState
+        self.appUpdateService = appState.appUpdateService
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionSpacing) {
@@ -232,7 +256,7 @@ struct AboutSettingsView: View {
                 SettingsValueRow(
                     title: "Version",
                     subtitle: "Installed on this Mac.",
-                    value: appState.appUpdateService.snapshot.currentVersion
+                    value: appUpdateService.snapshot.currentVersion
                 )
                 SettingsValueRow(
                     title: "Protocol",
@@ -242,7 +266,7 @@ struct AboutSettingsView: View {
                 SettingsValueRow(
                     title: "App Channel",
                     subtitle: "Release track for this app.",
-                    value: appState.appUpdateService.selectedChannel.title
+                    value: appUpdateService.selectedChannel.title
                 )
                 SettingsValueRow(
                     title: "Engine Channel",

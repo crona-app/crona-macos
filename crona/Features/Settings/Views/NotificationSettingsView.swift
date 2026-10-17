@@ -4,10 +4,12 @@ import UserNotifications
 
 struct NotificationSettingsView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var notificationService: NotificationService
     @ObservedObject private var alertSettings: AlertSettingsService
 
     init(appState: CompanionAppState) {
         self.appState = appState
+        self.notificationService = appState.notificationService
         _alertSettings = ObservedObject(wrappedValue: appState.alertSettingsService)
     }
 
@@ -20,7 +22,7 @@ struct NotificationSettingsView: View {
                     title: "Permission",
                     subtitle: "Access to native alerts, actions, and sounds.",
                     value: notificationStatusText(
-                        appState.notificationService.authorizationStatus
+                        notificationService.authorizationStatus
                     )
                 )
 
@@ -37,7 +39,7 @@ struct NotificationSettingsView: View {
                     }
 
                     SettingsActionButton("System Settings", systemImage: "gear", prominent: false) {
-                        appState.notificationService.openSystemNotificationSettings()
+                        notificationService.openSystemNotificationSettings()
                     }
                 }
             }
@@ -82,7 +84,7 @@ struct NotificationSettingsView: View {
                         },
                         set: {
                             alertSettings.setSoundPreset($0)
-                            appState.notificationService.playPresetPreview($0.rawValue)
+                            notificationService.playPresetPreview($0.rawValue)
                         }
                     )
                 ) {
@@ -261,7 +263,7 @@ struct NotificationSettingsView: View {
     }
 
     private var deliveryStatusText: String {
-        switch appState.notificationService.deliveryState {
+        switch notificationService.deliveryState {
         case .active: return "Crona for macOS"
         case .connecting: return "Connecting"
         case .failed: return "Daemon fallback"

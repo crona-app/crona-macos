@@ -3,11 +3,19 @@ import SwiftUI
 
 struct BreakScreenRootView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var breakScreenService: BreakScreenService
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let screen: NSScreen
     let isPrimary: Bool
 
-    private var service: BreakScreenService { appState.breakScreenService }
+    private var service: BreakScreenService { breakScreenService }
+    init(appState: CompanionAppState, screen: NSScreen, isPrimary: Bool) {
+        self.appState = appState
+        self.screen = screen
+        self.isPrimary = isPrimary
+        self.breakScreenService = appState.breakScreenService
+    }
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
             content(at: timeline.date)

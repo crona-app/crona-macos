@@ -281,6 +281,12 @@ struct ActiveTimerView: View {
 
 struct IdleFocusView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var issueActionsService: IssueActionsService
+
+    init(appState: CompanionAppState) {
+        self.appState = appState
+        self.issueActionsService = appState.issueActionsService
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -340,7 +346,7 @@ struct IdleFocusView: View {
                 }
             }
 
-            if let error = appState.issueActionsService.lastErrorMessage {
+            if let error = issueActionsService.lastErrorMessage {
                 HStack(spacing: 7) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(PopupVisualTheme.semantic(.warning))
@@ -348,7 +354,7 @@ struct IdleFocusView: View {
                         .lineLimit(2)
                     Spacer(minLength: 0)
                     Button {
-                        appState.issueActionsService.clearError()
+                        issueActionsService.clearError()
                     } label: {
                         Image(systemName: "xmark")
                     }
@@ -578,9 +584,17 @@ struct FocusStartConfigView: View {
 
 struct FocusIssueRow: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var issueActionsService: IssueActionsService
     let issue: DailyFocusIssue
     let onStart: () -> Void
     @State private var isActionsHovered = false
+
+    init(appState: CompanionAppState, issue: DailyFocusIssue, onStart: @escaping () -> Void) {
+        self.appState = appState
+        self.issue = issue
+        self.onStart = onStart
+        self.issueActionsService = appState.issueActionsService
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -710,7 +724,7 @@ struct FocusIssueRow: View {
     @ViewBuilder
     private var statusMenu: some View {
         Menu {
-            if let transitions = appState.issueActionsService.transitionsByIssueID[issue.id] {
+            if let transitions = issueActionsService.transitionsByIssueID[issue.id] {
                 if let blockedReason = transitions.blockedReason {
                     Text(blockedReason)
                 } else if transitions.allowedStatuses.isEmpty {
@@ -786,7 +800,7 @@ struct FocusIssueRow: View {
     }
 
     private var isWorking: Bool {
-        appState.issueActionsService.actionInFlightIssueID == issue.id
+        issueActionsService.actionInFlightIssueID == issue.id
     }
 
     private var metaLine: String {

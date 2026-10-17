@@ -3,11 +3,17 @@ import SwiftUI
 
 struct HabitsTabView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var habitsService: HabitsService
     @State private var loggingHabitID: Int64?
     @State private var logSeconds = 60
 
+    init(appState: CompanionAppState) {
+        self.appState = appState
+        self.habitsService = appState.habitsService
+    }
+
     var body: some View {
-        let snapshot = appState.habitsService.snapshot
+        let snapshot = habitsService.snapshot
 
         ViewThatFits(in: .vertical) {
             habitsContent(snapshot: snapshot)
@@ -52,10 +58,10 @@ struct HabitsTabView: View {
                     ForEach(snapshot.items) { habit in
                         HabitRow(
                             habit: habit,
-                            isWorking: appState.habitsService.actionInFlightHabitID == habit.id,
-                            activeAction: appState.habitsService.actionInFlightHabitID == habit.id
-                                ? appState.habitsService.actionInFlightStatus : nil,
-                            actionsDisabled: appState.habitsService.actionInFlightHabitID != nil,
+                            isWorking: habitsService.actionInFlightHabitID == habit.id,
+                            activeAction: habitsService.actionInFlightHabitID == habit.id
+                                ? habitsService.actionInFlightStatus : nil,
+                            actionsDisabled: habitsService.actionInFlightHabitID != nil,
                             isLogging: loggingHabitID == habit.id,
                             logSeconds: $logSeconds,
                             onComplete: { appState.habitEditor.complete(habit) },

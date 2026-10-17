@@ -7,6 +7,8 @@ struct WellbeingTabView: View {
     }
 
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var popoverStatsService: PopoverStatsService
+    @ObservedObject private var wellbeingService: WellbeingService
     @State private var mood = 0
     @State private var energy = 0
     @State private var hasSleepDuration = false
@@ -29,6 +31,12 @@ struct WellbeingTabView: View {
     private let leadingRailWidth: CGFloat = 22
     private let leadingRailSpacing: CGFloat = 11
     private let textColumnWidth: CGFloat = 106
+
+    init(appState: CompanionAppState) {
+        self.appState = appState
+        self.popoverStatsService = appState.popoverStatsService
+        self.wellbeingService = appState.wellbeingService
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
@@ -82,13 +90,13 @@ struct WellbeingTabView: View {
             feedbackView
 
             Button(action: save) {
-                if appState.wellbeingService.snapshot.isSaving {
+                if wellbeingService.snapshot.isSaving {
                     ProgressView().controlSize(.small)
                 } else if saveFeedback == .success {
                     Label("Check-In Updated", systemImage: "checkmark")
                         .frame(maxWidth: .infinity)
                 } else {
-                    Text(appState.wellbeingService.snapshot.checkIn == nil ? "Save Check-In" : "Update Check-In")
+                    Text(wellbeingService.snapshot.checkIn == nil ? "Save Check-In" : "Update Check-In")
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -97,21 +105,21 @@ struct WellbeingTabView: View {
             .disabled(!canSave)
         }
         .fixedSize(horizontal: false, vertical: true)
-        .task { await appState.wellbeingService.refresh() }
-        .onChange(of: appState.wellbeingService.snapshot.checkIn) { _, entry in load(entry) }
+        .task { await wellbeingService.refresh() }
+        .onChange(of: wellbeingService.snapshot.checkIn) { _, entry in load(entry) }
         .onChange(of: currentRequest) { _, _ in
             guard saveFeedback != nil else { return }
             feedbackDismissTask?.cancel()
             saveFeedback = nil
         }
-        .onAppear { load(appState.wellbeingService.snapshot.checkIn) }
+        .onAppear { load(wellbeingService.snapshot.checkIn) }
         .onDisappear { feedbackDismissTask?.cancel() }
     }
 
     private var canSave: Bool {
         mood > 0
             && energy > 0
-            && !appState.wellbeingService.snapshot.isSaving
+            && !wellbeingService.snapshot.isSaving
             && currentRequest != baselineRequest
     }
 
@@ -128,7 +136,7 @@ struct WellbeingTabView: View {
                     .lineLimit(2)
             case nil:
                 if let error = validationError
-                    ?? (suppressServiceError ? nil : appState.wellbeingService.snapshot.lastErrorDescription) {
+                    ?? (suppressServiceError ? nil : wellbeingService.snapshot.lastErrorDescription) {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.9))
                         .lineLimit(2)
@@ -152,7 +160,7 @@ struct WellbeingTabView: View {
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(PopupVisualTheme.primaryText)
             Spacer()
-            if appState.wellbeingService.snapshot.isLoading {
+            if wellbeingService.snapshot.isLoading {
                 ProgressView().controlSize(.small)
             }
         }
@@ -313,14 +321,14 @@ struct WellbeingTabView: View {
         saveFeedback = nil
         let request = currentRequest
         Task {
-            if await appState.wellbeingService.save(request) {
+            if await wellbeingService.save(request) {
                 baselineRequest = request
                 showFeedback(.success)
-                await appState.popoverStatsService.refresh()
-                await appState.popoverStatsService.refreshTodayMetrics()
+                await popoverStatsService.refresh()
+                await popoverStatsService.refreshTodayMetrics()
             } else {
                 showFeedback(.error(
-                    appState.wellbeingService.snapshot.lastErrorDescription
+                    wellbeingService.snapshot.lastErrorDescription
                         ?? "Couldn’t update the check-in. Try again."
                 ))
             }

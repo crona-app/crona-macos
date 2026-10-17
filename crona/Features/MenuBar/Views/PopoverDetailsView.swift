@@ -2,7 +2,14 @@ import SwiftUI
 
 struct PopoverDetailView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject private var habitsService: HabitsService
     let route: PopoverDetailRoute
+
+    init(appState: CompanionAppState, route: PopoverDetailRoute) {
+        self.appState = appState
+        self.route = route
+        self.habitsService = appState.habitsService
+    }
 
     var body: some View {
         Group {
@@ -14,7 +21,7 @@ struct PopoverDetailView: View {
                     missingDetail(title: "Issue unavailable")
                 }
             case .habitDetails(let habitID):
-                if let habit = appState.habitsService.snapshot.items.first(where: { $0.id == habitID }) {
+                if let habit = habitsService.snapshot.items.first(where: { $0.id == habitID }) {
                     HabitDetailView(appState: appState, habit: habit)
                 } else {
                     missingDetail(title: "Habit unavailable")
