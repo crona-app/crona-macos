@@ -33,6 +33,13 @@ class DaemonTestCase: XCTestCase {
         return (connection, transport)
     }
 
+    /// Preferences backed by a throwaway suite so tests never write the dev app's real defaults.
+    final func isolatedPreferences() -> PreferencesService {
+        let suiteName = "cronaTests.\(UUID().uuidString)"
+        addTeardownBlock { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        return PreferencesService(defaults: UserDefaults(suiteName: suiteName)!)
+    }
+
     final func postDaemonEvent(_ json: String) throws {
         let event = try JSONDecoder().decode(CronaProtocolEvent.self, from: Data(json.utf8))
         NotificationCenter.default.post(name: .cronaDaemonEventReceived, object: event)

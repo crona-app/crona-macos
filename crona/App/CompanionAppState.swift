@@ -185,8 +185,11 @@ final class CompanionAppState: ObservableObject {
         @Published var developerPreviewKind: DeveloperPreviewKind?
     #endif
 
-    init(daemonConnection injectedDaemonConnection: DaemonConnectionService? = nil) {
-        let preferences = PreferencesService()
+    init(
+        daemonConnection injectedDaemonConnection: DaemonConnectionService? = nil,
+        preferences injectedPreferences: PreferencesService? = nil
+    ) {
+        let preferences = injectedPreferences ?? PreferencesService()
         let kernelDiscovery = KernelDiscoveryService(configLoader: CronaConfigLoader())
         let notificationService = NotificationService()
         let launchAtLoginService = LaunchAtLoginService()

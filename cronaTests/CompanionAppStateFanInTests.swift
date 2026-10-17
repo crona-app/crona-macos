@@ -27,7 +27,7 @@ final class CompanionAppStateFanInTests: DaemonTestCase {
             "state": "running", "sessionId": "s1", "elapsedSeconds": 1_500,
             "hardLimitActive": true, "hardLimitExpired": true, "hardLimitKind": "countdown",
         ]
-        let appState = CompanionAppState(daemonConnection: connection)
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
         appState.preferences.preferences.showHardLimitActionPopups = true
         await appState.timerService.refresh()
         try postDaemonEvent(#"{"type":"timer.hard_limit_reached","payload":{"sessionId":"s1"}}"#)
@@ -52,5 +52,21 @@ final class CompanionAppStateFanInTests: DaemonTestCase {
 
         XCTAssertEqual(publications, 0)
         withExtendedLifetime(cancellable) {}
+    }
+}
+
+@MainActor
+final class CompanionAppStatePreferencesTests: DaemonTestCase {
+    func testAppStateUsesInjectedPreferencesWithoutTouchingStandardDefaults() async throws {
+        let (connection, _) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let suiteName = "CompanionAppStatePreferencesTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        addTeardownBlock { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        let injected = PreferencesService(defaults: defaults)
+
+        let appState = CompanionAppState(daemonConnection: connection, preferences: injected)
+
+        XCTAssertTrue(appState.preferences === injected)
     }
 }

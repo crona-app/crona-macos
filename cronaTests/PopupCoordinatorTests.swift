@@ -14,7 +14,7 @@ final class PopupCoordinatorTests: DaemonTestCase {
     ) async throws -> (CompanionAppState, IssueCreatorTestTransport, DaemonConnectionService) {
         let (connection, transport) = try await issueCreatorConnection()
         transport.timerStateFixture = expiredCountdownState
-        let appState = CompanionAppState(daemonConnection: connection)
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
         appState.preferences.preferences.showHardLimitActionPopups = popupsEnabled
         await appState.timerService.refresh()
         try postDaemonEvent(#"{"type":"timer.hard_limit_reached","payload":{"sessionId":"s1"}}"#)
@@ -91,7 +91,7 @@ final class PopupCoordinatorTests: DaemonTestCase {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }
         transport.timerStateFixture = runningState
-        let appState = CompanionAppState(daemonConnection: connection)
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
         appState.preferences.preferences.showInactivityActionPopups = true
 
         let presented = await appState.popups.presentInactivityPopup(for: try inactivityDelivery())

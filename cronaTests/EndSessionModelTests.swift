@@ -12,7 +12,7 @@ final class EndSessionModelTests: DaemonTestCase {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }
         transport.timerStateFixture = expiredCountdownState
-        let appState = CompanionAppState(daemonConnection: connection)
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
         appState.preferences.preferences.showHardLimitActionPopups = true
         await appState.timerService.refresh()
         try postDaemonEvent(#"{"type":"timer.hard_limit_reached","payload":{"sessionId":"s1"}}"#)
