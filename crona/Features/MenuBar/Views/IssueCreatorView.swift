@@ -364,6 +364,7 @@ struct IssueCreatorView: View {
 
 struct HabitCreatorView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject var habitEditor: HabitEditorModel
     @State private var selectedRepoID: Int64?
     @State private var scheduleSelection = "daily"
     @FocusState private var nameFocused: Bool
@@ -373,7 +374,7 @@ struct HabitCreatorView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Button(action: appState.cancelHabitCreator) {
+                Button(action: habitEditor.cancel) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .semibold))
                         .frame(width: 30, height: 30)
@@ -382,18 +383,18 @@ struct HabitCreatorView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Back")
-                Text(appState.habitBeingEdited == nil ? "Create Habit" : "Edit Habit")
+                Text(habitEditor.habitBeingEdited == nil ? "Create Habit" : "Edit Habit")
                     .font(.headline)
                 Spacer()
             }
 
             Text("Name (required)").font(.caption.weight(.medium)).foregroundStyle(.secondary)
-            TextField("Habit name", text: $appState.habitCreateName)
+            TextField("Habit name", text: $habitEditor.name)
                 .textFieldStyle(.plain)
                 .focused($nameFocused)
                 .creatorField(isFocused: nameFocused)
 
-            if appState.habitBeingEdited == nil {
+            if habitEditor.habitBeingEdited == nil {
                 destinationField
             } else {
                 HStack {
@@ -408,43 +409,43 @@ struct HabitCreatorView: View {
 
             scheduleSection
 
-            TextField("Target duration (optional, e.g. 30m)", text: $appState.habitCreateTarget)
+            TextField("Target duration (optional, e.g. 30m)", text: $habitEditor.target)
                 .textFieldStyle(.plain)
                 .creatorField()
 
-            TextField("Description (optional)", text: $appState.habitCreateDescription, axis: .vertical)
+            TextField("Description (optional)", text: $habitEditor.description, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(2...4)
                 .creatorField()
 
-            if appState.habitBeingEdited != nil {
-                Toggle("Active", isOn: $appState.habitCreateActive)
+            if habitEditor.habitBeingEdited != nil {
+                Toggle("Active", isOn: $habitEditor.active)
             }
 
             Divider().padding(.vertical, 4)
 
-            if let error = appState.habitCreateError ?? appState.habitsService.lastManagementError {
+            if let error = habitEditor.error ?? appState.habitsService.lastManagementError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(PopupVisualTheme.semantic(.warning))
             }
 
-            Button(action: appState.submitHabitCreator) {
-                Text(appState.habitsService.isManagingHabit ? "Saving…" : (appState.habitBeingEdited == nil ? "Create Habit" : "Save Changes"))
+            Button(action: habitEditor.submit) {
+                Text(appState.habitsService.isManagingHabit ? "Saving…" : (habitEditor.habitBeingEdited == nil ? "Create Habit" : "Save Changes"))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .keyboardShortcut(.defaultAction)
-            .disabled(appState.habitsService.isManagingHabit || appState.habitCreateName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(appState.habitsService.isManagingHabit || habitEditor.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding(20)
         .frame(width: 420)
         .fixedSize(horizontal: false, vertical: true)
-        .onExitCommand { appState.cancelHabitCreator() }
+        .onExitCommand { habitEditor.cancel() }
         .onAppear {
             DispatchQueue.main.async { nameFocused = true }
-            scheduleSelection = appState.habitCreateScheduleType
+            scheduleSelection = habitEditor.scheduleType
             selectedRepoID = selectedDestination?.repoID ?? appState.issueCreationService.destinations.first?.repoID
             Task { await appState.issueCreationService.loadDestinations() }
         }
@@ -459,7 +460,7 @@ struct HabitCreatorView: View {
                         Button(repo.name) {
                             selectedRepoID = repo.id
                             if selectedDestination?.repoID != repo.id {
-                                appState.habitCreateDestinationID = nil
+                                habitEditor.destinationID = nil
                             }
                         }
                     }
@@ -479,7 +480,7 @@ struct HabitCreatorView: View {
                 Menu {
                     ForEach(appState.issueCreationService.destinations.filter { $0.repoID == selectedRepoID }) { destination in
                         Button(destination.streamName) {
-                            appState.habitCreateDestinationID = destination.streamID
+                            habitEditor.destinationID = destination.streamID
                         }
                     }
                 } label: {
@@ -515,10 +516,10 @@ struct HabitCreatorView: View {
                 HStack(spacing: 5) {
                     ForEach(0..<weekdayNames.count, id: \.self) { day in
                         Button {
-                            if appState.habitCreateWeekdays.contains(day) {
-                                appState.habitCreateWeekdays.remove(day)
+                            if habitEditor.weekdays.contains(day) {
+                                habitEditor.weekdays.remove(day)
                             } else {
-                                appState.habitCreateWeekdays.insert(day)
+                                habitEditor.weekdays.insert(day)
                             }
                         } label: {
                             Text(weekdayNames[day])
@@ -529,11 +530,11 @@ struct HabitCreatorView: View {
                         .buttonStyle(.plain)
                         .background(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(appState.habitCreateWeekdays.contains(day) ? Color.accentColor.opacity(0.22) : PopupVisualTheme.primaryText.opacity(0.06))
+                                .fill(habitEditor.weekdays.contains(day) ? Color.accentColor.opacity(0.22) : PopupVisualTheme.primaryText.opacity(0.06))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .strokeBorder(appState.habitCreateWeekdays.contains(day) ? Color.accentColor.opacity(0.6) : .clear, lineWidth: 1)
+                                .strokeBorder(habitEditor.weekdays.contains(day) ? Color.accentColor.opacity(0.6) : .clear, lineWidth: 1)
                         )
                     }
                 }
@@ -548,7 +549,7 @@ struct HabitCreatorView: View {
         Button {
             scheduleSelection = value
             DispatchQueue.main.async {
-                appState.habitCreateScheduleType = value
+                habitEditor.scheduleType = value
             }
         } label: {
             HStack(spacing: 10) {
@@ -579,7 +580,7 @@ struct HabitCreatorView: View {
     }
 
     private var selectedDestination: IssueDestination? {
-        appState.issueCreationService.destinations.first { $0.streamID == appState.habitCreateDestinationID }
+        appState.issueCreationService.destinations.first { $0.streamID == habitEditor.destinationID }
     }
 
     private var destinationLabel: String {
@@ -604,6 +605,7 @@ struct HabitCreatorView: View {
 
 struct HabitDeleteConfirmationView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject var habitEditor: HabitEditorModel
     let habit: HabitRowModel
 
     var body: some View {
@@ -617,9 +619,9 @@ struct HabitDeleteConfirmationView: View {
                 Text(error).font(.caption).foregroundStyle(PopupVisualTheme.semantic(.error))
             }
             HStack {
-                Button("Cancel", action: appState.cancelHabitActionEditor)
+                Button("Cancel", action: habitEditor.cancelActionEditor)
                 Spacer()
-                Button("Delete", role: .destructive, action: appState.submitHabitActionEditor)
+                Button("Delete", role: .destructive, action: habitEditor.submitActionEditor)
                     .disabled(appState.habitsService.isManagingHabit)
             }
         }

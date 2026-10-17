@@ -7,14 +7,14 @@ final class HabitEditorModelTests: DaemonTestCase {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
-        appState.presentHabitCreator()
-        appState.habitCreateName = "   "
-        appState.habitCreateDestinationID = 7
+        appState.habitEditor.presentCreator()
+        appState.habitEditor.name = "   "
+        appState.habitEditor.destinationID = 7
 
-        appState.submitHabitCreator()
+        appState.habitEditor.submit()
         await settleAsyncTasks()
 
-        XCTAssertEqual(appState.habitCreateError, "Enter a habit name.")
+        XCTAssertEqual(appState.habitEditor.error, "Enter a habit name.")
         XCTAssertFalse(transport.methods.contains("habit.create"))
     }
 
@@ -22,47 +22,47 @@ final class HabitEditorModelTests: DaemonTestCase {
         let (connection, _) = try await issueCreatorConnection()
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
-        appState.presentHabitCreator()
-        appState.habitCreateName = "Read"
-        appState.habitCreateDestinationID = 7
-        appState.habitCreateScheduleType = "weekly"
+        appState.habitEditor.presentCreator()
+        appState.habitEditor.name = "Read"
+        appState.habitEditor.destinationID = 7
+        appState.habitEditor.scheduleType = "weekly"
 
-        appState.submitHabitCreator()
+        appState.habitEditor.submit()
 
-        XCTAssertEqual(appState.habitCreateError, "Select at least one weekday.")
+        XCTAssertEqual(appState.habitEditor.error, "Select at least one weekday.")
     }
 
     func testHabitCreatorRequiresDestination() async throws {
         let (connection, _) = try await issueCreatorConnection()
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
-        appState.presentHabitCreator()
-        appState.habitCreateName = "Read"
-        appState.habitCreateDestinationID = nil
+        appState.habitEditor.presentCreator()
+        appState.habitEditor.name = "Read"
+        appState.habitEditor.destinationID = nil
 
-        appState.submitHabitCreator()
+        appState.habitEditor.submit()
 
-        XCTAssertEqual(appState.habitCreateError, "Choose a repository and stream.")
+        XCTAssertEqual(appState.habitEditor.error, "Choose a repository and stream.")
     }
 
     func testHabitCreatorSendsCreateRequestAndCloses() async throws {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
-        appState.presentHabitCreator()
-        appState.habitCreateName = "Read"
-        appState.habitCreateTarget = "30m"
-        appState.habitCreateScheduleType = "weekly"
-        appState.habitCreateWeekdays = [3, 1]
-        appState.habitCreateDestinationID = 7
+        appState.habitEditor.presentCreator()
+        appState.habitEditor.name = "Read"
+        appState.habitEditor.target = "30m"
+        appState.habitEditor.scheduleType = "weekly"
+        appState.habitEditor.weekdays = [3, 1]
+        appState.habitEditor.destinationID = 7
 
-        appState.submitHabitCreator()
-        await waitForIssueCreator { !appState.isHabitCreatorPresented }
+        appState.habitEditor.submit()
+        await waitForIssueCreator { !appState.habitEditor.isPresented }
 
         let create = try XCTUnwrap(transport.requests.first(where: { $0.method == "habit.create" }))
         XCTAssertEqual(create.params["weekdays"]?.intArrayValue, [1, 3])
         XCTAssertEqual(create.params["targetMinutes"]?.intValue, 30)
-        XCTAssertNil(appState.habitCreateError)
+        XCTAssertNil(appState.habitEditor.error)
     }
 
     func testHabitCreatorDoesNotOpenWhileEndSessionSheetIsPresented() async throws {
@@ -71,8 +71,8 @@ final class HabitEditorModelTests: DaemonTestCase {
         let appState = CompanionAppState(daemonConnection: connection)
         appState.endSession.isSheetPresented = true
 
-        appState.presentHabitCreator()
+        appState.habitEditor.presentCreator()
 
-        XCTAssertFalse(appState.isHabitCreatorPresented)
+        XCTAssertFalse(appState.habitEditor.isPresented)
     }
 }

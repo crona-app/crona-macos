@@ -58,7 +58,7 @@ struct HabitsTabView: View {
                             actionsDisabled: appState.habitsService.actionInFlightHabitID != nil,
                             isLogging: loggingHabitID == habit.id,
                             logSeconds: $logSeconds,
-                            onComplete: { appState.completeHabit(habit) },
+                            onComplete: { appState.habitEditor.complete(habit) },
                             onBeginLog: {
                                 logSeconds = max(60, (habit.targetMinutes ?? 1) * 60)
                                 withAnimation(SystemGlassSettings.shared.reduceMotion ? nil : .easeInOut(duration: 0.18)) {
@@ -66,7 +66,7 @@ struct HabitsTabView: View {
                                 }
                             },
                             onSubmitLog: {
-                                appState.logHabit(
+                                appState.habitEditor.log(
                                     habit,
                                     durationMinutes: max(
                                         1, Int((Double(logSeconds) / 60).rounded()))
@@ -80,13 +80,13 @@ struct HabitsTabView: View {
                                     loggingHabitID = nil
                                 }
                             },
-                            onFail: { appState.failHabit(habit) },
-                            onClear: { appState.clearHabitCompletion(habit) },
+                            onFail: { appState.habitEditor.fail(habit) },
+                            onClear: { appState.habitEditor.clearCompletion(habit) },
                             openDetails: {
                                 appState.openHabitDetails(habit)
                             },
-                            editHabit: { appState.presentHabitEditor(for: habit) },
-                            deleteHabit: { appState.presentDeleteHabit(for: habit) }
+                            editHabit: { appState.habitEditor.presentEditor(for: habit) },
+                            deleteHabit: { appState.habitEditor.presentDelete(for: habit) }
                         )
                     }
                 }

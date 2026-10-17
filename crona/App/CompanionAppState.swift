@@ -122,6 +122,16 @@ final class CompanionAppState: ObservableObject {
             }
         }
     )
+    private(set) lazy var habitEditor = HabitEditorModel(
+        daemonConnection: daemonConnection,
+        habitsService: habitsService,
+        issueCreationService: issueCreationService,
+        contextService: contextService,
+        canPresent: { [weak self] in
+            guard let self else { return false }
+            return !endSession.isSheetPresented && issueActionEditor == nil
+        }
+    )
     private(set) lazy var issueCreator = IssueCreatorModel(
         daemonConnection: daemonConnection,
         issueCreationService: issueCreationService,
@@ -152,7 +162,6 @@ final class CompanionAppState: ObservableObject {
     @Published var focusStartError: String?
     @Published var selectedFocusIssue: DailyFocusIssue?
     @Published var issueActionEditor: IssueActionEditor?
-    @Published var habitActionEditor: HabitActionEditor?
     @Published var issueActionNote = ""
     @Published var issueActionDate = Date()
     @Published var manualSessionSummary = ""
@@ -170,16 +179,6 @@ final class CompanionAppState: ObservableObject {
     @Published var manualSessionEndPeriod = "AM"
     @Published var manualSessionNotes = ""
     @Published var manualSessionError: String?
-    @Published private(set) var habitBeingEdited: HabitRowModel?
-    @Published var isHabitCreatorPresented = false
-    @Published var habitCreateName = ""
-    @Published var habitCreateDescription = ""
-    @Published var habitCreateDestinationID: Int64?
-    @Published var habitCreateScheduleType = "daily"
-    @Published var habitCreateWeekdays: Set<Int> = []
-    @Published var habitCreateTarget = ""
-    @Published var habitCreateActive = true
-    @Published var habitCreateError: String?
     @Published var selectedPopoverTab: PopoverTab = .now
     @Published var isStatsCalendarPresented = false
     @Published private(set) var selectedSettingsDestination: SettingsDestination = .general
@@ -957,142 +956,6 @@ final class CompanionAppState: ObservableObject {
         selectedFocusIssue = nil
     }
 
-    func presentHabitCreator() {
-        guard daemonConnection.connectionState == .connected,
-            !endSession.isSheetPresented, issueActionEditor == nil, habitActionEditor == nil
-        else { return }
-        habitBeingEdited = nil
-        habitsService.clearManagementError()
-        habitCreateName = ""
-        habitCreateDescription = ""
-        habitCreateDestinationID = contextService.snapshot.streamID
-        habitCreateScheduleType = "daily"
-        habitCreateWeekdays = []
-        habitCreateTarget = ""
-        habitCreateActive = true
-        habitCreateError = nil
-        isHabitCreatorPresented = true
-    }
-
-    func presentHabitEditor(for habit: HabitRowModel) {
-        guard daemonConnection.connectionState == .connected,
-            !endSession.isSheetPresented, issueActionEditor == nil, habitActionEditor == nil
-        else { return }
-        habitsService.clearManagementError()
-        habitBeingEdited = habit
-        habitCreateName = habit.name
-        habitCreateDescription = habit.description ?? ""
-        habitCreateDestinationID = issueCreationService.destinations.first {
-            $0.repoName == habit.repoName && $0.streamName == habit.streamName
-        }?.streamID
-        habitCreateScheduleType = habit.scheduleType ?? "daily"
-        habitCreateWeekdays = Set(habit.weekdays)
-        habitCreateTarget = habit.targetMinutes.map(MenuBarTextFormatter.formatMinutes) ?? ""
-        habitCreateActive = habit.active
-        habitCreateError = nil
-        isHabitCreatorPresented = true
-        Task { await issueCreationService.loadDestinations() }
-    }
-
-    func cancelHabitCreator() {
-        guard !habitsService.isManagingHabit else { return }
-        habitsService.clearManagementError()
-        habitBeingEdited = nil
-        isHabitCreatorPresented = false
-    }
-
-    func presentDeleteHabit(for habit: HabitRowModel) {
-        habitsService.clearManagementError()
-        habitActionEditor = .delete(habit: habit)
-    }
-
-    func submitHabitCreator() {
-        let name = habitCreateName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let description = habitCreateDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, name.count <= 120 else {
-            habitCreateError = "Enter a habit name."
-            return
-        }
-        let targetText = habitCreateTarget.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard case .success(let targetMinutes) = FlexibleDurationParser.optionalMinutes(targetText),
-            targetMinutes == nil || targetMinutes! >= 0
-        else {
-            habitCreateError = "Enter a valid target duration."
-            return
-        }
-        let schedule: String
-        let weekdays: [Int]
-        switch habitCreateScheduleType {
-        case "weekly":
-            guard !habitCreateWeekdays.isEmpty else {
-                habitCreateError = "Select at least one weekday."
-                return
-            }
-            schedule = "weekly"
-            weekdays = habitCreateWeekdays.sorted()
-        case "weekdays":
-            schedule = "weekdays"
-            weekdays = []
-        default:
-            schedule = "daily"
-            weekdays = []
-        }
-        guard let streamID = habitCreateDestinationID else {
-            habitCreateError = "Choose a repository and stream."
-            return
-        }
-        habitCreateError = nil
-        let refreshDate = habitsService.snapshot.date.isEmpty ? DailyFocusService.todayString() : habitsService.snapshot.date
-        if let habit = habitBeingEdited {
-            Task {
-                let succeeded = await habitsService.update(
-                    CronaUpdateHabitRequest(
-                        id: habit.id,
-                        name: name,
-                        description: description.isEmpty ? nil : description,
-                        scheduleType: schedule,
-                        weekdays: weekdays,
-                        targetMinutes: targetMinutes,
-                        active: habitCreateActive
-                    ),
-                    refreshDate: refreshDate
-                )
-                if succeeded { self.habitBeingEdited = nil; self.isHabitCreatorPresented = false }
-            }
-        } else {
-            Task {
-                let succeeded = await habitsService.create(
-                    CronaCreateHabitRequest(
-                        streamID: streamID,
-                        name: name,
-                        description: description.isEmpty ? nil : description,
-                        scheduleType: schedule,
-                        weekdays: weekdays,
-                        targetMinutes: targetMinutes
-                    ),
-                    refreshDate: refreshDate
-                )
-                if succeeded { self.isHabitCreatorPresented = false }
-            }
-        }
-    }
-
-    func submitHabitActionEditor() {
-        guard case .delete(let habit) = habitActionEditor else { return }
-        let refreshDate = habitsService.snapshot.date.isEmpty ? DailyFocusService.todayString() : habitsService.snapshot.date
-        Task {
-            if await habitsService.delete(habit, refreshDate: refreshDate) {
-                habitActionEditor = nil
-            }
-        }
-    }
-
-    func cancelHabitActionEditor() {
-        guard !habitsService.isManagingHabit else { return }
-        habitActionEditor = nil
-        habitsService.clearManagementError()
-    }
-
     func requestIssueStatusChange(
         issue: DailyFocusIssue,
         status: CronaIssueStatus
@@ -1283,27 +1146,6 @@ final class CompanionAppState: ObservableObject {
                 focusStartError = error.localizedDescription
             }
         }
-    }
-
-    func completeHabit(_ habit: HabitRowModel) {
-        Task { await habitsService.complete(habit) }
-    }
-
-    func logHabit(_ habit: HabitRowModel, durationMinutes: Int) {
-        Task {
-            await habitsService.complete(
-                habit,
-                durationMinutes: max(1, durationMinutes)
-            )
-        }
-    }
-
-    func failHabit(_ habit: HabitRowModel) {
-        Task { await habitsService.fail(habit) }
-    }
-
-    func clearHabitCompletion(_ habit: HabitRowModel) {
-        Task { await habitsService.clearCompletion(habit) }
     }
 
     func requestNotificationAuthorization() {

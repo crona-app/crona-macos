@@ -54,6 +54,7 @@ struct PopoverRootView: View {
     @ObservedObject var appState: CompanionAppState
     @ObservedObject private var issueCreator: IssueCreatorModel
     @ObservedObject private var endSession: EndSessionModel
+    @ObservedObject private var habitEditor: HabitEditorModel
     let displayClock: PopupDisplayClock
     let onVisibleSurfaceHeightChange: ((CGFloat) -> Void)?
     @Environment(\.openSettings) private var openSettings
@@ -66,13 +67,14 @@ struct PopoverRootView: View {
         self.appState = appState
         self.issueCreator = appState.issueCreator
         self.endSession = appState.endSession
+        self.habitEditor = appState.habitEditor
         self.displayClock = displayClock
         self.onVisibleSurfaceHeightChange = onVisibleSurfaceHeightChange
     }
 
     var body: some View {
         Group {
-            if hasDashboardModal || issueCreator.isPresented || appState.isHabitCreatorPresented {
+            if hasDashboardModal || issueCreator.isPresented || habitEditor.isPresented {
                 ViewThatFits(in: .vertical) {
                     modalSurface
                     ScrollView(.vertical) {
@@ -224,14 +226,14 @@ struct PopoverRootView: View {
                         .scale(scale: 0.96)
                             .combined(with: .opacity)
                     )
-            } else if case .delete(let habit) = appState.habitActionEditor {
-                HabitDeleteConfirmationView(appState: appState, habit: habit)
+            } else if case .delete(let habit) = habitEditor.actionEditor {
+                HabitDeleteConfirmationView(appState: appState, habitEditor: habitEditor, habit: habit)
                     .transition(.scale(scale: 0.96).combined(with: .opacity))
             } else if issueCreator.isPresented {
                 IssueCreatorView(appState: appState, issueCreator: issueCreator)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
-            } else if appState.isHabitCreatorPresented {
-                HabitCreatorView(appState: appState)
+            } else if habitEditor.isPresented {
+                HabitCreatorView(appState: appState, habitEditor: habitEditor)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
@@ -239,7 +241,7 @@ struct PopoverRootView: View {
         .frame(width: StatusPopupSizing.width, alignment: .top)
         .padding(.vertical, hasDashboardModal ? 14 : 0)
         .background {
-            if issueCreator.isPresented || appState.isHabitCreatorPresented {
+            if issueCreator.isPresented || habitEditor.isPresented {
                 PopoverGlassBackground()
             }
         }
@@ -253,7 +255,7 @@ struct PopoverRootView: View {
 
     private var hasDashboardModal: Bool {
         endSession.isSheetPresented || appState.issueActionEditor != nil
-            || appState.habitActionEditor != nil
+            || habitEditor.actionEditor != nil
     }
 
     private var header: some View {
@@ -295,7 +297,7 @@ struct PopoverRootView: View {
                             appState.popoverStatsService.beginCalendar()
                             appState.isStatsCalendarPresented.toggle()
                         } else if appState.selectedPopoverTab == .habits {
-                            appState.presentHabitCreator()
+                            habitEditor.presentCreator()
                         } else {
                             issueCreator.presentCreator()
                         }

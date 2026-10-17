@@ -151,13 +151,13 @@ struct HabitDetailView: View {
                 Menu {
                     Button {
                         appState.dismissDetails()
-                        appState.presentHabitEditor(for: habit)
+                        appState.habitEditor.presentEditor(for: habit)
                     } label: {
                         Label("Edit Habit", systemImage: "pencil")
                     }
                     Button(role: .destructive) {
                         appState.dismissDetails()
-                        appState.presentDeleteHabit(for: habit)
+                        appState.habitEditor.presentDelete(for: habit)
                     } label: {
                         Label("Delete Habit", systemImage: "trash")
                     }
@@ -165,9 +165,9 @@ struct HabitDetailView: View {
                     Button {
                         appState.dismissDetails()
                         if habit.completed || habit.status == "failed" {
-                            appState.clearHabitCompletion(habit)
+                            appState.habitEditor.clearCompletion(habit)
                         } else {
-                            appState.completeHabit(habit)
+                            appState.habitEditor.complete(habit)
                         }
                     } label: {
                         Label(
@@ -179,7 +179,7 @@ struct HabitDetailView: View {
                     if !habit.completed {
                         Button {
                             appState.dismissDetails()
-                            appState.failHabit(habit)
+                            appState.habitEditor.fail(habit)
                         } label: {
                             Label("Mark Failed", systemImage: "xmark")
                         }
@@ -273,7 +273,7 @@ struct HabitDetailView: View {
             if !habit.completed && habit.status != "failed" {
                 HStack(spacing: 10) {
                     Button {
-                        appState.failHabit(habit)
+                        appState.habitEditor.fail(habit)
                     } label: {
                         Label("Fail", systemImage: "xmark")
                             .frame(maxWidth: .infinity)
@@ -281,7 +281,7 @@ struct HabitDetailView: View {
                     .buttonStyle(.bordered)
 
                     Button {
-                        appState.completeHabit(habit)
+                        appState.habitEditor.complete(habit)
                     } label: {
                         Label("Done", systemImage: "checkmark")
                             .frame(maxWidth: .infinity)
@@ -322,7 +322,7 @@ struct HabitDetailView: View {
             return
         }
 
-        appState.logHabit(
+        appState.habitEditor.log(
             habit,
             durationMinutes: max(1, Int((Double(seconds) / 60).rounded()))
         )
