@@ -10,14 +10,14 @@ final class IssueActionEditorModelTests: DaemonTestCase {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
-        appState.presentManualSession(for: fixtureIssue)
-        appState.manualSessionWorkHours = 0
-        appState.manualSessionWorkMinutes = 0
+        appState.issueActions.presentManualSession(for: fixtureIssue)
+        appState.issueActions.manualSession.workHours = 0
+        appState.issueActions.manualSession.workMinutes = 0
 
-        appState.submitIssueActionEditor()
+        appState.issueActions.submit()
         await settleAsyncTasks()
 
-        XCTAssertEqual(appState.manualSessionError, "Work duration must be a positive duration.")
+        XCTAssertEqual(appState.issueActions.manualSessionError, "Work duration must be a positive duration.")
         XCTAssertFalse(transport.methods.contains("session.log_manual"))
     }
 
@@ -25,16 +25,16 @@ final class IssueActionEditorModelTests: DaemonTestCase {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
-        appState.presentManualSession(for: fixtureIssue)
-        appState.manualSessionTimesEnabled = true
-        appState.manualSessionStartHour = 12
-        appState.manualSessionStartMinute = 5
-        appState.manualSessionStartPeriod = "AM"
-        appState.manualSessionEndHour = 1
-        appState.manualSessionEndMinute = 30
-        appState.manualSessionEndPeriod = "PM"
+        appState.issueActions.presentManualSession(for: fixtureIssue)
+        appState.issueActions.manualSession.timesEnabled = true
+        appState.issueActions.manualSession.startHour = 12
+        appState.issueActions.manualSession.startMinute = 5
+        appState.issueActions.manualSession.startPeriod = "AM"
+        appState.issueActions.manualSession.endHour = 1
+        appState.issueActions.manualSession.endMinute = 30
+        appState.issueActions.manualSession.endPeriod = "PM"
 
-        appState.submitIssueActionEditor()
+        appState.issueActions.submit()
         await waitForIssueCreator { transport.methods.contains("session.log_manual") }
 
         let log = try XCTUnwrap(transport.requests.first(where: { $0.method == "session.log_manual" }))
@@ -46,13 +46,13 @@ final class IssueActionEditorModelTests: DaemonTestCase {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
-        appState.requestIssueStatusChange(issue: fixtureIssue, status: .blocked)
-        appState.issueActionNote = "   "
+        appState.issueActions.requestStatusChange(issue: fixtureIssue, status: .blocked)
+        appState.issueActions.note = "   "
 
-        appState.submitIssueActionEditor()
+        appState.issueActions.submit()
         await settleAsyncTasks()
 
-        XCTAssertEqual(appState.issueActionEditor, .status(issue: fixtureIssue, status: .blocked))
+        XCTAssertEqual(appState.issueActions.editor, .status(issue: fixtureIssue, status: .blocked))
         XCTAssertFalse(transport.methods.contains("issue.change_status"))
     }
 
@@ -61,10 +61,10 @@ final class IssueActionEditorModelTests: DaemonTestCase {
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
         appState.selectedFocusIssue = fixtureIssue
-        appState.presentDeleteIssue(for: fixtureIssue)
+        appState.issueActions.presentDelete(for: fixtureIssue)
 
-        appState.submitIssueActionEditor()
-        await waitForIssueCreator { appState.issueActionEditor == nil }
+        appState.issueActions.submit()
+        await waitForIssueCreator { appState.issueActions.editor == nil }
 
         XCTAssertTrue(transport.methods.contains("issue.delete"))
         XCTAssertNil(appState.selectedFocusIssue)

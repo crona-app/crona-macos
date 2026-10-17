@@ -60,7 +60,7 @@ struct IssueDetailView: View {
                     }
                     Button {
                         appState.dismissDetails()
-                        appState.presentManualSession(for: issue)
+                        appState.issueActions.presentManualSession(for: issue)
                     } label: {
                         Label("Log Session…", systemImage: "clock.fill")
                     }
@@ -68,7 +68,7 @@ struct IssueDetailView: View {
                         ForEach(CronaIssueStatus.allCases) { status in
                             Button {
                                 appState.dismissDetails()
-                                appState.requestIssueStatusChange(issue: issue, status: status)
+                                appState.issueActions.requestStatusChange(issue: issue, status: status)
                             } label: {
                                 Label(status.title, systemImage: status.systemImage)
                             }
@@ -76,7 +76,7 @@ struct IssueDetailView: View {
                     }
                     Button(role: .destructive) {
                         appState.dismissDetails()
-                        appState.presentDeleteIssue(for: issue)
+                        appState.issueActions.presentDelete(for: issue)
                     } label: {
                         Label("Delete Issue", systemImage: "trash")
                     }

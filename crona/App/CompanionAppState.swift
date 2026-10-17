@@ -122,6 +122,14 @@ final class CompanionAppState: ObservableObject {
             }
         }
     )
+    private(set) lazy var issueActions = IssueActionEditorModel(
+        daemonConnection: daemonConnection,
+        issueActionsService: issueActionsService,
+        dailyFocusService: dailyFocusService,
+        onIssueDeleted: { [weak self] issueID in
+            if self?.selectedFocusIssue?.id == issueID { self?.selectedFocusIssue = nil }
+        }
+    )
     private(set) lazy var habitEditor = HabitEditorModel(
         daemonConnection: daemonConnection,
         habitsService: habitsService,
@@ -129,7 +137,7 @@ final class CompanionAppState: ObservableObject {
         contextService: contextService,
         canPresent: { [weak self] in
             guard let self else { return false }
-            return !endSession.isSheetPresented && issueActionEditor == nil
+            return !endSession.isSheetPresented && issueActions.editor == nil
         }
     )
     private(set) lazy var issueCreator = IssueCreatorModel(
@@ -140,7 +148,7 @@ final class CompanionAppState: ObservableObject {
         contextService: contextService,
         canPresent: { [weak self] in
             guard let self else { return false }
-            return !endSession.isSheetPresented && issueActionEditor == nil
+            return !endSession.isSheetPresented && issueActions.editor == nil
         },
         hasActiveFocusSession: { [weak self] in self?.hasActiveFocusSession ?? false },
         focusIssue: { [weak self] issue in
@@ -161,24 +169,6 @@ final class CompanionAppState: ObservableObject {
     @Published var isStartingFocus = false
     @Published var focusStartError: String?
     @Published var selectedFocusIssue: DailyFocusIssue?
-    @Published var issueActionEditor: IssueActionEditor?
-    @Published var issueActionNote = ""
-    @Published var issueActionDate = Date()
-    @Published var manualSessionSummary = ""
-    @Published var manualSessionDate = ""
-    @Published var manualSessionWorkHours = 1
-    @Published var manualSessionWorkMinutes = 0
-    @Published var manualSessionBreakHours = 0
-    @Published var manualSessionBreakMinutes = 0
-    @Published var manualSessionTimesEnabled = false
-    @Published var manualSessionStartHour = 9
-    @Published var manualSessionStartMinute = 0
-    @Published var manualSessionStartPeriod = "AM"
-    @Published var manualSessionEndHour = 10
-    @Published var manualSessionEndMinute = 45
-    @Published var manualSessionEndPeriod = "AM"
-    @Published var manualSessionNotes = ""
-    @Published var manualSessionError: String?
     @Published var selectedPopoverTab: PopoverTab = .now
     @Published var isStatsCalendarPresented = false
     @Published private(set) var selectedSettingsDestination: SettingsDestination = .general
@@ -431,7 +421,7 @@ final class CompanionAppState: ObservableObject {
             || windowService.breakScreensVisible
             || windowService.hardLimitPopupVisible
             || endSession.isSheetPresented
-            || issueActionEditor != nil
+            || issueActions.editor != nil
             || issueCreator.isPresented
     }
 
@@ -954,176 +944,6 @@ final class CompanionAppState: ObservableObject {
         isAdhocStartSelected = false
         focusStartError = nil
         selectedFocusIssue = nil
-    }
-
-    func requestIssueStatusChange(
-        issue: DailyFocusIssue,
-        status: CronaIssueStatus
-    ) {
-        issueActionsService.clearError()
-        guard status.notePrompt != nil else {
-            Task {
-                _ = await issueActionsService.changeStatus(
-                    issue: issue,
-                    status: status,
-                    note: nil
-                )
-            }
-            return
-        }
-        issueActionNote = ""
-        issueActionEditor = .status(issue: issue, status: status)
-    }
-
-    func setIssueDueDate(_ issue: DailyFocusIssue, date: String) {
-        issueActionsService.clearError()
-        Task {
-            _ = await issueActionsService.setDueDate(issue: issue, date: date)
-        }
-    }
-
-    func clearIssueDueDate(_ issue: DailyFocusIssue) {
-        issueActionsService.clearError()
-        Task {
-            _ = await issueActionsService.clearDueDate(issue: issue)
-        }
-    }
-
-    func presentCustomDueDate(for issue: DailyFocusIssue) {
-        issueActionsService.clearError()
-        let initialValue = issue.todoForDate ?? dailyFocusService.snapshot.date
-        issueActionDate = CronaCalendarDate.date(from: initialValue) ?? Date()
-        issueActionEditor = .dueDate(issue: issue)
-    }
-
-    func presentManualSession(for issue: DailyFocusIssue) {
-        issueActionsService.clearError()
-        manualSessionSummary = ""
-        manualSessionDate =
-            dailyFocusService.snapshot.date.isEmpty
-            ? (daemonConnection.currentDate.isEmpty
-                ? DailyFocusService.todayString() : daemonConnection.currentDate)
-            : dailyFocusService.snapshot.date
-        manualSessionWorkHours = 1
-        manualSessionWorkMinutes = 0
-        manualSessionBreakHours = 0
-        manualSessionBreakMinutes = 0
-        manualSessionTimesEnabled = false
-        manualSessionStartHour = 9
-        manualSessionStartMinute = 0
-        manualSessionStartPeriod = "AM"
-        manualSessionEndHour = 10
-        manualSessionEndMinute = 45
-        manualSessionEndPeriod = "AM"
-        manualSessionNotes = ""
-        manualSessionError = nil
-        issueActionEditor = .manualSession(issue: issue)
-    }
-
-    func cancelIssueActionEditor() {
-        guard issueActionsService.actionInFlightIssueID == nil else { return }
-        issueActionEditor = nil
-        issueActionNote = ""
-        manualSessionError = nil
-    }
-
-    func presentDeleteIssue(for issue: DailyFocusIssue) {
-        issueActionsService.clearError()
-        issueActionEditor = .delete(issue: issue)
-    }
-
-    func submitIssueActionEditor() {
-        guard let editor = issueActionEditor else { return }
-        switch editor {
-        case .status(let issue, let status):
-            let trimmedNote = issueActionNote.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !status.requiresNote || !trimmedNote.isEmpty else {
-                return
-            }
-            Task {
-                let succeeded = await issueActionsService.changeStatus(
-                    issue: issue,
-                    status: status,
-                    note: trimmedNote.isEmpty ? nil : trimmedNote
-                )
-                if succeeded {
-                    issueActionEditor = nil
-                    issueActionNote = ""
-                }
-            }
-        case .dueDate(let issue):
-            let date = CronaCalendarDate.string(from: issueActionDate)
-            Task {
-                let succeeded = await issueActionsService.setDueDate(issue: issue, date: date)
-                if succeeded {
-                    issueActionEditor = nil
-                }
-            }
-        case .manualSession(let issue):
-            manualSessionError = nil
-            let workMinutes = manualSessionWorkHours * 60 + manualSessionWorkMinutes
-            let breakMinutes = manualSessionBreakHours * 60 + manualSessionBreakMinutes
-            guard workMinutes > 0 else {
-                manualSessionError = "Work duration must be a positive duration."
-                return
-            }
-            guard isValidManualDate(manualSessionDate) else {
-                manualSessionError = "Choose a valid session date."
-                return
-            }
-            let startTime =
-                manualSessionTimesEnabled
-                ? formattedManualClock(
-                    hour: manualSessionStartHour, minute: manualSessionStartMinute,
-                    period: manualSessionStartPeriod)
-                : nil
-            let endTime =
-                manualSessionTimesEnabled
-                ? formattedManualClock(
-                    hour: manualSessionEndHour, minute: manualSessionEndMinute,
-                    period: manualSessionEndPeriod)
-                : nil
-            Task {
-                let request = CronaManualSessionLogRequest(
-                    issueID: issue.id,
-                    date: manualSessionDate.trimmingCharacters(in: .whitespacesAndNewlines),
-                    workDurationSeconds: workMinutes * 60,
-                    breakDurationSeconds: breakMinutes * 60,
-                    startTime: startTime,
-                    endTime: endTime,
-                    commitMessage: optionalTrimmed(manualSessionSummary),
-                    notes: optionalTrimmed(manualSessionNotes)
-                )
-                let succeeded = await issueActionsService.logManualSession(request)
-                if succeeded {
-                    issueActionEditor = nil
-                    manualSessionError = nil
-                }
-            }
-        case .delete(let issue):
-            Task {
-                let succeeded = await issueActionsService.deleteIssue(issue)
-                if succeeded {
-                    if selectedFocusIssue?.id == issue.id { selectedFocusIssue = nil }
-                    issueActionEditor = nil
-                }
-            }
-        }
-    }
-
-    private func formattedManualClock(hour: Int, minute: Int, period: String) -> String {
-        var hour24 = hour % 12
-        if period == "PM" { hour24 += 12 }
-        return String(format: "%02d:%02d", hour24, minute)
-    }
-
-    private func isValidManualDate(_ value: String) -> Bool {
-        CronaCalendarDate.date(from: value.trimmingCharacters(in: .whitespacesAndNewlines)) != nil
-    }
-
-    private func optionalTrimmed(_ value: String) -> String? {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
     }
 
     func startSelectedFocusSession(using config: FocusStartConfigState) {

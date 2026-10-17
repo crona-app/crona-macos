@@ -55,6 +55,7 @@ struct PopoverRootView: View {
     @ObservedObject private var issueCreator: IssueCreatorModel
     @ObservedObject private var endSession: EndSessionModel
     @ObservedObject private var habitEditor: HabitEditorModel
+    @ObservedObject private var issueActions: IssueActionEditorModel
     let displayClock: PopupDisplayClock
     let onVisibleSurfaceHeightChange: ((CGFloat) -> Void)?
     @Environment(\.openSettings) private var openSettings
@@ -68,6 +69,7 @@ struct PopoverRootView: View {
         self.issueCreator = appState.issueCreator
         self.endSession = appState.endSession
         self.habitEditor = appState.habitEditor
+        self.issueActions = appState.issueActions
         self.displayClock = displayClock
         self.onVisibleSurfaceHeightChange = onVisibleSurfaceHeightChange
     }
@@ -219,8 +221,8 @@ struct PopoverRootView: View {
                             removal: .opacity
                         )
                     )
-            } else if appState.issueActionEditor != nil {
-                IssueActionEditorView(appState: appState)
+            } else if issueActions.editor != nil {
+                IssueActionEditorView(appState: appState, issueActions: issueActions)
                     .padding(.horizontal, 28)
                     .transition(
                         .scale(scale: 0.96)
@@ -254,7 +256,7 @@ struct PopoverRootView: View {
     }
 
     private var hasDashboardModal: Bool {
-        endSession.isSheetPresented || appState.issueActionEditor != nil
+        endSession.isSheetPresented || issueActions.editor != nil
             || habitEditor.actionEditor != nil
     }
 
@@ -331,7 +333,7 @@ struct PopoverRootView: View {
                     .disabled(
                         appState.daemonConnection.connectionState != .connected
                             || endSession.isSheetPresented
-                            || appState.issueActionEditor != nil
+                            || issueActions.editor != nil
                             || issueCreator.isPresented
                             || issueCreator.isSubmitting
                     )

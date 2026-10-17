@@ -716,7 +716,7 @@ final class StatusBarService: NSObject {
 
     private var isModalPresentationActive: Bool {
         guard let appState else { return false }
-        return appState.issueActionEditor != nil
+        return appState.issueActions.editor != nil
             || appState.issueCreator.isPresented
             || appState.endSession.isSheetPresented
     }

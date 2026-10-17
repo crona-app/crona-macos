@@ -627,14 +627,14 @@ struct FocusIssueRow: View {
                 }
 
                 Button(role: .destructive) {
-                    appState.presentDeleteIssue(for: issue)
+                    appState.issueActions.presentDelete(for: issue)
                 } label: {
                     Label("Delete Issue", systemImage: "trash")
                 }
 
                 Divider()
                 Button {
-                    appState.presentManualSession(for: issue)
+                    appState.issueActions.presentManualSession(for: issue)
                 } label: {
                     Label("Log Session…", systemImage: "clock.fill")
                 }
@@ -690,13 +690,13 @@ struct FocusIssueRow: View {
                 Label("Edit Issue", systemImage: "pencil")
             }
             Button(role: .destructive) {
-                appState.presentDeleteIssue(for: issue)
+                appState.issueActions.presentDelete(for: issue)
             } label: {
                 Label("Delete Issue", systemImage: "trash")
             }
             Divider()
             Button {
-                appState.presentManualSession(for: issue)
+                appState.issueActions.presentManualSession(for: issue)
             } label: {
                 Label("Log Session…", systemImage: "clock.fill")
             }
@@ -718,7 +718,7 @@ struct FocusIssueRow: View {
                 } else {
                     ForEach(transitions.allowedStatuses) { status in
                         Button {
-                            appState.requestIssueStatusChange(issue: issue, status: status)
+                            appState.issueActions.requestStatusChange(issue: issue, status: status)
                         } label: {
                             Label(status.title, systemImage: status.systemImage)
                         }
@@ -736,14 +736,14 @@ struct FocusIssueRow: View {
     private var dueDateMenu: some View {
         Menu {
             Button {
-                appState.setIssueDueDate(issue, date: anchorDate)
+                appState.issueActions.setDueDate(issue, date: anchorDate)
             } label: {
                 Label("Today", systemImage: "calendar")
             }
 
             if let tomorrow = CronaCalendarDate.adding(days: 1, to: anchorDate) {
                 Button {
-                    appState.setIssueDueDate(issue, date: tomorrow)
+                    appState.issueActions.setDueDate(issue, date: tomorrow)
                 } label: {
                     Label("Tomorrow", systemImage: "sunrise")
                 }
@@ -751,7 +751,7 @@ struct FocusIssueRow: View {
 
             if let nextWeek = CronaCalendarDate.adding(days: 7, to: anchorDate) {
                 Button {
-                    appState.setIssueDueDate(issue, date: nextWeek)
+                    appState.issueActions.setDueDate(issue, date: nextWeek)
                 } label: {
                     Label("Next Week", systemImage: "calendar.badge.plus")
                 }
@@ -760,14 +760,14 @@ struct FocusIssueRow: View {
             Divider()
 
             Button {
-                appState.presentCustomDueDate(for: issue)
+                appState.issueActions.presentCustomDueDate(for: issue)
             } label: {
                 Label("Choose Date…", systemImage: "calendar.circle")
             }
 
             if issue.todoForDate != nil {
                 Button(role: .destructive) {
-                    appState.clearIssueDueDate(issue)
+                    appState.issueActions.clearDueDate(issue)
                 } label: {
                     Label("Clear Due Date", systemImage: "calendar.badge.minus")
                 }

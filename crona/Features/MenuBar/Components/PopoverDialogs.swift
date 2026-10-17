@@ -206,11 +206,12 @@ struct ReverseProgressBar: View {
 
 struct IssueActionEditorView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject var issueActions: IssueActionEditorModel
     @FocusState private var noteIsFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            switch appState.issueActionEditor {
+            switch issueActions.editor {
             case .status(let issue, let status):
                 statusEditor(issue: issue, status: status)
             case .dueDate(let issue):
@@ -228,7 +229,7 @@ struct IssueActionEditorView: View {
         .background(PopoverDialogBackground(cornerRadius: 28))
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .onAppear {
-            if case .status = appState.issueActionEditor {
+            if case .status = issueActions.editor {
                 DispatchQueue.main.async {
                     noteIsFocused = true
                 }
@@ -249,7 +250,7 @@ struct IssueActionEditorView: View {
 
         TextField(
             status.notePrompt ?? "Note",
-            text: $appState.issueActionNote,
+            text: $issueActions.note,
             axis: .vertical
         )
         .textFieldStyle(.plain)
@@ -274,7 +275,7 @@ struct IssueActionEditorView: View {
         editorActions(
             submitTitle: "Change Status",
             submitDisabled: status.requiresNote
-                && appState.issueActionNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && issueActions.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         )
     }
 
@@ -288,7 +289,7 @@ struct IssueActionEditorView: View {
 
         DatePicker(
             "Due date",
-            selection: $appState.issueActionDate,
+            selection: $issueActions.date,
             displayedComponents: .date
         )
         .datePickerStyle(.graphical)
@@ -313,12 +314,12 @@ struct IssueActionEditorView: View {
                 Label("Date", systemImage: "calendar")
                     .foregroundStyle(PopupVisualTheme.secondaryText)
                 Spacer()
-                Text(formattedPopoverDate(appState.manualSessionDate, appState: appState))
+                Text(formattedPopoverDate(issueActions.manualSession.date, appState: appState))
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(PopupVisualTheme.primaryText)
             }
 
-            TextField("Summary (optional)", text: $appState.manualSessionSummary)
+            TextField("Summary (optional)", text: $issueActions.manualSession.summary)
                 .textFieldStyle(.plain)
                 .padding(10)
                 .popupInputSurface()
@@ -326,13 +327,13 @@ struct IssueActionEditorView: View {
             manualSessionSection("Duration", systemImage: "hourglass") {
                 durationPickerRow(
                     title: "Work",
-                    hours: $appState.manualSessionWorkHours,
-                    minutes: $appState.manualSessionWorkMinutes
+                    hours: $issueActions.manualSession.workHours,
+                    minutes: $issueActions.manualSession.workMinutes
                 )
                 durationPickerRow(
                     title: "Break",
-                    hours: $appState.manualSessionBreakHours,
-                    minutes: $appState.manualSessionBreakMinutes
+                    hours: $issueActions.manualSession.breakHours,
+                    minutes: $issueActions.manualSession.breakMinutes
                 )
             }
 
@@ -341,25 +342,25 @@ struct IssueActionEditorView: View {
                     Text("Set start and end times")
                         .font(.subheadline.weight(.medium))
                     Spacer(minLength: 12)
-                    Toggle("", isOn: $appState.manualSessionTimesEnabled)
+                    Toggle("", isOn: $issueActions.manualSession.timesEnabled)
                         .labelsHidden()
                         .toggleStyle(.switch)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
 
-                if appState.manualSessionTimesEnabled {
+                if issueActions.manualSession.timesEnabled {
                     timePickerRow(
                         title: "Start",
-                        hour: $appState.manualSessionStartHour,
-                        minute: $appState.manualSessionStartMinute,
-                        period: $appState.manualSessionStartPeriod
+                        hour: $issueActions.manualSession.startHour,
+                        minute: $issueActions.manualSession.startMinute,
+                        period: $issueActions.manualSession.startPeriod
                     )
                     timePickerRow(
                         title: "End",
-                        hour: $appState.manualSessionEndHour,
-                        minute: $appState.manualSessionEndMinute,
-                        period: $appState.manualSessionEndPeriod
+                        hour: $issueActions.manualSession.endHour,
+                        minute: $issueActions.manualSession.endMinute,
+                        period: $issueActions.manualSession.endPeriod
                     )
                 }
             }
@@ -368,7 +369,7 @@ struct IssueActionEditorView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(PopupVisualTheme.secondaryText)
             TextField(
-                "Anything else worth remembering? (optional)", text: $appState.manualSessionNotes,
+                "Anything else worth remembering? (optional)", text: $issueActions.manualSession.notes,
                 axis: .vertical
             )
             .textFieldStyle(.plain)
@@ -399,14 +400,14 @@ struct IssueActionEditorView: View {
 
         HStack(spacing: 10) {
             Button("Cancel") {
-                appState.cancelIssueActionEditor()
+                issueActions.cancel()
             }
             .keyboardShortcut(.cancelAction)
 
             Spacer()
 
             Button(role: .destructive) {
-                appState.submitIssueActionEditor()
+                issueActions.submit()
             } label: {
                 Label(
                     appState.issueActionsService.actionInFlightIssueID == issue.id
@@ -503,7 +504,7 @@ struct IssueActionEditorView: View {
 
     @ViewBuilder
     private var editorError: some View {
-        if let error = appState.manualSessionError ?? appState.issueActionsService.lastErrorMessage
+        if let error = issueActions.manualSessionError ?? appState.issueActionsService.lastErrorMessage
         {
             Label(error, systemImage: "exclamationmark.triangle.fill")
                 .font(.caption)
@@ -540,14 +541,14 @@ struct IssueActionEditorView: View {
     ) -> some View {
         HStack {
             Button("Cancel") {
-                appState.cancelIssueActionEditor()
+                issueActions.cancel()
             }
             .keyboardShortcut(.cancelAction)
 
             Spacer()
 
             Button {
-                appState.submitIssueActionEditor()
+                issueActions.submit()
             } label: {
                 HStack(spacing: 6) {
                     Image(

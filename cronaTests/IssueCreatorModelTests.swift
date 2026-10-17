@@ -21,7 +21,7 @@ final class IssueCreatorModelTests: DaemonTestCase {
         let (connection, _) = try await issueCreatorConnection()
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
-        appState.issueActionEditor = .delete(issue: fixtureIssue)
+        appState.issueActions.editor = .delete(issue: fixtureIssue)
 
         appState.issueCreator.presentCreator()
 
