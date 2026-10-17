@@ -66,12 +66,23 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
     var creationStatus = "planned"
     var createdFixture: [String: Any]?
     var failStatusChange = false
+    var failStart = false
+    var suspendStart = false
+    var awayModeEnabled = false
+    var healthDate: String?
     var refreshContinuation: CheckedContinuation<Void, Never>?
+    private var startContinuation: CheckedContinuation<Void, Never>?
 
     func resumeRefresh() {
         suspendRefresh = false
         refreshContinuation?.resume()
         refreshContinuation = nil
+    }
+
+    func resumeStart() {
+        suspendStart = false
+        startContinuation?.resume()
+        startContinuation = nil
     }
 
     func send(_ request: Data) async throws -> Data {
@@ -84,7 +95,7 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
         switch probe.method {
         case "health.get":
             result = ["status": "ok", "db": true, "ok": 1, "uptime": 1,
-                "currentDate": logicalDate, "timezone": "Asia/Kolkata"] as [String: Any]
+                "currentDate": healthDate ?? logicalDate, "timezone": "Asia/Kolkata"] as [String: Any]
         case "kernel.info.get":
             result = ["pid": 1, "protocolVersion": CronaProtocolVersion.current.rawValue] as [String: Any]
         case "issue.create", "issue.update", "issue.set_todo", "issue.clear_todo":
@@ -113,6 +124,14 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
             } else {
                 result = ["state": "idle"]
             }
+        case "timer.start":
+            if suspendStart {
+                await withCheckedContinuation { startContinuation = $0 }
+            }
+            if failStart { throw NSError(domain: "FocusStartTests", code: 1) }
+            result = ["state": "idle"]
+        case "settings.get_all" where awayModeEnabled:
+            result = ["local": ["awayModeEnabled": true]]
         case "timer.extend":
             if failExtend { throw NSError(domain: "PopupTests", code: 1) }
             result = timerStateFixture ?? ["state": "idle"]
