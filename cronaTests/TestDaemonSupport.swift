@@ -54,6 +54,7 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
     var failEnd = false
     var hasAdhocSession = false
     var timerStateFixture: [String: Any]?
+    var failExtend = false
     var provideDestinations = false
     var creationStatus = "planned"
     var createdFixture: [String: Any]?
@@ -105,6 +106,9 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
             } else {
                 result = ["state": "idle"]
             }
+        case "timer.extend":
+            if failExtend { throw NSError(domain: "PopupTests", code: 1) }
+            result = timerStateFixture ?? ["state": "idle"]
         case "timer.end":
             if failEnd { throw NSError(domain: "AdhocTests", code: 1) }
             hasAdhocSession = false

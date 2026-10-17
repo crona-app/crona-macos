@@ -1187,7 +1187,7 @@ final class CompanionAppState: ObservableObject {
         }
     }
 
-    private func presentInactivityPopup(for delivery: CronaAlertDelivery) async -> Bool {
+    func presentInactivityPopup(for delivery: CronaAlertDelivery) async -> Bool {
         guard preferences.preferences.showInactivityActionPopups else { return false }
 
         await timerService.refresh()
