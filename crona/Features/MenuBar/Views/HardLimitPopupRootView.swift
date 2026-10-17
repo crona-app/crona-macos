@@ -102,6 +102,7 @@ private struct HardLimitTimeContextView: View {
 
 struct HardLimitPopupRootView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject var endSession: EndSessionModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -129,7 +130,7 @@ struct HardLimitPopupRootView: View {
         }
         .frame(
             width: HardLimitPopupSizing.panelWidth,
-            height: HardLimitPopupSizing.panelHeight(for: appState.hardLimitPopupPhase, adhoc: appState.timerService.snapshot.adhoc, adhocHeight: appState.adhocCompletionHeight),
+            height: HardLimitPopupSizing.panelHeight(for: appState.hardLimitPopupPhase, adhoc: appState.timerService.snapshot.adhoc, adhocHeight: endSession.adhocCompletionHeight),
             alignment: .center
         )
         .companionAppearance(appState)
@@ -422,6 +423,7 @@ private struct InactivityEndSessionView: View {
     var body: some View {
         PopupEndSessionForm(
             appState: appState,
+            endSession: appState.endSession,
             subtitle: "Add a short note for this focus session.",
             timeSummary: nil,
             timeContextIntent: nil,
@@ -544,6 +546,7 @@ private struct HardLimitEndSessionView: View {
     var body: some View {
         PopupEndSessionForm(
             appState: appState,
+            endSession: appState.endSession,
             subtitle: "What did you complete? Add a short note before closing the session.",
             timeSummary: HardLimitSessionTimeSummary.from(appState.timerService.snapshot),
             timeContextIntent: .commit,
@@ -554,6 +557,7 @@ private struct HardLimitEndSessionView: View {
 
 private struct PopupEndSessionForm: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject var endSession: EndSessionModel
     let subtitle: String
     let timeSummary: HardLimitSessionTimeSummary?
     let timeContextIntent: HardLimitTimeContextIntent?
@@ -561,7 +565,7 @@ private struct PopupEndSessionForm: View {
 
     @ViewBuilder var body: some View {
         if appState.timerService.snapshot.adhoc {
-            AdhocAttributionView(appState: appState, onCancel: onBack)
+            AdhocAttributionView(appState: appState, endSession: endSession, onCancel: onBack)
         } else {
             VStack(alignment: .leading, spacing: 12) {
                 header(symbol: "checkmark.circle", title: "End Session", subtitle: subtitle)
@@ -576,15 +580,15 @@ private struct PopupEndSessionForm: View {
                         .foregroundStyle(PopupVisualTheme.primaryText)
 
                     StableMultilineTextField(
-                        text: $appState.endSessionCommitMessage,
+                        text: $endSession.commitMessage,
                         placeholder: "e.g. Updated the install docs and verified the Linux steps",
-                        isEnabled: !appState.isSubmittingEndSession,
-                        focusRequest: appState.endSessionFocusRequest
+                        isEnabled: !endSession.isSubmitting,
+                        focusRequest: endSession.focusRequest
                     )
                     .frame(height: 104)
                     .popupInputSurface(cornerRadius: 12)
 
-                    if let error = appState.endSessionErrorMessage, !error.isEmpty {
+                    if let error = endSession.errorMessage, !error.isEmpty {
                         Text(error)
                             .font(.caption)
                             .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.92))
@@ -593,17 +597,17 @@ private struct PopupEndSessionForm: View {
 
                 VStack(spacing: 8) {
                     Button {
-                        appState.confirmEndSession()
+                        endSession.confirm()
                     } label: {
                         popupButtonLabel(
-                            title: appState.isSubmittingEndSession ? "Ending Session" : appState.endSessionActionTitle,
+                            title: endSession.isSubmitting ? "Ending Session" : endSession.actionTitle,
                             shortcut: "⌘↩",
-                            isLoading: appState.isSubmittingEndSession
+                            isLoading: endSession.isSubmitting
                         )
                     }
                     .buttonStyle(PopupFullWidthButtonStyle(style: .primary))
                     .keyboardShortcut(.return, modifiers: [.command])
-                    .disabled(!appState.canSubmitEndSession)
+                    .disabled(!endSession.canSubmit)
 
                     Button {
                         onBack()
@@ -612,7 +616,7 @@ private struct PopupEndSessionForm: View {
                     }
                     .buttonStyle(PopupFullWidthButtonStyle(style: .secondary))
                     .keyboardShortcut(.cancelAction)
-                    .disabled(appState.isSubmittingEndSession)
+                    .disabled(endSession.isSubmitting)
                 }
             }
             .padding(10)

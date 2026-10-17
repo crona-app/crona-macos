@@ -120,8 +120,8 @@ final class WindowService {
         let panel = timerHUDPanel ?? makeTimerHUDPanel(appState: appState)
         timerHUDPanel = panel
         prepareTransientPanel(panel)
-        if appState.endSessionPresentationSource == .timerHUD, appState.timerService.snapshot.adhoc {
-            let size = NSSize(width: 396, height: appState.adhocCompletionHeight + 16)
+        if appState.endSession.presentationSource == .timerHUD, appState.timerService.snapshot.adhoc {
+            let size = NSSize(width: 396, height: appState.endSession.adhocCompletionHeight + 16)
             if panel.frame.size != size {
                 var frame = panel.frame
                 frame.origin.y = frame.maxY - size.height
@@ -199,7 +199,7 @@ final class WindowService {
         if presented {
             timerHUDCompactFrame = panel.frame
             var frame = panel.frame
-            let size = appState?.timerService.snapshot.adhoc == true ? NSSize(width: 396, height: (appState?.adhocCompletionHeight ?? 600) + 16) : TimerHUDMetrics.commitSize
+            let size = appState?.timerService.snapshot.adhoc == true ? NSSize(width: 396, height: (appState?.endSession.adhocCompletionHeight ?? 600) + 16) : TimerHUDMetrics.commitSize
             frame.origin.y = frame.maxY - size.height
             frame.size = size
             frame = clampedWindowFrame(frame)
@@ -302,6 +302,7 @@ final class WindowService {
         TimerHUDHostingController(
             rootView: TimerHUDRootView(
                 appState: appState!,
+                endSession: appState!.endSession,
                 size: size
             )
         )
@@ -1028,7 +1029,7 @@ final class WindowService {
         panel.standardWindowButton(.zoomButton)?.isHidden = true
         panel.isReleasedWhenClosed = false
         panel.contentViewController = NSHostingController(
-            rootView: HardLimitPopupRootView(appState: appState))
+            rootView: HardLimitPopupRootView(appState: appState, endSession: appState.endSession))
         return panel
     }
 
@@ -1112,7 +1113,7 @@ final class WindowService {
         case .decision:
             height = 95 + PopupCloseChromeInsets.top
         case .endSession:
-            height = (appState.timerService.snapshot.adhoc ? appState.adhocCompletionHeight + 32 : 430) + PopupCloseChromeInsets.top
+            height = (appState.timerService.snapshot.adhoc ? appState.endSession.adhocCompletionHeight + 32 : 430) + PopupCloseChromeInsets.top
         case nil:
             height = panel.frame.height
         }
@@ -1135,7 +1136,7 @@ final class WindowService {
 
     private func resizeHardLimitPanel(_ panel: NSPanel, animated: Bool) {
         guard let appState else { return }
-        let height = HardLimitPopupSizing.panelHeight(for: appState.hardLimitPopupPhase, adhoc: appState.timerService.snapshot.adhoc, adhocHeight: appState.adhocCompletionHeight)
+        let height = HardLimitPopupSizing.panelHeight(for: appState.hardLimitPopupPhase, adhoc: appState.timerService.snapshot.adhoc, adhocHeight: appState.endSession.adhocCompletionHeight)
         guard abs(panel.frame.height - height) > 0.5 else { return }
 
         var frame = panel.frame

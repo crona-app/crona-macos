@@ -37,6 +37,7 @@ extension TimerHUDSize {
 
 struct TimerHUDRootView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject var endSession: EndSessionModel
     var size: TimerHUDSize = .spacious
     var isPreview = false
     @State private var isHovered = false
@@ -46,7 +47,7 @@ struct TimerHUDRootView: View {
 
     var body: some View {
         Group {
-            if appState.endSessionPresentationSource == .timerHUD {
+            if endSession.presentationSource == .timerHUD {
                 commitView
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
             } else {
@@ -54,7 +55,7 @@ struct TimerHUDRootView: View {
                     .transition(.opacity)
             }
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: appState.endSessionPresentationSource)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: endSession.presentationSource)
         .padding(8)
         .companionAppearance(appState)
     }
@@ -163,7 +164,7 @@ struct TimerHUDRootView: View {
 
     @ViewBuilder private var commitView: some View {
         if appState.timerService.snapshot.adhoc {
-            AdhocAttributionView(appState: appState)
+            AdhocAttributionView(appState: appState, endSession: endSession)
                 .frame(width: 380)
                 .background(PopoverGlassBackground(cornerRadius: 22, showsShadow: false))
                 .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(PopupVisualTheme.surfaceStroke, lineWidth: 0.8))
@@ -190,16 +191,16 @@ struct TimerHUDRootView: View {
                     Text("Commit message")
                         .font(.subheadline.weight(.semibold))
                     StableMultilineTextField(
-                        text: $appState.endSessionCommitMessage,
+                        text: $endSession.commitMessage,
                         placeholder: "Describe what you completed",
-                        isEnabled: !appState.isSubmittingEndSession,
-                        focusRequest: appState.endSessionFocusRequest
+                        isEnabled: !endSession.isSubmitting,
+                        focusRequest: endSession.focusRequest
                     )
                     .frame(height: 116)
                     .popupInputSurface(cornerRadius: 12)
                 }
 
-                if let error = appState.endSessionErrorMessage, !error.isEmpty {
+                if let error = endSession.errorMessage, !error.isEmpty {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
                         .font(.caption)
                         .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.9))
@@ -209,22 +210,22 @@ struct TimerHUDRootView: View {
                 Spacer(minLength: 0)
 
                 HStack {
-                    Button("Cancel") { appState.cancelEndSession() }
+                    Button("Cancel") { endSession.cancel() }
                         .keyboardShortcut(.cancelAction)
-                        .disabled(appState.isSubmittingEndSession)
+                        .disabled(endSession.isSubmitting)
                     Spacer()
                     Button {
-                        appState.confirmEndSession()
+                        endSession.confirm()
                     } label: {
-                        if appState.isSubmittingEndSession {
+                        if endSession.isSubmitting {
                             ProgressView().controlSize(.small)
                         } else {
-                            Text(appState.endSessionActionTitle)
+                            Text(endSession.actionTitle)
                         }
                     }
                     .keyboardShortcut(.return, modifiers: [.command])
                     .buttonStyle(.borderedProminent)
-                    .disabled(!appState.canSubmitEndSession)
+                    .disabled(!endSession.canSubmit)
                 }
             }
             .padding(20)

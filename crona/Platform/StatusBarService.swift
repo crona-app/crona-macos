@@ -718,7 +718,7 @@ final class StatusBarService: NSObject {
         guard let appState else { return false }
         return appState.issueActionEditor != nil
             || appState.issueCreator.isPresented
-            || appState.isEndSessionSheetPresented
+            || appState.endSession.isSheetPresented
     }
 
     private func stopDismissalMonitoring() {

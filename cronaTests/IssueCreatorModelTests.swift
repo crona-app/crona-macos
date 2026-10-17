@@ -10,7 +10,7 @@ final class IssueCreatorModelTests: DaemonTestCase {
         let (connection, _) = try await issueCreatorConnection()
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
-        appState.isEndSessionSheetPresented = true
+        appState.endSession.isSheetPresented = true
 
         appState.issueCreator.presentCreator()
 

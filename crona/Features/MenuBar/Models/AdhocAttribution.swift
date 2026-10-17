@@ -63,58 +63,7 @@ enum AdhocCompletionLayout {
 }
 
 extension CompanionAppState {
-    var adhocCompletionHeight: CGFloat {
-        (adhocAttribution.resolution == .create && adhocAttribution.createdIssue != nil
-            ? AdhocCompletionLayout.height(for: .keep)
-            : AdhocCompletionLayout.height(for: adhocAttribution.resolution))
-            + (adhocAttribution.loadError != nil || endSessionErrorMessage != nil ? 48 : 0)
-    }
-
-    var endSessionActionTitle: String {
-        guard timerService.snapshot.adhoc else { return "End Session" }
-        switch adhocAttribution.resolution {
-        case .attach: return "Attach & Finish"
-        case .create: return adhocAttribution.createdIssue == nil ? "Create & Finish" : "Retry & Finish"
-        case .keep: return "Keep Ad Hoc & Finish"
-        case nil: return "End Session"
-        }
-    }
-
-    var canSubmitEndSession: Bool {
-        guard !isSubmittingEndSession else { return false }
-        guard timerService.snapshot.adhoc else { return true }
-        guard let resolution = adhocAttribution.resolution else { return false }
-        return resolution != .create || adhocAttribution.createdIssue != nil || adhocAttribution.estimateMinutes >= 0
-    }
-
-    var adhocElapsedSeconds: Int {
-        guard let start = timerService.snapshot.sessionStartTime else { return max(0, timerService.snapshot.elapsedSeconds) }
-        return max(0, Int(Date().timeIntervalSince(start)))
-    }
-
     var activeFocusTitle: String? {
         timerService.snapshot.adhoc ? "Ad Hoc Focus" : contextService.snapshot.issueTitle
-    }
-
-    func loadAdhocAttribution() async {
-        guard let sessionID = pendingEndSessionID, !adhocAttribution.isLoading else { return }
-        let loadID = UUID()
-        adhocAttribution.loadID = loadID
-        adhocAttribution.isLoading = true
-        adhocAttribution.loadError = nil
-        do {
-            let issues = try await daemonConnection.withClient { try await $0.listAllIssues() }
-            await issueCreationService.loadDestinations()
-            guard pendingEndSessionID == sessionID, adhocAttribution.loadID == loadID else { return }
-            adhocAttribution.issues = issues
-            if adhocAttribution.filter == .today, adhocAttribution.filteredIssues(today: daemonConnection.currentDate).isEmpty {
-                adhocAttribution.filter = .all
-            }
-            adhocAttribution.loadError = issueCreationService.lastErrorMessage
-        } catch {
-            guard pendingEndSessionID == sessionID, adhocAttribution.loadID == loadID else { return }
-            adhocAttribution.loadError = error.localizedDescription
-        }
-        if pendingEndSessionID == sessionID, adhocAttribution.loadID == loadID { adhocAttribution.isLoading = false }
     }
 }

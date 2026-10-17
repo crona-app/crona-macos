@@ -3784,27 +3784,27 @@ extension CronaCompanionTests {
         transport.provideDestinations = true
         let appState = CompanionAppState(daemonConnection: connection)
         await appState.timerService.refresh()
-        appState.beginEndSession(source: .menuPopover)
-        await appState.loadAdhocAttribution()
-        XCTAssertEqual(appState.adhocAttribution.date, transport.logicalDate)
-        appState.adhocAttribution.resolution = .create
-        appState.adhocAttribution.destinationID = 7
-        appState.adhocAttribution.title = "Created work"
-        appState.endSessionCommitMessage = "Summary"
+        appState.endSession.begin(source: .menuPopover)
+        await appState.endSession.loadAdhocAttribution()
+        XCTAssertEqual(appState.endSession.adhocAttribution.date, transport.logicalDate)
+        appState.endSession.adhocAttribution.resolution = .create
+        appState.endSession.adhocAttribution.destinationID = 7
+        appState.endSession.adhocAttribution.title = "Created work"
+        appState.endSession.commitMessage = "Summary"
         transport.failEnd = true
-        appState.confirmEndSession()
-        appState.confirmEndSession()
-        await waitForIssueCreator { !appState.isSubmittingEndSession }
+        appState.endSession.confirm()
+        appState.endSession.confirm()
+        await waitForIssueCreator { !appState.endSession.isSubmitting }
         XCTAssertEqual(transport.methods.filter { $0 == "issue.create" }.count, 1)
         XCTAssertEqual(transport.methods.filter { $0 == "timer.end" }.count, 1)
-        XCTAssertEqual(appState.adhocAttribution.createdIssue?.id, 42)
-        XCTAssertNotNil(appState.endSessionErrorMessage)
-        appState.cancelEndSession()
-        appState.beginEndSession(source: .menuPopover)
-        XCTAssertEqual(appState.adhocAttribution.createdIssue?.id, 42)
-        XCTAssertEqual(appState.endSessionCommitMessage, "Summary")
+        XCTAssertEqual(appState.endSession.adhocAttribution.createdIssue?.id, 42)
+        XCTAssertNotNil(appState.endSession.errorMessage)
+        appState.endSession.cancel()
+        appState.endSession.begin(source: .menuPopover)
+        XCTAssertEqual(appState.endSession.adhocAttribution.createdIssue?.id, 42)
+        XCTAssertEqual(appState.endSession.commitMessage, "Summary")
         transport.failEnd = false
-        appState.confirmEndSession()
+        appState.endSession.confirm()
         await waitForIssueCreator { transport.methods.filter { $0 == "timer.end" }.count == 2 }
         XCTAssertEqual(transport.methods.filter { $0 == "issue.create" }.count, 1)
         let end = try XCTUnwrap(transport.requests.last(where: { $0.method == "timer.end" }))
@@ -3817,19 +3817,19 @@ extension CronaCompanionTests {
         transport.hasAdhocSession = true
         let appState = CompanionAppState(daemonConnection: connection)
         await appState.timerService.refresh()
-        appState.beginEndSession(source: .menuPopover)
-        appState.adhocAttribution.resolution = .keep
-        let previousFocusRequest = appState.endSessionFocusRequest
-        appState.confirmEndSession()
-        XCTAssertNotNil(appState.endSessionErrorMessage)
-        XCTAssertGreaterThan(appState.endSessionFocusRequest, previousFocusRequest)
-        appState.endSessionCommitMessage = "Summary"
-        appState.adhocAttribution.resolution = .attach
-        appState.confirmEndSession()
+        appState.endSession.begin(source: .menuPopover)
+        appState.endSession.adhocAttribution.resolution = .keep
+        let previousFocusRequest = appState.endSession.focusRequest
+        appState.endSession.confirm()
+        XCTAssertNotNil(appState.endSession.errorMessage)
+        XCTAssertGreaterThan(appState.endSession.focusRequest, previousFocusRequest)
+        appState.endSession.commitMessage = "Summary"
+        appState.endSession.adhocAttribution.resolution = .attach
+        appState.endSession.confirm()
         XCTAssertFalse(transport.methods.contains("timer.end"))
         appState.timerService.snapshot.sessionID = "another-session"
-        appState.confirmEndSession()
-        XCTAssertTrue(appState.endSessionErrorMessage?.contains("changed") == true)
+        appState.endSession.confirm()
+        XCTAssertTrue(appState.endSession.errorMessage?.contains("changed") == true)
     }
 }
 
@@ -3840,12 +3840,12 @@ extension CronaCompanionTests {
         transport.hasAdhocSession = true
         let appState = CompanionAppState(daemonConnection: connection)
         await appState.timerService.refresh()
-        appState.beginEndSession(source: .menuPopover)
-        XCTAssertFalse(appState.canSubmitEndSession)
-        appState.adhocAttribution.resolution = .keep
-        appState.endSessionCommitMessage = "Kept work"
-        XCTAssertTrue(appState.canSubmitEndSession)
-        appState.confirmEndSession()
+        appState.endSession.begin(source: .menuPopover)
+        XCTAssertFalse(appState.endSession.canSubmit)
+        appState.endSession.adhocAttribution.resolution = .keep
+        appState.endSession.commitMessage = "Kept work"
+        XCTAssertTrue(appState.endSession.canSubmit)
+        appState.endSession.confirm()
         await waitForIssueCreator { transport.methods.contains("timer.end") }
         let request = try XCTUnwrap(transport.requests.first(where: { $0.method == "timer.end" }))
         XCTAssertEqual(request.params["adhocResolution"]?.stringValue, "keep")
@@ -3876,16 +3876,16 @@ extension CronaCompanionTests {
         transport.hasAdhocSession = true
         let appState = CompanionAppState(daemonConnection: connection)
         await appState.timerService.refresh()
-        appState.beginEndSession(source: .menuPopover)
-        appState.adhocAttribution.resolution = .create
-        appState.adhocAttribution.title = "Old draft"
-        appState.endSessionCommitMessage = "Old summary"
-        appState.cancelEndSession()
+        appState.endSession.begin(source: .menuPopover)
+        appState.endSession.adhocAttribution.resolution = .create
+        appState.endSession.adhocAttribution.title = "Old draft"
+        appState.endSession.commitMessage = "Old summary"
+        appState.endSession.cancel()
         appState.timerService.snapshot.sessionID = "new-session"
-        appState.beginEndSession(source: .timerHUD)
-        XCTAssertNil(appState.adhocAttribution.resolution)
-        XCTAssertEqual(appState.adhocAttribution.title, "")
-        XCTAssertEqual(appState.endSessionCommitMessage, "")
+        appState.endSession.begin(source: .timerHUD)
+        XCTAssertNil(appState.endSession.adhocAttribution.resolution)
+        XCTAssertEqual(appState.endSession.adhocAttribution.title, "")
+        XCTAssertEqual(appState.endSession.commitMessage, "")
     }
 }
 
@@ -3896,14 +3896,14 @@ extension CronaCompanionTests {
         transport.hasAdhocSession = true
         let appState = CompanionAppState(daemonConnection: connection)
         await appState.timerService.refresh()
-        appState.beginEndSession(source: .menuPopover)
-        appState.adhocAttribution.estimateMinutes = -1
-        appState.adhocAttribution.resolution = .create
-        XCTAssertFalse(appState.canSubmitEndSession)
-        appState.adhocAttribution.resolution = .keep
-        XCTAssertTrue(appState.canSubmitEndSession)
-        appState.adhocAttribution.resolution = .attach
-        XCTAssertTrue(appState.canSubmitEndSession)
+        appState.endSession.begin(source: .menuPopover)
+        appState.endSession.adhocAttribution.estimateMinutes = -1
+        appState.endSession.adhocAttribution.resolution = .create
+        XCTAssertFalse(appState.endSession.canSubmit)
+        appState.endSession.adhocAttribution.resolution = .keep
+        XCTAssertTrue(appState.endSession.canSubmit)
+        appState.endSession.adhocAttribution.resolution = .attach
+        XCTAssertTrue(appState.endSession.canSubmit)
     }
 }
 
@@ -3917,22 +3917,22 @@ extension CronaCompanionTests {
         transport.failStatusChange = true
         let appState = CompanionAppState(daemonConnection: connection)
         await appState.timerService.refresh()
-        appState.beginEndSession(source: .menuPopover)
-        await appState.loadAdhocAttribution()
-        appState.adhocAttribution.resolution = .create
-        appState.adhocAttribution.destinationID = 7
-        appState.adhocAttribution.title = "Unscheduled work"
-        appState.adhocAttribution.date = ""
-        appState.endSessionCommitMessage = "Summary"
-        appState.confirmEndSession()
-        await waitForIssueCreator { !appState.isSubmittingEndSession }
-        XCTAssertEqual(appState.adhocAttribution.createdIssue?.status, "backlog")
+        appState.endSession.begin(source: .menuPopover)
+        await appState.endSession.loadAdhocAttribution()
+        appState.endSession.adhocAttribution.resolution = .create
+        appState.endSession.adhocAttribution.destinationID = 7
+        appState.endSession.adhocAttribution.title = "Unscheduled work"
+        appState.endSession.adhocAttribution.date = ""
+        appState.endSession.commitMessage = "Summary"
+        appState.endSession.confirm()
+        await waitForIssueCreator { !appState.endSession.isSubmitting }
+        XCTAssertEqual(appState.endSession.adhocAttribution.createdIssue?.status, "backlog")
         XCTAssertFalse(transport.methods.contains("timer.end"))
         transport.failStatusChange = false
-        appState.confirmEndSession()
+        appState.endSession.confirm()
         await waitForIssueCreator { transport.methods.contains("timer.end") }
         XCTAssertEqual(transport.methods.filter { $0 == "issue.create" }.count, 1)
-        XCTAssertEqual(appState.adhocAttribution.createdIssue?.status, "ready")
+        XCTAssertEqual(appState.endSession.adhocAttribution.createdIssue?.status, "ready")
         let creation = try XCTUnwrap(transport.requests.first(where: { $0.method == "issue.create" }))
         XCTAssertNil(creation.params["todoForDate"]?.stringValue)
         let status = try XCTUnwrap(transport.requests.last(where: { $0.method == "issue.change_status" }))

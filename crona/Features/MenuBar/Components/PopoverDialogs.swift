@@ -27,10 +27,11 @@ struct PlaceholderPanel: View {
 
 struct EndSessionSheetView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject var endSession: EndSessionModel
 
     @ViewBuilder var body: some View {
         if appState.timerService.snapshot.adhoc {
-            AdhocAttributionView(appState: appState)
+            AdhocAttributionView(appState: appState, endSession: endSession)
                 .frame(width: 392)
                 .background(SheetGlassBackground())
         } else {
@@ -53,15 +54,15 @@ struct EndSessionSheetView: View {
                             .foregroundStyle(PopupVisualTheme.primaryText)
 
                         StableMultilineTextField(
-                            text: $appState.endSessionCommitMessage,
+                            text: $endSession.commitMessage,
                             placeholder: "Describe what you completed",
-                            isEnabled: !appState.isSubmittingEndSession,
-                            focusRequest: appState.endSessionFocusRequest
+                            isEnabled: !endSession.isSubmitting,
+                            focusRequest: endSession.focusRequest
                         )
                         .frame(height: 104)
                         .popupInputSurface(cornerRadius: 12)
 
-                        if let error = appState.endSessionErrorMessage, !error.isEmpty {
+                        if let error = endSession.errorMessage, !error.isEmpty {
                             Text(error)
                                 .font(.caption)
                                 .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.9))
@@ -70,26 +71,26 @@ struct EndSessionSheetView: View {
 
                     HStack {
                         Button("Cancel") {
-                            appState.cancelEndSession()
+                            endSession.cancel()
                         }
                         .keyboardShortcut(.cancelAction)
-                        .disabled(appState.isSubmittingEndSession)
+                        .disabled(endSession.isSubmitting)
 
                         Spacer()
 
                         Button {
-                            appState.confirmEndSession()
+                            endSession.confirm()
                         } label: {
-                            if appState.isSubmittingEndSession {
+                            if endSession.isSubmitting {
                                 ProgressView()
                                     .controlSize(.small)
                             } else {
-                                Text(appState.endSessionActionTitle)
+                                Text(endSession.actionTitle)
                             }
                         }
                         .keyboardShortcut(.return, modifiers: [.command])
                         .buttonStyle(.borderedProminent)
-                        .disabled(!appState.canSubmitEndSession)
+                        .disabled(!endSession.canSubmit)
                     }
                 }
                 .padding(.horizontal, 26)

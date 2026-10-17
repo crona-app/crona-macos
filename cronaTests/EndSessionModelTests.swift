@@ -18,12 +18,12 @@ final class EndSessionModelTests: DaemonTestCase {
         try postDaemonEvent(#"{"type":"timer.hard_limit_reached","payload":{"sessionId":"s1"}}"#)
         await waitForIssueCreator { appState.hardLimitPopupPhase == .decision }
         appState.chooseHardLimitEnd()
-        XCTAssertEqual(appState.pendingEndSessionID, "s1")
+        XCTAssertEqual(appState.endSession.pendingSessionID, "s1")
 
         try postDaemonEvent(#"{"type":"session.ended","payload":{"sessionId":"s1"}}"#)
         await waitForIssueCreator { appState.hardLimitPopupPhase == nil }
 
-        XCTAssertNil(appState.pendingEndSessionID)
+        XCTAssertNil(appState.endSession.pendingSessionID)
         XCTAssertNil(appState.hardLimitPopupSessionID)
     }
 
@@ -33,11 +33,11 @@ final class EndSessionModelTests: DaemonTestCase {
         transport.hasAdhocSession = true
         let appState = CompanionAppState(daemonConnection: connection)
         await appState.timerService.refresh()
-        appState.beginEndSession(source: .menuPopover)
+        appState.endSession.begin(source: .menuPopover)
 
-        appState.confirmEndSession()
+        appState.endSession.confirm()
 
-        XCTAssertEqual(appState.endSessionErrorMessage, "A session summary is required.")
+        XCTAssertEqual(appState.endSession.errorMessage, "A session summary is required.")
         XCTAssertFalse(transport.methods.contains("timer.end"))
     }
 
@@ -47,12 +47,12 @@ final class EndSessionModelTests: DaemonTestCase {
         transport.hasAdhocSession = true
         let appState = CompanionAppState(daemonConnection: connection)
         await appState.timerService.refresh()
-        appState.beginEndSession(source: .menuPopover)
-        appState.endSessionCommitMessage = "draft"
+        appState.endSession.begin(source: .menuPopover)
+        appState.endSession.commitMessage = "draft"
 
-        appState.cancelEndSession()
-        appState.beginEndSession(source: .menuPopover)
+        appState.endSession.cancel()
+        appState.endSession.begin(source: .menuPopover)
 
-        XCTAssertEqual(appState.endSessionCommitMessage, "draft")
+        XCTAssertEqual(appState.endSession.commitMessage, "draft")
     }
 }
