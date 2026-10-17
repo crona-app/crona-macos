@@ -118,6 +118,14 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
             issue["status"] = probe.params["status"]?.stringValue ?? "ready"
             createdFixture = issue
             result = issue
+        case "habit.create", "habit.update":
+            result = ["id": probe.params["id"]?.intValue ?? 9, "streamId": probe.params["streamId"]?.intValue ?? 7,
+                "name": probe.params["name"]?.stringValue ?? "", "scheduleType": "daily", "weekdays": [Int](),
+                "active": true, "repoId": 3, "repoName": "Repo", "streamName": "Stream"] as [String: Any]
+        case "habit.delete":
+            result = ["ok": true]
+        case "habit.list_due":
+            result = [Any]()
         case "repo.list":
             result = provideDestinations ? [["id": 3, "name": "Repo"]] : []
         case "stream.list":
@@ -160,6 +168,7 @@ enum JSONScalar: Decodable {
     case string(String)
     case int(Int)
     case bool(Bool)
+    case array([JSONScalar])
     case null
 
     init(from decoder: Decoder) throws {
@@ -170,6 +179,8 @@ enum JSONScalar: Decodable {
             self = .int(int)
         } else if let bool = try? container.decode(Bool.self) {
             self = .bool(bool)
+        } else if let array = try? container.decode([JSONScalar].self) {
+            self = .array(array)
         } else {
             self = .string(try container.decode(String.self))
         }
@@ -182,6 +193,11 @@ enum JSONScalar: Decodable {
 
     var intValue: Int? {
         if case let .int(value) = self { return value }
+        return nil
+    }
+
+    var intArrayValue: [Int]? {
+        if case let .array(values) = self { return values.compactMap(\.intValue) }
         return nil
     }
 
