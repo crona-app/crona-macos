@@ -111,7 +111,7 @@ final class WindowService {
                 preferencesEnabled: appState.preferences.preferences.showTimerHUD,
                 activeTimer: active,
                 menuBarPopoverPresented: isMenuBarPopoverPresented,
-                hardLimitPopupPresented: appState.hardLimitPopupPhase != nil || hardLimitPopupVisible
+                hardLimitPopupPresented: appState.popups.hardLimitPopupPhase != nil || hardLimitPopupVisible
             )
         else {
             timerHUDPanel?.orderOut(nil)
@@ -180,7 +180,7 @@ final class WindowService {
                 preferencesEnabled: appState.preferences.preferences.showTimerHUD,
                 activeTimer: active,
                 menuBarPopoverPresented: false,
-                hardLimitPopupPresented: appState.hardLimitPopupPhase != nil || hardLimitPopupVisible
+                hardLimitPopupPresented: appState.popups.hardLimitPopupPhase != nil || hardLimitPopupVisible
             )
         else {
             timerHUDPanel?.orderOut(nil)
@@ -898,7 +898,7 @@ final class WindowService {
     }
 
     func showSmartPauseResumeNotice() {
-        guard let appState, appState.smartPauseResumeNotice != nil else { return }
+        guard let appState, appState.popups.smartPauseResumeNotice != nil else { return }
 
         let panel = smartPauseResumePanel ?? makeSmartPauseResumePanel(appState: appState)
         smartPauseResumePanel = panel
@@ -970,7 +970,7 @@ final class WindowService {
             if let hostingController = panel.contentViewController
                 as? NSHostingController<HardLimitWarningIndicatorRootView>
             {
-                hostingController.rootView = HardLimitWarningIndicatorRootView(appState: appState)
+                hostingController.rootView = HardLimitWarningIndicatorRootView(appState: appState, popups: appState.popups)
             } else {
                 panel.contentViewController = makeHardLimitWarningHostingController(
                     appState: appState
@@ -1029,7 +1029,7 @@ final class WindowService {
         panel.standardWindowButton(.zoomButton)?.isHidden = true
         panel.isReleasedWhenClosed = false
         panel.contentViewController = NSHostingController(
-            rootView: HardLimitPopupRootView(appState: appState, endSession: appState.endSession))
+            rootView: HardLimitPopupRootView(appState: appState, popups: appState.popups, endSession: appState.endSession))
         return panel
     }
 
@@ -1061,7 +1061,7 @@ final class WindowService {
         panel.standardWindowButton(.zoomButton)?.isHidden = true
         panel.isReleasedWhenClosed = false
         panel.contentViewController = NSHostingController(
-            rootView: InactivityPopupRootView(appState: appState))
+            rootView: InactivityPopupRootView(appState: appState, popups: appState.popups))
         return panel
     }
 
@@ -1095,7 +1095,7 @@ final class WindowService {
         panel.standardWindowButton(.zoomButton)?.isHidden = true
         panel.isReleasedWhenClosed = false
         panel.contentViewController = NSHostingController(
-            rootView: SmartPauseResumeNoticeRootView(appState: appState)
+            rootView: SmartPauseResumeNoticeRootView(appState: appState, popups: appState.popups)
         )
         panel.setContentSize(
             NSSize(
@@ -1109,7 +1109,7 @@ final class WindowService {
     private func resizeInactivityPanel(_ panel: NSPanel, animated: Bool) {
         guard let appState else { return }
         let height: CGFloat
-        switch appState.inactivityPopupPhase {
+        switch appState.popups.inactivityPopupPhase {
         case .decision:
             height = 95 + PopupCloseChromeInsets.top
         case .endSession:
@@ -1136,7 +1136,7 @@ final class WindowService {
 
     private func resizeHardLimitPanel(_ panel: NSPanel, animated: Bool) {
         guard let appState else { return }
-        let height = HardLimitPopupSizing.panelHeight(for: appState.hardLimitPopupPhase, adhoc: appState.timerService.snapshot.adhoc, adhocHeight: appState.endSession.adhocCompletionHeight)
+        let height = HardLimitPopupSizing.panelHeight(for: appState.popups.hardLimitPopupPhase, adhoc: appState.timerService.snapshot.adhoc, adhocHeight: appState.endSession.adhocCompletionHeight)
         guard abs(panel.frame.height - height) > 0.5 else { return }
 
         var frame = panel.frame
@@ -1213,7 +1213,7 @@ final class WindowService {
         appState: CompanionAppState
     ) -> NSHostingController<HardLimitWarningIndicatorRootView> {
         let controller = NSHostingController(
-            rootView: HardLimitWarningIndicatorRootView(appState: appState)
+            rootView: HardLimitWarningIndicatorRootView(appState: appState, popups: appState.popups)
         )
         controller.view.wantsLayer = true
         controller.view.layer?.backgroundColor = NSColor.clear.cgColor

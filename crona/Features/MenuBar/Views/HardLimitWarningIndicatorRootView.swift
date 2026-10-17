@@ -2,10 +2,11 @@ import SwiftUI
 
 struct HardLimitWarningIndicatorRootView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject var popups: PopupCoordinator
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        if let model = appState.hardLimitWarningIndicatorModel {
+        if let model = popups.hardLimitWarningIndicatorModel {
             let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
 
             TimelineView(.periodic(from: .now, by: 1)) { timeline in
@@ -47,9 +48,9 @@ struct HardLimitWarningIndicatorRootView: View {
                 }
                 .frame(width: 184)
                 .clipShape(shape)
-                .opacity(appState.isHardLimitWarningIndicatorAnimatingIn ? 1 : 0.02)
-                .blur(radius: reduceMotion || appState.isHardLimitWarningIndicatorAnimatingIn ? 0 : 16)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: appState.isHardLimitWarningIndicatorAnimatingIn)
+                .opacity(popups.isHardLimitWarningIndicatorAnimatingIn ? 1 : 0.02)
+                .blur(radius: reduceMotion || popups.isHardLimitWarningIndicatorAnimatingIn ? 0 : 16)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: popups.isHardLimitWarningIndicatorAnimatingIn)
                 .companionAppearance(appState)
             }
         }

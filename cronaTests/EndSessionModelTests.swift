@@ -16,15 +16,15 @@ final class EndSessionModelTests: DaemonTestCase {
         appState.preferences.preferences.showHardLimitActionPopups = true
         await appState.timerService.refresh()
         try postDaemonEvent(#"{"type":"timer.hard_limit_reached","payload":{"sessionId":"s1"}}"#)
-        await waitForIssueCreator { appState.hardLimitPopupPhase == .decision }
-        appState.chooseHardLimitEnd()
+        await waitForIssueCreator { appState.popups.hardLimitPopupPhase == .decision }
+        appState.popups.chooseHardLimitEnd()
         XCTAssertEqual(appState.endSession.pendingSessionID, "s1")
 
         try postDaemonEvent(#"{"type":"session.ended","payload":{"sessionId":"s1"}}"#)
-        await waitForIssueCreator { appState.hardLimitPopupPhase == nil }
+        await waitForIssueCreator { appState.popups.hardLimitPopupPhase == nil }
 
         XCTAssertNil(appState.endSession.pendingSessionID)
-        XCTAssertNil(appState.hardLimitPopupSessionID)
+        XCTAssertNil(appState.popups.hardLimitPopupSessionID)
     }
 
     func testConfirmEndSessionRequiresSummaryForAdhocSessions() async throws {

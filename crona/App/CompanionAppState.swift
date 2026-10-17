@@ -114,14 +114,26 @@ final class CompanionAppState: ObservableObject {
         onFinalized: { [weak self] in
             guard let self else { return }
             selectedFocusIssue = nil
-            if hardLimitPopupSessionID != nil {
-                finalizeHardLimitPopup()
-            }
-            if inactivityPopupSessionID != nil {
-                finalizeInactivityPopup()
-            }
+            popups.finalizePopups(forSessionID: nil)
         }
     )
+    private(set) lazy var popups: PopupCoordinator = {
+        let popups = PopupCoordinator(
+            daemonConnection: daemonConnection,
+            timerService: timerService,
+            contextService: contextService,
+            preferences: preferences,
+            windowService: windowService,
+            endSession: endSession,
+            hardLimitCountdownService: hardLimitCountdownService,
+            inactivityPopupCountdownService: inactivityPopupCountdownService
+        )
+        #if DEBUG
+            popups.developerPreviewKind = { [weak self] in self?.developerPreviewKind }
+            popups.dismissDeveloperPreviews = { [weak self] in self?.dismissDeveloperPreviews() }
+        #endif
+        return popups
+    }()
     private(set) lazy var issueActions = IssueActionEditorModel(
         daemonConnection: daemonConnection,
         issueActionsService: issueActionsService,
@@ -159,10 +171,7 @@ final class CompanionAppState: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
     private var daemonEventObserver: NSObjectProtocol?
     private var daemonConnectObserver: NSObjectProtocol?
-    private var hardLimitPopupDismissTask: Task<Void, Never>?
-    private var smartPauseResumeNoticeDismissTask: Task<Void, Never>?
     private var presentationTimer: Timer?
-    private var lastWarningIndicatorKey: String?
     private var settingsSceneAction: (() -> Void)?
     @Published var popoverDetailsRoute: PopoverDetailRoute?
     @Published var isAdhocStartSelected = false
@@ -172,19 +181,6 @@ final class CompanionAppState: ObservableObject {
     @Published var selectedPopoverTab: PopoverTab = .now
     @Published var isStatsCalendarPresented = false
     @Published private(set) var selectedSettingsDestination: SettingsDestination = .general
-    @Published var hardLimitPopupPhase: HardLimitPopupPhase?
-    @Published private(set) var hardLimitPopupSessionID: String?
-    @Published var hardLimitPopupExtendChoice = HardLimitExtendChoice.defaultValue
-    @Published var hardLimitPopupErrorMessage: String?
-    @Published var isSubmittingHardLimitAction = false
-    @Published var hardLimitPopupSuccessModel: HardLimitPopupSuccessModel?
-    @Published var hardLimitWarningIndicatorModel: HardLimitWarningIndicatorModel?
-    @Published var isHardLimitPopupAnimatingIn = false
-    @Published var inactivityPopupPhase: InactivityPopupPhase?
-    @Published var inactivityPopupDelivery: CronaAlertDelivery?
-    @Published private(set) var inactivityPopupSessionID: String?
-    @Published var isHardLimitWarningIndicatorAnimatingIn = false
-    @Published var smartPauseResumeNotice: SmartPauseResumeNotice?
     #if DEBUG
         @Published var developerPreviewKind: DeveloperPreviewKind?
     #endif
@@ -255,7 +251,7 @@ final class CompanionAppState: ObservableObject {
         self.appUpdateService = appUpdateService
 
         self.smartPauseService.setAutomaticResumeHandler { [weak self] snapshot in
-            self?.presentSmartPauseResumeNotice(for: snapshot)
+            self?.popups.presentSmartPauseResumeNotice(for: snapshot)
         }
 
         notificationService.configure(
@@ -278,7 +274,7 @@ final class CompanionAppState: ObservableObject {
             },
             onFocusInactivity: { [weak self] delivery in
                 guard let self else { return false }
-                return await self.presentInactivityPopup(for: delivery)
+                return await self.popups.presentInactivityPopup(for: delivery)
             },
             shouldSilenceAlert: { [weak windowService] kind in
                 guard kind.hasPrefix("timer.") else { return false }
@@ -348,7 +344,6 @@ final class CompanionAppState: ObservableObject {
         if let daemonConnectObserver {
             NotificationCenter.default.removeObserver(daemonConnectObserver)
         }
-        hardLimitPopupDismissTask?.cancel()
         presentationTimer?.invalidate()
     }
 
@@ -452,8 +447,7 @@ final class CompanionAppState: ObservableObject {
         guard presentationTimer == nil else { return }
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.reconcileHardLimitWarningIndicatorPresentation()
-                self?.reconcileInactivityPopupPresentation()
+                self?.popups.reconcileTimedPresentation()
             }
         }
         timer.tolerance = 0.1
@@ -483,46 +477,23 @@ final class CompanionAppState: ObservableObject {
         func showDeveloperHardLimitPreview() {
             dismissDeveloperPreviews()
             developerPreviewKind = .hardLimit
-            hardLimitPopupSessionID = "developer-preview"
-            hardLimitPopupPhase = .decision
-            hardLimitPopupExtendChoice = .minutes5
-            hardLimitPopupErrorMessage = nil
-            hardLimitPopupSuccessModel = nil
-            isHardLimitPopupAnimatingIn = true
-            windowService.showHardLimitPopup()
+            popups.showHardLimitPreview()
         }
 
         func showDeveloperInactivityPreview() {
             dismissDeveloperPreviews()
             developerPreviewKind = .inactivity
-            inactivityPopupSessionID = "developer-preview"
-            inactivityPopupPhase = .decision
-            inactivityPopupDelivery = nil
-            windowService.showInactivityPopup()
+            popups.showInactivityPreview()
         }
 
         func showDeveloperWarningPreview() {
             dismissDeveloperPreviews()
-            hardLimitWarningIndicatorModel = HardLimitWarningIndicatorModel(
-                id: "developer-warning",
-                kind: .expiry,
-                title: "Session Ending",
-                remainingText: "10"
-            )
-            isHardLimitWarningIndicatorAnimatingIn = false
-            windowService.showHardLimitWarningIndicator()
-            DispatchQueue.main.async {
-                self.isHardLimitWarningIndicatorAnimatingIn = true
-            }
+            popups.showWarningPreview()
         }
 
         func showDeveloperSmartPauseResumePreview() {
             dismissDeveloperPreviews()
-            smartPauseResumeNotice = SmartPauseResumeNotice(
-                sessionID: "developer-preview",
-                resumedAt: Date()
-            )
-            windowService.showSmartPauseResumeNotice()
+            popups.showSmartPauseResumePreview()
         }
 
         func showDeveloperBreakScreenPreview() {
@@ -532,17 +503,8 @@ final class CompanionAppState: ObservableObject {
         }
 
         func dismissDeveloperPreviews() {
-            hardLimitCountdownService.cancel()
-            inactivityPopupCountdownService.cancel()
+            popups.clearPreviewState()
             developerPreviewKind = nil
-            hardLimitPopupPhase = nil
-            hardLimitPopupSessionID = nil
-            hardLimitPopupSuccessModel = nil
-            inactivityPopupPhase = nil
-            inactivityPopupSessionID = nil
-            inactivityPopupDelivery = nil
-            hardLimitWarningIndicatorModel = nil
-            smartPauseResumeNotice = nil
             endSession.clear()
             windowService.dismissDeveloperPreviews()
         }
@@ -615,7 +577,7 @@ final class CompanionAppState: ObservableObject {
     }
 
     func presentPrimarySurfaceWhenNoWindowIsActive() {
-        guard hardLimitPopupPhase == nil, !windowService.hardLimitPopupVisible else { return }
+        guard popups.hardLimitPopupPhase == nil, !windowService.hardLimitPopupVisible else { return }
         if preferences.preferences.showMenuBarItem {
             statusBarService.showPopupFromApplicationLaunch()
         } else {
@@ -737,195 +699,6 @@ final class CompanionAppState: ObservableObject {
                     "Failed to extend timer: \(error.localizedDescription, privacy: .private)")
             }
         }
-    }
-
-    func chooseHardLimitEnd() {
-        #if DEBUG
-            if developerPreviewKind == .hardLimit {
-                hardLimitPopupPhase = .endSession
-                endSession.setPreviewPending(source: .hardLimitPopup)
-                windowService.updateHardLimitPopup()
-                return
-            }
-        #endif
-        hardLimitCountdownService.cancel()
-        endSession.begin(source: .hardLimitPopup)
-        guard endSession.pendingSessionID != nil else { return }
-        hardLimitPopupErrorMessage = nil
-        hardLimitPopupPhase = .endSession
-        windowService.updateHardLimitPopup()
-        endSession.requestFocus()
-    }
-
-    func chooseInactivityPopupEnd() {
-        #if DEBUG
-            if developerPreviewKind == .inactivity {
-                inactivityPopupPhase = .endSession
-                endSession.setPreviewPending(source: .inactivityPopup)
-                windowService.updateInactivityPopup()
-                return
-            }
-        #endif
-        inactivityPopupCountdownService.cancel()
-        endSession.begin(source: .inactivityPopup)
-        guard endSession.pendingSessionID != nil else { return }
-        inactivityPopupPhase = .endSession
-        windowService.updateInactivityPopup()
-        endSession.requestFocus()
-    }
-
-    func dismissInactivityPopup() {
-        #if DEBUG
-            if developerPreviewKind == .inactivity {
-                dismissDeveloperPreviews()
-                return
-            }
-        #endif
-        finalizeInactivityPopup()
-    }
-
-    func handleHardLimitPopupClose() {
-        guard !endSession.isSubmitting, !isSubmittingHardLimitAction else { return }
-        chooseHardLimitEnd()
-    }
-
-    func dismissSmartPauseResumeNoticeNow() {
-        dismissSmartPauseResumeNotice()
-    }
-
-    func returnToInactivityDecision() {
-        guard !endSession.isSubmitting else { return }
-        #if DEBUG
-            if developerPreviewKind == .inactivity {
-                endSession.clear(preserveDraft: timerService.snapshot.adhoc)
-                inactivityPopupPhase = .decision
-                windowService.updateInactivityPopup()
-                return
-            }
-        #endif
-        endSession.clear(preserveDraft: timerService.snapshot.adhoc)
-        inactivityPopupPhase = .decision
-        startInactivityPopupCountdown()
-        windowService.updateInactivityPopup()
-    }
-
-    func chooseHardLimitExtend() {
-        #if DEBUG
-            if developerPreviewKind == .hardLimit {
-                hardLimitPopupPhase = .extend
-                hardLimitPopupExtendChoice = .minutes5
-                windowService.updateHardLimitPopup()
-                return
-            }
-        #endif
-        hardLimitCountdownService.cancel()
-        guard let sessionID = timerService.snapshot.sessionID else { return }
-        hardLimitPopupSessionID = sessionID
-        hardLimitPopupErrorMessage = nil
-        hardLimitPopupExtendChoice = defaultExtendChoice(for: timerService.snapshot)
-        hardLimitPopupPhase = .extend
-        windowService.updateHardLimitPopup()
-    }
-
-    func confirmHardLimitExtend() {
-        #if DEBUG
-            if developerPreviewKind == .hardLimit {
-                hardLimitPopupPhase = .success
-                hardLimitPopupSuccessModel = HardLimitPopupSuccessModel(
-                    remainingTimeText: "30:00",
-                    endTimeText: TimerEndTimeFormatter.string(
-                        from: Date().addingTimeInterval(1_800))
-                )
-                windowService.updateHardLimitPopup()
-                return
-            }
-        #endif
-        guard let sessionID = hardLimitPopupSessionID ?? timerService.snapshot.sessionID else {
-            return
-        }
-        guard sessionID == timerService.snapshot.sessionID else {
-            hardLimitPopupErrorMessage = "The active session changed. Refresh and try again."
-            return
-        }
-
-        let request: CronaTimerExtendRequest?
-        switch TimerPresentation.from(timerService.snapshot).mode {
-        case .pomodoro:
-            request = buildPomodoroExtendRequest(choice: hardLimitPopupExtendChoice)
-        case .stopwatch, .timer:
-            request = Self.buildQuickExtendRequest(
-                snapshot: timerService.snapshot,
-                additionalSeconds: hardLimitPopupExtendChoice.secondsValue)
-        }
-
-        guard let request else {
-            hardLimitPopupErrorMessage = "No extend option is available."
-            return
-        }
-
-        isSubmittingHardLimitAction = true
-        hardLimitPopupErrorMessage = nil
-
-        Task {
-            do {
-                _ = try await daemonConnection.withClient { try await $0.timerExtend(request) }
-                await timerService.refresh()
-                await contextService.refresh()
-                await MainActor.run {
-                    self.presentExtendSuccess()
-                }
-            } catch {
-                logger.error(
-                    "Failed to extend timer from popup: \(error.localizedDescription, privacy: .private)"
-                )
-                await MainActor.run {
-                    self.isSubmittingHardLimitAction = false
-                    self.hardLimitPopupErrorMessage = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    var hardLimitExtensionEndDate: Date? {
-        #if DEBUG
-            if developerPreviewKind == .hardLimit {
-                return Date().addingTimeInterval(1_800)
-            }
-        #endif
-        let request: CronaTimerExtendRequest?
-        switch TimerPresentation.from(timerService.snapshot).mode {
-        case .pomodoro:
-            request = buildPomodoroExtendRequest(choice: hardLimitPopupExtendChoice)
-        case .stopwatch, .timer:
-            request = Self.buildQuickExtendRequest(
-                snapshot: timerService.snapshot,
-                additionalSeconds: hardLimitPopupExtendChoice.secondsValue
-            )
-        }
-
-        guard let request else { return nil }
-        return TimerEndProjection.extensionEndDate(
-            snapshot: timerService.snapshot,
-            request: request
-        )
-    }
-
-    func returnToHardLimitDecision() {
-        guard !endSession.isSubmitting, !isSubmittingHardLimitAction else { return }
-        #if DEBUG
-            if developerPreviewKind == .hardLimit {
-                endSession.clear(preserveDraft: timerService.snapshot.adhoc)
-                hardLimitPopupErrorMessage = nil
-                hardLimitPopupPhase = .decision
-                windowService.updateHardLimitPopup()
-                return
-            }
-        #endif
-        endSession.clear(preserveDraft: timerService.snapshot.adhoc)
-        hardLimitPopupErrorMessage = nil
-        hardLimitPopupPhase = .decision
-        startHardLimitDecisionCountdown()
-        windowService.updateHardLimitPopup()
     }
 
     func selectFocusIssue(_ issue: DailyFocusIssue) {
@@ -1059,9 +832,7 @@ final class CompanionAppState: ObservableObject {
                     self?.objectWillChange.send()
                     self?.statusBarService.updateStatusItem()
                     self?.endSession.reconcile()
-                    self?.reconcileHardLimitPopupPresentation()
-                    self?.reconcileHardLimitWarningIndicatorPresentation()
-                    self?.reconcileInactivityPopupPresentation()
+                    self?.popups.reconcile()
                     self?.windowService.reconcileTimerHUD()
                 }
                 .store(in: &cancellables)
@@ -1079,9 +850,9 @@ final class CompanionAppState: ObservableObject {
         case "day.start":
             handleDayStart(event)
         case "timer.hard_limit_reached":
-            handleHardLimitReached(event)
+            popups.handleHardLimitReached(sessionID: event.sessionID)
         case "timer.extended":
-            handleTimerExtended(event)
+            popups.handleTimerExtended(sessionID: event.sessionID)
         default:
             break
         }
@@ -1134,382 +905,9 @@ final class CompanionAppState: ObservableObject {
 
     private func finalizeEndSessionIfNeeded(for sessionID: String) {
         guard !endSession.finalizeIfPending(sessionID: sessionID) else { return }
-        if hardLimitPopupSessionID == sessionID {
-            finalizeHardLimitPopup()
-        }
-        if inactivityPopupSessionID == sessionID {
-            finalizeInactivityPopup()
-        }
+        popups.finalizePopups(forSessionID: sessionID)
     }
 
-    private func handleHardLimitReached(_ event: CronaProtocolEvent) {
-        logger.debug(
-            "Handling hard limit popup for session: \(event.sessionID ?? "nil", privacy: .private(mask: .hash))"
-        )
-        Task { [self] in
-            await timerService.refresh()
-            await contextService.refresh()
-            await MainActor.run {
-                guard preferences.preferences.showHardLimitActionPopups else { return }
-                guard timerService.snapshot.sessionID != nil else { return }
-                guard timerService.snapshot.hardLimitActive, timerService.snapshot.hardLimitExpired
-                else { return }
-
-                finalizeHardLimitWarningIndicator()
-                hardLimitPopupDismissTask?.cancel()
-                hardLimitPopupDismissTask = nil
-                hardLimitPopupSessionID = timerService.snapshot.sessionID
-                hardLimitPopupPhase = .decision
-                hardLimitPopupExtendChoice = defaultExtendChoice(for: timerService.snapshot)
-                hardLimitPopupErrorMessage = nil
-                hardLimitPopupSuccessModel = nil
-                isSubmittingHardLimitAction = false
-                isHardLimitPopupAnimatingIn = false
-                startHardLimitDecisionCountdown()
-                windowService.showHardLimitPopup()
-                DispatchQueue.main.async {
-                    self.isHardLimitPopupAnimatingIn = true
-                }
-            }
-        }
-    }
-
-    private func handleTimerExtended(_ event: CronaProtocolEvent) {
-        guard let sessionID = hardLimitPopupSessionID,
-            sessionID == event.sessionID || event.sessionID == nil
-        else { return }
-        Task {
-            await timerService.refresh()
-            await contextService.refresh()
-            await MainActor.run {
-                presentExtendSuccess()
-            }
-        }
-    }
-
-    func presentInactivityPopup(for delivery: CronaAlertDelivery) async -> Bool {
-        guard preferences.preferences.showInactivityActionPopups else { return false }
-
-        await timerService.refresh()
-        await contextService.refresh()
-
-        guard preferences.preferences.showInactivityActionPopups else { return false }
-        guard timerService.snapshot.sessionID != nil else { return false }
-        guard timerService.snapshot.state == "running" else { return false }
-        guard !timerService.snapshot.hardLimitExpired else { return false }
-
-        inactivityPopupCountdownService.cancel()
-        inactivityPopupDelivery = delivery
-        inactivityPopupSessionID = timerService.snapshot.sessionID
-        inactivityPopupPhase = .decision
-        startInactivityPopupCountdown()
-        windowService.showInactivityPopup()
-
-        return true
-    }
-
-    private func reconcileHardLimitPopupPresentation() {
-        guard let phase = hardLimitPopupPhase else { return }
-
-        guard daemonConnection.connectionState == .connected else {
-            finalizeHardLimitPopup()
-            return
-        }
-
-        guard let sessionID = hardLimitPopupSessionID ?? timerService.snapshot.sessionID else {
-            finalizeHardLimitPopup()
-            return
-        }
-
-        if timerService.snapshot.sessionID != sessionID, phase != .success {
-            finalizeHardLimitPopup()
-            return
-        }
-
-        windowService.updateHardLimitPopup()
-    }
-
-    private func reconcileInactivityPopupPresentation() {
-        guard inactivityPopupPhase != nil else { return }
-
-        if isInactivityDeveloperPreviewActive {
-            windowService.updateInactivityPopup()
-            return
-        }
-
-        guard preferences.preferences.showInactivityActionPopups else {
-            finalizeInactivityPopup()
-            return
-        }
-
-        guard daemonConnection.connectionState == .connected else {
-            finalizeInactivityPopup()
-            return
-        }
-
-        guard let sessionID = inactivityPopupSessionID else {
-            finalizeInactivityPopup()
-            return
-        }
-
-        guard timerService.snapshot.sessionID == sessionID else {
-            finalizeInactivityPopup()
-            return
-        }
-
-        windowService.updateInactivityPopup()
-    }
-
-    private var isInactivityDeveloperPreviewActive: Bool {
-        #if DEBUG
-            developerPreviewKind == .inactivity
-        #else
-            false
-        #endif
-    }
-
-    private func reconcileHardLimitWarningIndicatorPresentation() {
-        guard preferences.preferences.showHardLimitWarningIndicator else {
-            finalizeHardLimitWarningIndicator()
-            return
-        }
-
-        guard daemonConnection.connectionState == .connected else {
-            finalizeHardLimitWarningIndicator()
-            return
-        }
-
-        let snapshot = timerService.snapshot
-        guard snapshot.sessionID != nil, snapshot.state == "running", snapshot.hardLimitActive,
-            !snapshot.hardLimitExpired
-        else {
-            finalizeHardLimitWarningIndicator()
-            return
-        }
-
-        guard let model = buildHardLimitWarningIndicatorModel(snapshot: snapshot) else {
-            finalizeHardLimitWarningIndicator()
-            return
-        }
-
-        if lastWarningIndicatorKey != model.id {
-            lastWarningIndicatorKey = model.id
-        }
-        if hardLimitWarningIndicatorModel != model {
-            hardLimitWarningIndicatorModel = model
-        }
-        if !windowService.hardLimitWarningIndicatorVisible {
-            isHardLimitWarningIndicatorAnimatingIn = false
-            windowService.showHardLimitWarningIndicator()
-            DispatchQueue.main.async {
-                self.isHardLimitWarningIndicatorAnimatingIn = true
-            }
-        }
-    }
-
-    private func presentExtendSuccess() {
-        hardLimitCountdownService.cancel()
-        let presentation = TimerPresentation.from(timerService.snapshot)
-        let timeFormatter = MenuBarTextFormatter.formatClock(
-            seconds: presentation.displaySeconds
-        )
-        let endTimeText: String
-        if let endDate = TimerEndProjection.activeEndDate(snapshot: timerService.snapshot) {
-            endTimeText = TimerEndTimeFormatter.string(from: endDate)
-        } else {
-            endTimeText = "Now"
-        }
-
-        hardLimitPopupPhase = .success
-        hardLimitPopupSuccessModel = HardLimitPopupSuccessModel(
-            remainingTimeText: timeFormatter,
-            endTimeText: endTimeText
-        )
-        hardLimitPopupErrorMessage = nil
-        isSubmittingHardLimitAction = false
-        windowService.updateHardLimitPopup()
-
-        hardLimitPopupDismissTask?.cancel()
-        hardLimitPopupDismissTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(2.2))
-            self?.finalizeHardLimitPopup()
-        }
-    }
-
-    private func finalizeHardLimitPopup() {
-        hardLimitCountdownService.cancel()
-        hardLimitPopupDismissTask?.cancel()
-        hardLimitPopupDismissTask = nil
-        isHardLimitPopupAnimatingIn = false
-        windowService.closeHardLimitPopup { [weak self] in
-            guard let self else { return }
-            self.hardLimitPopupPhase = nil
-            self.hardLimitPopupSessionID = nil
-            self.hardLimitPopupExtendChoice = .defaultValue
-            self.hardLimitPopupErrorMessage = nil
-            self.hardLimitPopupSuccessModel = nil
-            self.isSubmittingHardLimitAction = false
-            self.windowService.reconcileTimerHUD()
-        }
-    }
-
-    private func finalizeInactivityPopup() {
-        inactivityPopupCountdownService.cancel()
-        windowService.closeInactivityPopup { [weak self] in
-            guard let self else { return }
-            self.inactivityPopupPhase = nil
-            self.inactivityPopupDelivery = nil
-            self.inactivityPopupSessionID = nil
-            if self.endSession.presentationSource == .inactivityPopup {
-                self.endSession.clear()
-            }
-        }
-    }
-
-    private func presentSmartPauseResumeNotice(for snapshot: TimerSnapshot) {
-        guard let sessionID = snapshot.sessionID else { return }
-
-        smartPauseResumeNoticeDismissTask?.cancel()
-        smartPauseResumeNotice = SmartPauseResumeNotice(
-            sessionID: sessionID,
-            resumedAt: Date()
-        )
-        windowService.showSmartPauseResumeNotice()
-
-        smartPauseResumeNoticeDismissTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(3))
-            guard !Task.isCancelled else { return }
-            self?.dismissSmartPauseResumeNotice()
-        }
-    }
-
-    func dismissSmartPauseResumeNotice() {
-        smartPauseResumeNoticeDismissTask?.cancel()
-        smartPauseResumeNoticeDismissTask = nil
-        windowService.closeSmartPauseResumeNotice { [weak self] in
-            self?.smartPauseResumeNotice = nil
-        }
-    }
-
-    private func finalizeHardLimitWarningIndicator() {
-        guard
-            hardLimitWarningIndicatorModel != nil
-                || windowService.hardLimitWarningIndicatorVisible
-        else {
-            return
-        }
-        isHardLimitWarningIndicatorAnimatingIn = false
-        windowService.closeHardLimitWarningIndicator { [weak self] in
-            guard let self else { return }
-            self.hardLimitWarningIndicatorModel = nil
-            self.lastWarningIndicatorKey = nil
-        }
-    }
-
-    private func startHardLimitDecisionCountdown() {
-        hardLimitCountdownService.start { [weak self] in
-            guard let self, self.hardLimitPopupPhase == .decision else { return }
-            self.chooseHardLimitEnd()
-        }
-    }
-
-    private func startInactivityPopupCountdown() {
-        inactivityPopupCountdownService.start(
-            duration: InactivityPopupConfiguration.autoDismissDuration
-        ) { [weak self] in
-            guard let self, self.inactivityPopupPhase == .decision else { return }
-            self.finalizeInactivityPopup()
-        }
-    }
-
-    private func defaultExtendChoice(for snapshot: TimerSnapshot) -> HardLimitExtendChoice {
-        switch TimerPresentation.from(snapshot).mode {
-        case .pomodoro:
-            return .session1
-        case .stopwatch, .timer:
-            return .minutes5
-        }
-    }
-
-    private func buildPomodoroExtendRequest(choice: HardLimitExtendChoice)
-        -> CronaTimerExtendRequest?
-    {
-        guard let sessions = choice.sessionValue, sessions > 0 else { return nil }
-        return CronaTimerExtendRequest(
-            additionalSeconds: 0,
-            additionalSessions: sessions,
-            hardLimitTotalSeconds: max(1, timerService.snapshot.hardLimitTotalSeconds),
-            hardLimitWorkSeconds: max(1, timerService.snapshot.hardLimitWorkSeconds),
-            hardLimitBreakSeconds: max(0, timerService.snapshot.hardLimitBreakSeconds),
-            hardLimitLongBreakSeconds: max(0, timerService.snapshot.hardLimitLongBreakSeconds),
-            hardLimitCyclesBeforeLongBreak: max(
-                0, timerService.snapshot.hardLimitCyclesBeforeLongBreak)
-        )
-    }
-
-    private func buildHardLimitWarningIndicatorModel(snapshot: TimerSnapshot)
-        -> HardLimitWarningIndicatorModel?
-    {
-        let leadSeconds = CompanionPreferences.normalizedHardLimitWarningLeadSeconds(
-            preferences.preferences.hardLimitWarningLeadSeconds
-        )
-        let presentation = TimerPresentation.from(snapshot)
-        let remainingSeconds = max(0, presentation.displaySeconds)
-        guard remainingSeconds > 0, remainingSeconds <= leadSeconds else { return nil }
-
-        let sessionID = snapshot.sessionID ?? "unknown"
-        if presentation.mode == .pomodoro,
-            let currentSegment = TimerSegmentKind(rawValue: snapshot.segmentType),
-            let nextSegment = TimerSegmentKind(rawValue: snapshot.nextSegmentType),
-            currentSegment != nextSegment
-        {
-            let kind: HardLimitWarningKind
-            let title: String
-
-            if currentSegment.isBreak, nextSegment == .work {
-                kind = .resume
-                title = "Focus Resumes"
-            } else if currentSegment == .work, nextSegment.isBreak {
-                kind = .breakStart
-                title = "Break Starting"
-            } else {
-                return nil
-            }
-
-            let id =
-                "\(sessionID):\(kind.rawValue):\(snapshot.segmentType ?? "unknown"):\(snapshot.nextSegmentType ?? "unknown")"
-            return HardLimitWarningIndicatorModel(
-                id: id,
-                kind: kind,
-                title: title,
-                remainingText: String(format: "%02d", remainingSeconds)
-            )
-        }
-
-        let id = "\(sessionID):expiry:\(snapshot.segmentType ?? "unknown")"
-        return HardLimitWarningIndicatorModel(
-            id: id,
-            kind: .expiry,
-            title: "Session Ending",
-            remainingText: String(format: "%02d", remainingSeconds)
-        )
-    }
-}
-
-enum HardLimitPopupPhase: Equatable {
-    case decision
-    case endSession
-    case extend
-    case success
-}
-
-enum InactivityPopupPhase: Equatable {
-    case decision
-    case endSession
-}
-
-enum InactivityPopupConfiguration {
-    static let autoDismissDuration: TimeInterval = 60
 }
 
 enum PopoverDetailRoute: Equatable {
@@ -1522,83 +920,4 @@ enum PopoverDetailRoute: Equatable {
         case .habitDetails: return "Habit Details"
         }
     }
-}
-
-enum HardLimitExtendChoice: String, CaseIterable, Identifiable, Equatable {
-    case minutes1
-    case minutes5
-    case minutes15
-    case session1
-    case session2
-
-    static let defaultValue: HardLimitExtendChoice = .minutes5
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .minutes1: return "1 min — Quick wrap-up"
-        case .minutes5: return "5 min — Finish the current task"
-        case .minutes15: return "15 min — Continue the focus block"
-        case .session1: return "1 session — Continue the current cadence"
-        case .session2: return "2 sessions — Make a deeper pass"
-        }
-    }
-
-    var secondsValue: Int? {
-        switch self {
-        case .minutes1: return 60
-        case .minutes5: return 300
-        case .minutes15: return 900
-        case .session1, .session2: return nil
-        }
-    }
-
-    var sessionValue: Int? {
-        switch self {
-        case .session1: return 1
-        case .session2: return 2
-        case .minutes1, .minutes5, .minutes15: return nil
-        }
-    }
-}
-
-struct HardLimitPopupSuccessModel: Equatable {
-    let remainingTimeText: String
-    let endTimeText: String
-}
-
-enum HardLimitWarningKind: String, Equatable {
-    case expiry
-    case breakStart
-    case resume
-
-    var symbolName: String {
-        switch self {
-        case .expiry:
-            return "hourglass.circle.fill"
-        case .breakStart:
-            return "cup.and.saucer.fill"
-        case .resume:
-            return "bolt.fill"
-        }
-    }
-
-    var tint: NSColor {
-        switch self {
-        case .expiry:
-            return .systemOrange
-        case .breakStart:
-            return .systemPink
-        case .resume:
-            return .systemYellow
-        }
-    }
-}
-
-struct HardLimitWarningIndicatorModel: Equatable {
-    let id: String
-    let kind: HardLimitWarningKind
-    let title: String
-    let remainingText: String
 }

@@ -35,9 +35,9 @@ final class PopupCoordinatorTests: DaemonTestCase {
         let (appState, _, connection) = try await appStateWithHardLimitDecision()
         defer { connection.stop() }
 
-        await waitForIssueCreator { appState.hardLimitPopupPhase == .decision }
+        await waitForIssueCreator { appState.popups.hardLimitPopupPhase == .decision }
 
-        XCTAssertEqual(appState.hardLimitPopupSessionID, "s1")
+        XCTAssertEqual(appState.popups.hardLimitPopupSessionID, "s1")
     }
 
     func testHardLimitReachedEventIsIgnoredWhenPopupsDisabled() async throws {
@@ -46,18 +46,18 @@ final class PopupCoordinatorTests: DaemonTestCase {
 
         try await Task.sleep(for: .milliseconds(300))
 
-        XCTAssertNil(appState.hardLimitPopupPhase)
+        XCTAssertNil(appState.popups.hardLimitPopupPhase)
     }
 
     func testHardLimitExtendSendsRequestAndShowsSuccess() async throws {
         let (appState, transport, connection) = try await appStateWithHardLimitDecision()
         defer { connection.stop() }
-        await waitForIssueCreator { appState.hardLimitPopupPhase == .decision }
+        await waitForIssueCreator { appState.popups.hardLimitPopupPhase == .decision }
 
-        appState.chooseHardLimitExtend()
-        XCTAssertEqual(appState.hardLimitPopupPhase, .extend)
-        appState.confirmHardLimitExtend()
-        await waitForIssueCreator { appState.hardLimitPopupPhase == .success }
+        appState.popups.chooseHardLimitExtend()
+        XCTAssertEqual(appState.popups.hardLimitPopupPhase, .extend)
+        appState.popups.confirmHardLimitExtend()
+        await waitForIssueCreator { appState.popups.hardLimitPopupPhase == .success }
 
         XCTAssertEqual(transport.methods.filter { $0 == "timer.extend" }.count, 1)
     }
@@ -65,25 +65,25 @@ final class PopupCoordinatorTests: DaemonTestCase {
     func testHardLimitExtendFailureShowsErrorAndStaysInExtend() async throws {
         let (appState, transport, connection) = try await appStateWithHardLimitDecision()
         defer { connection.stop() }
-        await waitForIssueCreator { appState.hardLimitPopupPhase == .decision }
+        await waitForIssueCreator { appState.popups.hardLimitPopupPhase == .decision }
         transport.failExtend = true
 
-        appState.chooseHardLimitExtend()
-        appState.confirmHardLimitExtend()
-        await waitForIssueCreator { appState.hardLimitPopupErrorMessage != nil }
+        appState.popups.chooseHardLimitExtend()
+        appState.popups.confirmHardLimitExtend()
+        await waitForIssueCreator { appState.popups.hardLimitPopupErrorMessage != nil }
 
-        XCTAssertFalse(appState.isSubmittingHardLimitAction)
-        XCTAssertEqual(appState.hardLimitPopupPhase, .extend)
+        XCTAssertFalse(appState.popups.isSubmittingHardLimitAction)
+        XCTAssertEqual(appState.popups.hardLimitPopupPhase, .extend)
     }
 
     func testHardLimitChooseEndMovesToEndSessionPhase() async throws {
         let (appState, _, connection) = try await appStateWithHardLimitDecision()
         defer { connection.stop() }
-        await waitForIssueCreator { appState.hardLimitPopupPhase == .decision }
+        await waitForIssueCreator { appState.popups.hardLimitPopupPhase == .decision }
 
-        appState.chooseHardLimitEnd()
+        appState.popups.chooseHardLimitEnd()
 
-        XCTAssertEqual(appState.hardLimitPopupPhase, .endSession)
+        XCTAssertEqual(appState.popups.hardLimitPopupPhase, .endSession)
         XCTAssertEqual(appState.endSession.pendingSessionID, "s1")
     }
 
@@ -94,14 +94,14 @@ final class PopupCoordinatorTests: DaemonTestCase {
         let appState = CompanionAppState(daemonConnection: connection)
         appState.preferences.preferences.showInactivityActionPopups = true
 
-        let presented = await appState.presentInactivityPopup(for: try inactivityDelivery())
+        let presented = await appState.popups.presentInactivityPopup(for: try inactivityDelivery())
         XCTAssertTrue(presented)
-        XCTAssertEqual(appState.inactivityPopupPhase, .decision)
-        appState.chooseInactivityPopupEnd()
-        XCTAssertEqual(appState.inactivityPopupPhase, .endSession)
-        appState.returnToInactivityDecision()
+        XCTAssertEqual(appState.popups.inactivityPopupPhase, .decision)
+        appState.popups.chooseInactivityPopupEnd()
+        XCTAssertEqual(appState.popups.inactivityPopupPhase, .endSession)
+        appState.popups.returnToInactivityDecision()
 
-        XCTAssertEqual(appState.inactivityPopupPhase, .decision)
+        XCTAssertEqual(appState.popups.inactivityPopupPhase, .decision)
         XCTAssertNil(appState.endSession.pendingSessionID)
     }
 }

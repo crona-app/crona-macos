@@ -102,17 +102,18 @@ private struct HardLimitTimeContextView: View {
 
 struct HardLimitPopupRootView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject var popups: PopupCoordinator
     @ObservedObject var endSession: EndSessionModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
-            if let phase = appState.hardLimitPopupPhase {
+            if let phase = popups.hardLimitPopupPhase {
                 HoverDismissPopupChrome(
                     cornerRadius: 28,
                     showsDismissControl: phase != .endSession,
                     dismissLabel: "End Session",
-                    onClose: appState.handleHardLimitPopupClose
+                    onClose: popups.handleHardLimitPopupClose
                 ) {
                     VStack(spacing: 0) {
                         content(for: phase)
@@ -120,17 +121,17 @@ struct HardLimitPopupRootView: View {
                     .padding(8)
                 }
                 .frame(width: HardLimitPopupSizing.contentWidth)
-                .opacity(appState.isHardLimitPopupAnimatingIn ? 1 : 0)
-                .blur(radius: reduceMotion || appState.isHardLimitPopupAnimatingIn ? 0 : 28)
-                .scaleEffect(reduceMotion || appState.isHardLimitPopupAnimatingIn ? 1 : 0.97)
+                .opacity(popups.isHardLimitPopupAnimatingIn ? 1 : 0)
+                .blur(radius: reduceMotion || popups.isHardLimitPopupAnimatingIn ? 0 : 28)
+                .scaleEffect(reduceMotion || popups.isHardLimitPopupAnimatingIn ? 1 : 0.97)
                 .animation(
                     reduceMotion ? nil : .easeOut(duration: 0.24),
-                    value: appState.isHardLimitPopupAnimatingIn)
+                    value: popups.isHardLimitPopupAnimatingIn)
             }
         }
         .frame(
             width: HardLimitPopupSizing.panelWidth,
-            height: HardLimitPopupSizing.panelHeight(for: appState.hardLimitPopupPhase, adhoc: appState.timerService.snapshot.adhoc, adhocHeight: endSession.adhocCompletionHeight),
+            height: HardLimitPopupSizing.panelHeight(for: popups.hardLimitPopupPhase, adhoc: appState.timerService.snapshot.adhoc, adhocHeight: endSession.adhocCompletionHeight),
             alignment: .center
         )
         .companionAppearance(appState)
@@ -144,23 +145,24 @@ struct HardLimitPopupRootView: View {
         case .endSession:
             HardLimitEndSessionView(appState: appState)
         case .extend:
-            HardLimitExtendView(appState: appState)
+            HardLimitExtendView(appState: appState, popups: popups)
         case .success:
-            HardLimitExtendSuccessView(appState: appState)
+            HardLimitExtendSuccessView(appState: appState, popups: popups)
         }
     }
 }
 
 struct InactivityPopupRootView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject var popups: PopupCoordinator
 
     var body: some View {
-        if let phase = appState.inactivityPopupPhase {
+        if let phase = popups.inactivityPopupPhase {
             HoverDismissPopupChrome(
                 cornerRadius: 24,
                 showsDismissControl: phase != .endSession,
                 dismissLabel: "Keep Running",
-                onClose: appState.dismissInactivityPopup
+                onClose: popups.dismissInactivityPopup
             ) {
                 VStack(spacing: 0) {
                     switch phase {
@@ -181,14 +183,15 @@ struct InactivityPopupRootView: View {
 
 struct SmartPauseResumeNoticeRootView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject var popups: PopupCoordinator
 
     var body: some View {
-        if appState.smartPauseResumeNotice != nil {
+        if popups.smartPauseResumeNotice != nil {
             HoverDismissPopupChrome(
                 cornerRadius: 24,
                 showsDismissControl: true,
                 dismissLabel: "Dismiss",
-                onClose: appState.dismissSmartPauseResumeNoticeNow
+                onClose: popups.dismissSmartPauseResumeNotice
             ) {
                 HStack(spacing: 12) {
                     Image(systemName: "play.circle.fill")
@@ -307,11 +310,13 @@ private struct HoverDismissPopupChrome<Content: View>: View {
 
 private struct InactivityDecisionView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject var popups: PopupCoordinator
     @ObservedObject private var countdown: HardLimitCountdownService
     @FocusState private var focusedAction: DecisionAction?
 
     init(appState: CompanionAppState) {
         self.appState = appState
+        self.popups = appState.popups
         self.countdown = appState.inactivityPopupCountdownService
     }
 
@@ -321,7 +326,7 @@ private struct InactivityDecisionView: View {
 
             HStack(spacing: 8) {
                 Button {
-                    appState.chooseInactivityPopupEnd()
+                    popups.chooseInactivityPopupEnd()
                 } label: {
                     popupCompactButtonLabel(title: "End Session", shortcut: "E")
                 }
@@ -334,7 +339,7 @@ private struct InactivityDecisionView: View {
                 }
 
                 Button {
-                    appState.dismissInactivityPopup()
+                    popups.dismissInactivityPopup()
                 } label: {
                     popupCompactButtonLabel(
                         title: "Keep Running",
@@ -372,7 +377,7 @@ private struct InactivityDecisionView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(
-                    appState.inactivityPopupDelivery?.alert.title
+                    popups.inactivityPopupDelivery?.alert.title
                         ?? "Still focusing?"
                 )
                 .font(.subheadline.weight(.semibold))
@@ -427,7 +432,7 @@ private struct InactivityEndSessionView: View {
             subtitle: "Add a short note for this focus session.",
             timeSummary: nil,
             timeContextIntent: nil,
-            onBack: { appState.returnToInactivityDecision() }
+            onBack: { appState.popups.returnToInactivityDecision() }
         )
     }
 }
@@ -456,7 +461,7 @@ private struct HardLimitDecisionView: View {
 
             VStack(spacing: 8) {
                 Button {
-                    appState.chooseHardLimitEnd()
+                    appState.popups.chooseHardLimitEnd()
                 } label: {
                     popupButtonLabel(
                         title: "Finish Session",
@@ -474,7 +479,7 @@ private struct HardLimitDecisionView: View {
                 }
 
                 Button {
-                    appState.chooseHardLimitExtend()
+                    appState.popups.chooseHardLimitExtend()
                 } label: {
                     popupButtonLabel(
                         title: "Keep Working",
@@ -550,7 +555,7 @@ private struct HardLimitEndSessionView: View {
             subtitle: "What did you complete? Add a short note before closing the session.",
             timeSummary: HardLimitSessionTimeSummary.from(appState.timerService.snapshot),
             timeContextIntent: .commit,
-            onBack: { appState.returnToHardLimitDecision() }
+            onBack: { appState.popups.returnToHardLimitDecision() }
         )
     }
 }
@@ -627,6 +632,7 @@ private struct PopupEndSessionForm: View {
 
 private struct HardLimitExtendView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject var popups: PopupCoordinator
 
     var body: some View {
         let mode = TimerPresentation.from(appState.timerService.snapshot).mode
@@ -645,14 +651,14 @@ private struct HardLimitExtendView: View {
             VStack(spacing: 10) {
                 ForEach(Array(choices(for: mode).enumerated()), id: \.element.id) { index, choice in
                     Button {
-                        appState.hardLimitPopupExtendChoice = choice
+                        popups.hardLimitPopupExtendChoice = choice
                     } label: {
                         HStack {
                             Text(choice.title)
                                 .font(.headline)
                                 .foregroundStyle(PopupVisualTheme.primaryText)
                             Spacer()
-                            if appState.hardLimitPopupExtendChoice == choice {
+                            if popups.hardLimitPopupExtendChoice == choice {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(PopupVisualTheme.semantic(.info))
                             }
@@ -664,7 +670,7 @@ private struct HardLimitExtendView: View {
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .fill(
                                     PopupVisualTheme.primaryText.opacity(
-                                        appState.hardLimitPopupExtendChoice == choice ? 0.1 : 0.05)
+                                        popups.hardLimitPopupExtendChoice == choice ? 0.1 : 0.05)
                                 )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -677,11 +683,11 @@ private struct HardLimitExtendView: View {
                 }
             }
 
-            if let endDate = appState.hardLimitExtensionEndDate {
+            if let endDate = popups.hardLimitExtensionEndDate {
                 EndsAtRow(date: endDate)
             }
 
-            if let error = appState.hardLimitPopupErrorMessage, !error.isEmpty {
+            if let error = popups.hardLimitPopupErrorMessage, !error.isEmpty {
                 Text(error)
                     .font(.caption)
                     .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.92))
@@ -689,26 +695,26 @@ private struct HardLimitExtendView: View {
 
             VStack(spacing: 10) {
                 Button {
-                    appState.confirmHardLimitExtend()
+                    popups.confirmHardLimitExtend()
                 } label: {
                     popupButtonLabel(
-                        title: appState.isSubmittingHardLimitAction ? "Extending" : "Extend",
+                        title: popups.isSubmittingHardLimitAction ? "Extending" : "Extend",
                         shortcut: "↩",
-                        isLoading: appState.isSubmittingHardLimitAction
+                        isLoading: popups.isSubmittingHardLimitAction
                     )
                 }
                 .buttonStyle(PopupFullWidthButtonStyle(style: .primary))
                 .keyboardShortcut(.defaultAction)
-                .disabled(appState.isSubmittingHardLimitAction)
+                .disabled(popups.isSubmittingHardLimitAction)
 
                 Button {
-                    appState.returnToHardLimitDecision()
+                    popups.returnToHardLimitDecision()
                 } label: {
                     popupButtonLabel(title: "Back", shortcut: "esc")
                 }
                 .buttonStyle(PopupFullWidthButtonStyle(style: .secondary))
                 .keyboardShortcut(.cancelAction)
-                .disabled(appState.isSubmittingHardLimitAction)
+                .disabled(popups.isSubmittingHardLimitAction)
             }
         }
         .padding(10)
@@ -726,9 +732,10 @@ private struct HardLimitExtendView: View {
 
 private struct HardLimitExtendSuccessView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject var popups: PopupCoordinator
 
     var body: some View {
-        let success = appState.hardLimitPopupSuccessModel
+        let success = popups.hardLimitPopupSuccessModel
 
         VStack(spacing: 18) {
             header(
