@@ -219,14 +219,14 @@ struct AdhocAttributionView: View {
     private var datePicker: some View {
         VStack(spacing: 10) {
             DatePicker("Scheduled date", selection: Binding(
-                get: { CronaCalendarDate.date(from: appState.adhocAttribution.date) ?? appState.defaultIssueCreateDate },
+                get: { CronaCalendarDate.date(from: appState.adhocAttribution.date) ?? appState.issueCreator.defaultDueDate },
                 set: { appState.adhocAttribution.date = CronaCalendarDate.string(from: $0) }
             ), displayedComponents: .date)
             .datePickerStyle(.graphical)
             .labelsHidden()
             Button("Use selected date") {
                 if appState.adhocAttribution.date.isEmpty {
-                    appState.adhocAttribution.date = CronaCalendarDate.string(from: appState.defaultIssueCreateDate)
+                    appState.adhocAttribution.date = CronaCalendarDate.string(from: appState.issueCreator.defaultDueDate)
                 }
                 isDatePickerPresented = false
             }

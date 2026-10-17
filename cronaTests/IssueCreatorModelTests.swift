@@ -12,9 +12,9 @@ final class IssueCreatorModelTests: DaemonTestCase {
         let appState = CompanionAppState(daemonConnection: connection)
         appState.isEndSessionSheetPresented = true
 
-        appState.presentIssueCreator()
+        appState.issueCreator.presentCreator()
 
-        XCTAssertFalse(appState.isIssueCreatorPresented)
+        XCTAssertFalse(appState.issueCreator.isPresented)
     }
 
     func testIssueCreatorDoesNotOpenWhileIssueActionEditorIsPresented() async throws {
@@ -23,9 +23,9 @@ final class IssueCreatorModelTests: DaemonTestCase {
         let appState = CompanionAppState(daemonConnection: connection)
         appState.issueActionEditor = .delete(issue: fixtureIssue)
 
-        appState.presentIssueCreator()
+        appState.issueCreator.presentCreator()
 
-        XCTAssertFalse(appState.isIssueCreatorPresented)
+        XCTAssertFalse(appState.issueCreator.isPresented)
     }
 
     func testIssueCreatorIgnoresReopenUntilDismissalCompletes() async throws {
@@ -33,15 +33,15 @@ final class IssueCreatorModelTests: DaemonTestCase {
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
 
-        appState.presentIssueCreator()
-        appState.cancelIssueCreator()
-        appState.presentIssueCreator()
+        appState.issueCreator.presentCreator()
+        appState.issueCreator.cancel()
+        appState.issueCreator.presentCreator()
         try await Task.sleep(for: .milliseconds(300))
-        XCTAssertFalse(appState.isIssueCreatorPresented)
+        XCTAssertFalse(appState.issueCreator.isPresented)
 
-        appState.presentIssueCreator()
+        appState.issueCreator.presentCreator()
         try await Task.sleep(for: .milliseconds(50))
-        XCTAssertTrue(appState.isIssueCreatorPresented)
-        XCTAssertTrue(appState.isIssueCreatorContentVisible)
+        XCTAssertTrue(appState.issueCreator.isPresented)
+        XCTAssertTrue(appState.issueCreator.isContentVisible)
     }
 }

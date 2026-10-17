@@ -2,6 +2,7 @@ import SwiftUI
 
 struct IssueCreatorView: View {
     @ObservedObject var appState: CompanionAppState
+    @ObservedObject var issueCreator: IssueCreatorModel
     @FocusState private var focusedField: Field?
     @State private var selectedRepoID: Int64?
     @State private var selectedFollowUp: IssueCreationFollowUp?
@@ -12,7 +13,7 @@ struct IssueCreatorView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
-                Button(action: appState.cancelIssueCreator) {
+                Button(action: issueCreator.cancel) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .semibold))
                         .frame(width: 30, height: 30)
@@ -21,10 +22,10 @@ struct IssueCreatorView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .disabled(appState.isSubmittingIssueCreator)
+                .disabled(issueCreator.isSubmitting)
                 .accessibilityLabel("Back")
 
-                Text(appState.issueBeingEdited == nil ? "Create Issue" : "Edit Issue")
+                Text(issueCreator.issueBeingEdited == nil ? "Create Issue" : "Edit Issue")
                     .font(.headline)
                     .foregroundStyle(PopupVisualTheme.primaryText)
 
@@ -32,27 +33,27 @@ struct IssueCreatorView: View {
             }
 
             Text("Title (required)").font(.caption.weight(.medium)).foregroundStyle(.secondary)
-            TextField("What needs doing?", text: $appState.issueCreateTitle)
+            TextField("What needs doing?", text: $issueCreator.title)
                 .textFieldStyle(.plain)
                 .focused($focusedField, equals: .title)
-                .onChange(of: appState.issueCreateTitle) { _, value in
-                    if value.count > 120 { appState.issueCreateTitle = String(value.prefix(120)) }
+                .onChange(of: issueCreator.title) { _, value in
+                    if value.count > 120 { issueCreator.title = String(value.prefix(120)) }
                 }
                 .creatorField(isFocused: focusedField == .title)
 
             Text("Description (optional)").font(.caption.weight(.medium)).foregroundStyle(.secondary)
-            TextField("Add details or context", text: $appState.issueCreateDescription, axis: .vertical)
+            TextField("Add details or context", text: $issueCreator.description, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(2...4)
                 .focused($focusedField, equals: .description)
-                .onChange(of: appState.issueCreateDescription) { _, value in
-                    if value.count > 2_000 { appState.issueCreateDescription = String(value.prefix(2_000)) }
+                .onChange(of: issueCreator.description) { _, value in
+                    if value.count > 2_000 { issueCreator.description = String(value.prefix(2_000)) }
                 }
                 .creatorField(isFocused: focusedField == .description)
 
             Text("Estimate (optional) and scheduled date").font(.caption.weight(.medium)).foregroundStyle(.secondary)
             HStack(spacing: 10) {
-                TextField("Estimate (e.g. 45m, 1h30m)", text: $appState.issueCreateEstimate)
+                TextField("Estimate (e.g. 45m, 1h30m)", text: $issueCreator.estimate)
                     .textFieldStyle(.plain)
                     .focused($focusedField, equals: .estimate)
                     .creatorField(isFocused: focusedField == .estimate)
@@ -76,38 +77,38 @@ struct IssueCreatorView: View {
                         DatePicker(
                             "Due Date",
                             selection: Binding(
-                                get: { appState.issueCreateDueDate ?? appState.defaultIssueCreateDate },
-                                set: { appState.issueCreateDueDate = $0 }
+                                get: { issueCreator.dueDate ?? issueCreator.defaultDueDate },
+                                set: { issueCreator.dueDate = $0 }
                             ),
                             displayedComponents: .date
                         )
                         .datePickerStyle(.graphical)
                         .labelsHidden()
-                        if appState.issueCreateDueDate == nil {
+                        if issueCreator.dueDate == nil {
                             Button("Use selected date") {
-                                appState.issueCreateDueDate = appState.defaultIssueCreateDate
+                                issueCreator.dueDate = issueCreator.defaultDueDate
                                 isDueDatePickerPresented = false
                             }
                         }
                         Button("No date") {
-                            appState.issueCreateDueDate = nil
+                            issueCreator.dueDate = nil
                             isDueDatePickerPresented = false
                         }
                     }
-                    .disabled(appState.isSubmittingIssueCreator)
+                    .disabled(issueCreator.isSubmitting)
                     .padding(12)
                 }
             }
 
-            if !appState.issueCreateEstimate.isEmpty,
-                case .failure = FlexibleDurationParser.optionalMinutes(appState.issueCreateEstimate) {
+            if !issueCreator.estimate.isEmpty,
+                case .failure = FlexibleDurationParser.optionalMinutes(issueCreator.estimate) {
                 Text("Use a duration such as 45m or 1h30m.")
                     .font(.caption)
                     .foregroundStyle(PopupVisualTheme.semantic(.error))
             }
 
             Text("Destination (required)").font(.caption.weight(.medium)).foregroundStyle(.secondary)
-            if appState.issueBeingEdited == nil {
+            if issueCreator.issueBeingEdited == nil {
                 destinationField
             } else {
                 selectedDestinationField
@@ -118,7 +119,7 @@ struct IssueCreatorView: View {
             VStack(alignment: .leading, spacing: 12) {
                 footerFeedback
 
-                if appState.issueBeingEdited == nil {
+                if issueCreator.issueBeingEdited == nil {
                     Text("After creating")
                         .font(.caption)
                         .foregroundStyle(PopupVisualTheme.secondaryText)
@@ -140,9 +141,9 @@ struct IssueCreatorView: View {
                         .keyboardShortcut(.defaultAction)
                         .disabled(createActionDisabled)
                 } else {
-                    Button(action: { appState.submitIssueCreator(followUp: .close) }) {
+                    Button(action: { issueCreator.submit(followUp: .close) }) {
                         Text(
-                            appState.isSubmittingIssueCreator
+                            issueCreator.isSubmitting
                                 ? "Saving…" : "Save Changes"
                         )
                         .frame(maxWidth: .infinity)
@@ -152,13 +153,13 @@ struct IssueCreatorView: View {
                         .keyboardShortcut(.defaultAction)
                         .disabled(
                             validationMessage != nil
-                                || appState.isSubmittingIssueCreator
+                                || issueCreator.isSubmitting
                                 || appState.issueActionsService.actionInFlightIssueID != nil
                         )
                 }
             }
         }
-        .disabled(appState.isSubmittingIssueCreator)
+        .disabled(issueCreator.isSubmitting)
         .padding(20)
         .frame(width: 420)
         .fixedSize(horizontal: false, vertical: true)
@@ -168,18 +169,18 @@ struct IssueCreatorView: View {
         }
         .onChange(of: appState.issueCreationService.destinations) { _, destinations in
             guard selectedRepoID == nil,
-                let destinationID = appState.issueCreateDestinationID
+                let destinationID = issueCreator.destinationID
             else { return }
             selectedRepoID = destinations.first { $0.streamID == destinationID }?.repoID
         }
         .onChange(of: selectedRepoID) { _, repoID in
-            guard let streamID = appState.issueCreateDestinationID,
+            guard let streamID = issueCreator.destinationID,
                 appState.issueCreationService.destinations.first(where: { $0.streamID == streamID })?.repoID != repoID
             else { return }
-            appState.issueCreateDestinationID = nil
+            issueCreator.destinationID = nil
         }
         .onExitCommand {
-            appState.cancelIssueCreator()
+            issueCreator.cancel()
         }
         .onChange(of: appState.hasActiveFocusSession) { _, isActive in
             if isActive, selectedFollowUp == .focus {
@@ -220,11 +221,11 @@ struct IssueCreatorView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Menu {
                     Button("Choose stream") {
-                        appState.issueCreateDestinationID = nil
+                        issueCreator.destinationID = nil
                     }
                     ForEach(filteredStreams) { destination in
                         Button(destination.streamName) {
-                            appState.issueCreateDestinationID = destination.streamID
+                            issueCreator.destinationID = destination.streamID
                         }
                     }
                 } label: {
@@ -291,11 +292,11 @@ struct IssueCreatorView: View {
     }
 
     private var selectedDestination: IssueDestination? {
-        appState.issueCreationService.destinations.first { $0.streamID == appState.issueCreateDestinationID }
+        appState.issueCreationService.destinations.first { $0.streamID == issueCreator.destinationID }
     }
 
     private var createActionDisabled: Bool {
-        validationMessage != nil || appState.isSubmittingIssueCreator
+        validationMessage != nil || issueCreator.isSubmitting
             || (selectedFollowUp == .focus && appState.hasActiveFocusSession)
     }
 
@@ -342,22 +343,22 @@ struct IssueCreatorView: View {
     }
 
     private func submitCreateAction() {
-        appState.submitIssueCreator(followUp: selectedFollowUp ?? .close)
+        issueCreator.submit(followUp: selectedFollowUp ?? .close)
     }
 
     private var validationMessage: String? {
-        if appState.issueCreateTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if issueCreator.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return "Issue title is required."
         }
-        if appState.issueCreateDestinationID == nil { return "Choose a repo and stream." }
-        if case .failure = FlexibleDurationParser.optionalMinutes(appState.issueCreateEstimate) {
+        if issueCreator.destinationID == nil { return "Choose a repo and stream." }
+        if case .failure = FlexibleDurationParser.optionalMinutes(issueCreator.estimate) {
             return "Estimate must be like 90, 90m, 1h30m, 1.5h, or 1h34m23s."
         }
         return nil
     }
 
     private var formattedDueDate: String {
-        appState.issueCreateDueDate?.formatted(date: .abbreviated, time: .omitted) ?? "No date"
+        issueCreator.dueDate?.formatted(date: .abbreviated, time: .omitted) ?? "No date"
     }
 }
 
@@ -638,10 +639,10 @@ struct IssueCreationSuccessView: View {
             Text("Created \(success.issue.title)").font(.caption.weight(.semibold)).lineLimit(1)
             Spacer(minLength: 0)
             if success.plannedForToday && !appState.hasActiveFocusSession {
-                Button("Start Focus", action: appState.startFocusFromCreatedIssue)
+                Button("Start Focus", action: appState.issueCreator.startFocusFromCreatedIssue)
                     .buttonStyle(.plain).font(.caption.weight(.semibold)).foregroundStyle(PopupVisualTheme.semantic(.warning))
             }
-            Button(action: appState.dismissIssueCreationSuccess) { Image(systemName: "xmark") }
+            Button(action: appState.issueCreator.dismissSuccess) { Image(systemName: "xmark") }
                 .buttonStyle(.plain).accessibilityLabel("Dismiss")
         }
         .padding(.horizontal, 12).padding(.vertical, 10)

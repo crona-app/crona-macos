@@ -12,22 +12,22 @@ final class CronaCompanionTests: DaemonTestCase {
         let appState = CompanionAppState(daemonConnection: connection)
         let issue = DailyFocusIssue(id: 42, streamID: 7, title: "Original", status: "planned",
             estimateMinutes: nil, workedSeconds: 0, todoForDate: nil)
-        appState.presentIssueEditor(for: issue)
-        XCTAssertNil(appState.issueCreateDueDate)
-        appState.issueCreateTitle = "Edited"
-        appState.submitIssueCreator()
-        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        appState.issueCreator.presentEditor(for: issue)
+        XCTAssertNil(appState.issueCreator.dueDate)
+        appState.issueCreator.title = "Edited"
+        appState.issueCreator.submit()
+        await waitForIssueCreator { !appState.issueCreator.isSubmitting }
         XCTAssertEqual(transport.methods.filter { $0 == "issue.update" }.count, 1)
         XCTAssertFalse(transport.methods.contains("issue.set_todo"))
         XCTAssertFalse(transport.methods.contains("issue.clear_todo"))
 
         let scheduled = DailyFocusIssue(id: 42, streamID: 7, title: "Scheduled", status: "planned",
             estimateMinutes: nil, workedSeconds: 0, todoForDate: transport.logicalDate)
-        appState.presentIssueEditor(for: scheduled)
-        XCTAssertEqual(appState.issueCreateDueDate.map(CronaCalendarDate.string(from:)), transport.logicalDate)
-        appState.issueCreateDueDate = nil
-        appState.submitIssueCreator()
-        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        appState.issueCreator.presentEditor(for: scheduled)
+        XCTAssertEqual(appState.issueCreator.dueDate.map(CronaCalendarDate.string(from:)), transport.logicalDate)
+        appState.issueCreator.dueDate = nil
+        appState.issueCreator.submit()
+        await waitForIssueCreator { !appState.issueCreator.isSubmitting }
         XCTAssertEqual(transport.methods.filter { $0 == "issue.clear_todo" }.count, 1)
     }
 
@@ -53,69 +53,69 @@ final class CronaCompanionTests: DaemonTestCase {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
-        appState.presentIssueCreator()
+        appState.issueCreator.presentCreator()
         XCTAssertNotEqual(transport.logicalDate, DailyFocusService.todayString())
-        XCTAssertEqual(appState.issueCreateDueDate.map(CronaCalendarDate.string(from:)), transport.logicalDate)
-        appState.issueCreateTitle = "New"
-        appState.issueCreateDestinationID = 7
-        appState.submitIssueCreator()
-        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        XCTAssertEqual(appState.issueCreator.dueDate.map(CronaCalendarDate.string(from:)), transport.logicalDate)
+        appState.issueCreator.title = "New"
+        appState.issueCreator.destinationID = 7
+        appState.issueCreator.submit()
+        await waitForIssueCreator { !appState.issueCreator.isSubmitting }
         XCTAssertEqual(transport.requests.last { $0.method == "issue.create" }?.params["todoForDate"]?.stringValue,
             transport.logicalDate)
-        XCTAssertEqual(appState.issueCreationSuccess?.plannedForToday, true)
+        XCTAssertEqual(appState.issueCreator.success?.plannedForToday, true)
 
-        appState.presentIssueCreator()
-        appState.issueCreateTitle = "Unscheduled"
-        appState.issueCreateDestinationID = 7
-        appState.issueCreateDueDate = nil
-        appState.submitIssueCreator()
-        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        appState.issueCreator.presentCreator()
+        appState.issueCreator.title = "Unscheduled"
+        appState.issueCreator.destinationID = 7
+        appState.issueCreator.dueDate = nil
+        appState.issueCreator.submit()
+        await waitForIssueCreator { !appState.issueCreator.isSubmitting }
         XCTAssertNil(transport.requests.last { $0.method == "issue.create" }?.params["todoForDate"])
-        XCTAssertEqual(appState.issueCreationSuccess?.plannedForToday, false)
+        XCTAssertEqual(appState.issueCreator.success?.plannedForToday, false)
     }
 
     func testIssueCreatorLocksSubmissionThroughRefreshAndCreateMore() async throws {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
-        appState.presentIssueCreator()
+        appState.issueCreator.presentCreator()
         await settleAsyncTasks()
-        appState.issueCreateTitle = "New"
-        appState.issueCreateDestinationID = 7
-        appState.issueCreateDueDate = CronaCalendarDate.date(from: "2001-02-04")
+        appState.issueCreator.title = "New"
+        appState.issueCreator.destinationID = 7
+        appState.issueCreator.dueDate = CronaCalendarDate.date(from: "2001-02-04")
         transport.suspendRefresh = true
-        appState.submitIssueCreator(followUp: .more)
-        XCTAssertTrue(appState.isSubmittingIssueCreator)
-        appState.submitIssueCreator(followUp: .more)
+        appState.issueCreator.submit(followUp: .more)
+        XCTAssertTrue(appState.issueCreator.isSubmitting)
+        appState.issueCreator.submit(followUp: .more)
         await waitForIssueCreator { transport.refreshContinuation != nil }
         XCTAssertFalse(appState.issueCreationService.isCreating)
-        XCTAssertTrue(appState.isSubmittingIssueCreator)
-        appState.submitIssueCreator(followUp: .more)
-        appState.cancelIssueCreator()
-        XCTAssertTrue(appState.isIssueCreatorPresented)
-        XCTAssertEqual(appState.issueCreateTitle, "New")
+        XCTAssertTrue(appState.issueCreator.isSubmitting)
+        appState.issueCreator.submit(followUp: .more)
+        appState.issueCreator.cancel()
+        XCTAssertTrue(appState.issueCreator.isPresented)
+        XCTAssertEqual(appState.issueCreator.title, "New")
         XCTAssertEqual(transport.methods.filter { $0 == "issue.create" }.count, 1)
         transport.resumeRefresh()
-        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
-        XCTAssertEqual(appState.issueCreateTitle, "")
-        XCTAssertEqual(appState.issueCreateDestinationID, 7)
-        XCTAssertEqual(appState.issueCreateDueDate.map(CronaCalendarDate.string(from:)), "2001-02-04")
+        await waitForIssueCreator { !appState.issueCreator.isSubmitting }
+        XCTAssertEqual(appState.issueCreator.title, "")
+        XCTAssertEqual(appState.issueCreator.destinationID, 7)
+        XCTAssertEqual(appState.issueCreator.dueDate.map(CronaCalendarDate.string(from:)), "2001-02-04")
     }
 
     func testIssueCreatorFailureReleasesSubmissionAndRetainsInputs() async throws {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
-        appState.issueCreateTitle = "Retry me"
-        appState.issueCreateDestinationID = 7
+        appState.issueCreator.title = "Retry me"
+        appState.issueCreator.destinationID = 7
         transport.failCreation = true
-        appState.submitIssueCreator()
-        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
-        XCTAssertEqual(appState.issueCreateTitle, "Retry me")
+        appState.issueCreator.submit()
+        await waitForIssueCreator { !appState.issueCreator.isSubmitting }
+        XCTAssertEqual(appState.issueCreator.title, "Retry me")
         XCTAssertNotNil(appState.issueCreationService.lastErrorMessage)
         transport.failCreation = false
-        appState.submitIssueCreator(followUp: .more)
-        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        appState.issueCreator.submit(followUp: .more)
+        await waitForIssueCreator { !appState.issueCreator.isSubmitting }
         XCTAssertEqual(transport.methods.filter { $0 == "issue.create" }.count, 2)
     }
 
@@ -123,20 +123,20 @@ final class CronaCompanionTests: DaemonTestCase {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
-        appState.presentIssueCreator()
+        appState.issueCreator.presentCreator()
         await settleAsyncTasks()
-        appState.issueCreateTitle = "New"
-        appState.issueCreateDestinationID = 7
+        appState.issueCreator.title = "New"
+        appState.issueCreator.destinationID = 7
         transport.suspendRefresh = true
-        appState.submitIssueCreator()
+        appState.issueCreator.submit()
         await waitForIssueCreator { transport.refreshContinuation != nil }
         transport.resumeRefresh()
-        await waitForIssueCreator { appState.issueCreationSuccess != nil }
-        XCTAssertTrue(appState.isSubmittingIssueCreator)
-        XCTAssertTrue(appState.isIssueCreatorPresented)
-        appState.submitIssueCreator()
-        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
-        XCTAssertFalse(appState.isIssueCreatorPresented)
+        await waitForIssueCreator { appState.issueCreator.success != nil }
+        XCTAssertTrue(appState.issueCreator.isSubmitting)
+        XCTAssertTrue(appState.issueCreator.isPresented)
+        appState.issueCreator.submit()
+        await waitForIssueCreator { !appState.issueCreator.isSubmitting }
+        XCTAssertFalse(appState.issueCreator.isPresented)
         XCTAssertEqual(transport.methods.filter { $0 == "issue.create" }.count, 1)
     }
 
@@ -147,34 +147,34 @@ final class CronaCompanionTests: DaemonTestCase {
         _ = connection.applyDayBoundary(CronaDayBoundaryEventPayload(kind: "start",
             dateBefore: "", dateAfter: "", effectiveLocalTime: "", effectiveUTCTime: nil,
             timezone: "Asia/Kolkata", occurrenceID: "invalid", logicalDate: "2001-13-40"))
-        XCTAssertEqual(CronaCalendarDate.string(from: appState.defaultIssueCreateDate), DailyFocusService.todayString())
+        XCTAssertEqual(CronaCalendarDate.string(from: appState.issueCreator.defaultDueDate), DailyFocusService.todayString())
     }
 
     func testIssueCreatorFocusGuardsActiveAndNewlyStartedSessions() async throws {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
-        appState.issueCreateTitle = "New"
-        appState.issueCreateDestinationID = 7
+        appState.issueCreator.title = "New"
+        appState.issueCreator.destinationID = 7
         appState.timerService.snapshot = TimerSnapshot(state: "running", sessionID: "active")
-        appState.submitIssueCreator(followUp: .focus)
-        XCTAssertFalse(appState.isSubmittingIssueCreator)
+        appState.issueCreator.submit(followUp: .focus)
+        XCTAssertFalse(appState.issueCreator.isSubmitting)
         XCTAssertFalse(transport.methods.contains("issue.create"))
 
         appState.timerService.snapshot = TimerSnapshot(state: "idle")
         transport.suspendRefresh = true
-        appState.submitIssueCreator(followUp: .focus)
+        appState.issueCreator.submit(followUp: .focus)
         await waitForIssueCreator { transport.refreshContinuation != nil }
         appState.timerService.snapshot = TimerSnapshot(state: "running", sessionID: "active")
         transport.resumeRefresh()
-        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        await waitForIssueCreator { !appState.issueCreator.isSubmitting }
         XCTAssertNil(appState.selectedFocusIssue)
-        XCTAssertNotNil(appState.issueCreationSuccess)
+        XCTAssertNotNil(appState.issueCreator.success)
         XCTAssertEqual(appState.timerService.snapshot.sessionID, "active")
 
         appState.timerService.snapshot = TimerSnapshot(state: "idle")
-        appState.submitIssueCreator(followUp: .focus)
-        await waitForIssueCreator { !appState.isSubmittingIssueCreator }
+        appState.issueCreator.submit(followUp: .focus)
+        await waitForIssueCreator { !appState.issueCreator.isSubmitting }
         XCTAssertEqual(appState.selectedFocusIssue?.id, 42)
     }
 

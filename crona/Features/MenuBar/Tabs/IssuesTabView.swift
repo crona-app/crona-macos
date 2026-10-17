@@ -621,7 +621,7 @@ struct FocusIssueRow: View {
                     Label("View Details", systemImage: "info.circle")
                 }
                 Button {
-                    appState.presentIssueEditor(for: issue)
+                    appState.issueCreator.presentEditor(for: issue)
                 } label: {
                     Label("Edit Issue", systemImage: "pencil")
                 }
@@ -685,7 +685,7 @@ struct FocusIssueRow: View {
         .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .contextMenu {
             Button {
-                appState.presentIssueEditor(for: issue)
+                appState.issueCreator.presentEditor(for: issue)
             } label: {
                 Label("Edit Issue", systemImage: "pencil")
             }

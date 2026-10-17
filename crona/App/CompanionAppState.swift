@@ -93,13 +93,28 @@ final class CompanionAppState: ObservableObject {
     let breakScreenService: BreakScreenService
     let userActivityMonitor: UserActivityMonitor
     let appUpdateService: AppUpdateService
+    private(set) lazy var issueCreator = IssueCreatorModel(
+        daemonConnection: daemonConnection,
+        issueCreationService: issueCreationService,
+        issueActionsService: issueActionsService,
+        dailyFocusService: dailyFocusService,
+        contextService: contextService,
+        canPresent: { [weak self] in
+            guard let self else { return false }
+            return !isEndSessionSheetPresented && issueActionEditor == nil
+        },
+        hasActiveFocusSession: { [weak self] in self?.hasActiveFocusSession ?? false },
+        focusIssue: { [weak self] issue in
+            self?.selectedPopoverTab = .now
+            self?.selectedFocusIssue = issue
+        }
+    )
     private var cancellables: Set<AnyCancellable> = []
     private var daemonEventObserver: NSObjectProtocol?
     private var daemonConnectObserver: NSObjectProtocol?
     private var endSessionFallbackTask: Task<Void, Never>?
     private var hardLimitPopupDismissTask: Task<Void, Never>?
     private var smartPauseResumeNoticeDismissTask: Task<Void, Never>?
-    private var issueCreationSuccessDismissTask: Task<Void, Never>?
     private var presentationTimer: Timer?
     private var lastWarningIndicatorKey: String?
     private var settingsSceneAction: (() -> Void)?
@@ -128,15 +143,6 @@ final class CompanionAppState: ObservableObject {
     @Published var manualSessionEndPeriod = "AM"
     @Published var manualSessionNotes = ""
     @Published var manualSessionError: String?
-    @Published var isIssueCreatorPresented = false
-    @Published var isIssueCreatorContentVisible = false
-    @Published var issueCreateTitle = ""
-    @Published var issueCreateDescription = ""
-    @Published var issueCreateEstimate = ""
-    @Published var issueCreateDueDate: Date?
-    @Published private(set) var isSubmittingIssueCreator = false
-    @Published var issueCreateDestinationID: Int64?
-    @Published private(set) var issueBeingEdited: DailyFocusIssue?
     @Published private(set) var habitBeingEdited: HabitRowModel?
     @Published var isHabitCreatorPresented = false
     @Published var habitCreateName = ""
@@ -147,8 +153,6 @@ final class CompanionAppState: ObservableObject {
     @Published var habitCreateTarget = ""
     @Published var habitCreateActive = true
     @Published var habitCreateError: String?
-    private var issueCreatorPresentationGeneration: UInt = 0
-    @Published var issueCreationSuccess: IssueCreationSuccess?
     @Published var selectedPopoverTab: PopoverTab = .now
     @Published var isStatsCalendarPresented = false
     @Published private(set) var selectedSettingsDestination: SettingsDestination = .general
@@ -411,7 +415,7 @@ final class CompanionAppState: ObservableObject {
             || windowService.hardLimitPopupVisible
             || isEndSessionSheetPresented
             || issueActionEditor != nil
-            || isIssueCreatorPresented
+            || issueCreator.isPresented
     }
 
     func start() {
@@ -941,80 +945,6 @@ final class CompanionAppState: ObservableObject {
         selectedFocusIssue = nil
     }
 
-    func presentIssueCreator() {
-        guard daemonConnection.connectionState == .connected,
-            !isSubmittingIssueCreator,
-            !isIssueCreatorPresented,
-            !isEndSessionSheetPresented,
-            issueActionEditor == nil
-        else { return }
-        issueCreationService.clearError()
-        issueBeingEdited = nil
-        issueCreateTitle = ""
-        issueCreateDescription = ""
-        issueCreateEstimate = ""
-        issueCreateDueDate = defaultIssueCreateDate
-        issueCreateDestinationID = contextService.snapshot.streamID
-        isIssueCreatorContentVisible = false
-        isIssueCreatorPresented = true
-        issueCreatorPresentationGeneration &+= 1
-        let presentationGeneration = issueCreatorPresentationGeneration
-        Task { @MainActor [weak self] in
-            await Task.yield()
-            guard let self,
-                self.isIssueCreatorPresented,
-                presentationGeneration == self.issueCreatorPresentationGeneration
-            else { return }
-            withAnimation(.easeInOut(duration: 0.22)) {
-                self.isIssueCreatorContentVisible = true
-            }
-        }
-        Task {
-            await issueCreationService.loadDestinations()
-            if !issueCreationService.destinations.contains(where: {
-                $0.streamID == issueCreateDestinationID
-            }) {
-                issueCreateDestinationID = nil
-            }
-        }
-    }
-
-    func presentIssueEditor(for issue: DailyFocusIssue) {
-        guard daemonConnection.connectionState == .connected,
-            !isSubmittingIssueCreator,
-            !isEndSessionSheetPresented,
-            issueActionEditor == nil,
-            !isIssueCreatorPresented
-        else { return }
-        issueCreationService.clearError()
-        issueBeingEdited = issue
-        issueCreateTitle = issue.title
-        issueCreateDescription = issue.description ?? ""
-        issueCreateEstimate = issue.estimateMinutes.map(String.init) ?? ""
-        issueCreateDueDate = issue.todoForDate.flatMap(CronaCalendarDate.date(from:))
-        issueCreateDestinationID = issue.streamID
-        isIssueCreatorContentVisible = false
-        isIssueCreatorPresented = true
-        issueCreatorPresentationGeneration &+= 1
-        let generation = issueCreatorPresentationGeneration
-        Task { @MainActor [weak self] in
-            await Task.yield()
-            guard let self, self.isIssueCreatorPresented,
-                generation == self.issueCreatorPresentationGeneration
-            else { return }
-            withAnimation(.easeInOut(duration: 0.22)) {
-                self.isIssueCreatorContentVisible = true
-            }
-        }
-    }
-
-    func cancelIssueCreator() {
-        guard !isSubmittingIssueCreator else { return }
-        issueCreationService.clearError()
-        issueBeingEdited = nil
-        dismissIssueCreatorPresentation()
-    }
-
     func presentHabitCreator() {
         guard daemonConnection.connectionState == .connected,
             !isEndSessionSheetPresented, issueActionEditor == nil, habitActionEditor == nil
@@ -1149,165 +1079,6 @@ final class CompanionAppState: ObservableObject {
         guard !habitsService.isManagingHabit else { return }
         habitActionEditor = nil
         habitsService.clearManagementError()
-    }
-
-    func submitIssueCreator(followUp: IssueCreationFollowUp = .close) {
-        guard !isSubmittingIssueCreator,
-            !issueCreationService.isCreating,
-            issueActionsService.actionInFlightIssueID == nil,
-            followUp != .focus || !hasActiveFocusSession
-        else { return }
-        let title = issueCreateTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        let description = issueCreateDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-        let estimateText = issueCreateEstimate.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty, title.count <= 120,
-            description.count <= 2_000,
-            let streamID = issueCreateDestinationID
-        else { return }
-        guard case .success(let estimate) = FlexibleDurationParser.optionalMinutes(estimateText)
-        else { return }
-        let logicalDate = issueCreateDueDate.map(CronaCalendarDate.string(from:))
-        isSubmittingIssueCreator = true
-        if let issueBeingEdited {
-            let issue = issueBeingEdited
-            Task {
-                defer { isSubmittingIssueCreator = false }
-                let succeeded = await issueActionsService.updateIssue(
-                    issue: issue,
-                    title: title,
-                    description: description.isEmpty ? nil : description,
-                    estimateMinutes: estimate,
-                    todoForDate: logicalDate
-                )
-                if succeeded {
-                    self.issueBeingEdited = nil
-                    await dismissIssueCreatorPresentationAndWait()
-                }
-            }
-            return
-        }
-
-        let request = CronaCreateIssueRequest(
-            streamID: streamID,
-            title: title,
-            description: description.isEmpty ? nil : description,
-            estimateMinutes: estimate,
-            todoForDate: logicalDate
-        )
-        Task {
-            defer { isSubmittingIssueCreator = false }
-            guard let created = await issueCreationService.create(request) else { return }
-            let issue = DailyFocusIssue(
-                id: created.id,
-                streamID: created.streamID,
-                title: created.title,
-                status: created.status,
-                estimateMinutes: created.estimateMinutes,
-                workedSeconds: created.workedSeconds,
-                todoForDate: created.todoForDate,
-                repoName: created.repoName,
-                streamName: created.streamName,
-                description: created.description,
-                notes: created.notes,
-                pinnedDaily: created.pinnedDaily
-            )
-            await dailyFocusService.refresh()
-
-            switch followUp {
-            case .more:
-                issueCreationSuccess = nil
-                issueBeingEdited = nil
-                issueCreateTitle = ""
-                issueCreateDescription = ""
-                issueCreateEstimate = ""
-                issueCreateDestinationID = created.streamID
-            case .focus:
-                issueCreationSuccessDismissTask?.cancel()
-                issueCreationSuccess = nil
-                await dismissIssueCreatorPresentationAndWait()
-                if hasActiveFocusSession {
-                    issueCreationSuccess = IssueCreationSuccess(
-                        issue: issue, plannedForToday: created.todoForDate == issueCreatorLogicalDate)
-                    scheduleIssueCreationSuccessDismissal()
-                } else {
-                    selectedPopoverTab = .now
-                    selectedFocusIssue = issue
-                }
-            case .close:
-                issueCreationSuccess = IssueCreationSuccess(
-                    issue: issue, plannedForToday: created.todoForDate == issueCreatorLogicalDate)
-                await dismissIssueCreatorPresentationAndWait()
-                scheduleIssueCreationSuccessDismissal()
-            }
-        }
-    }
-
-    private var issueCreatorLogicalDate: String {
-        guard let date = CronaCalendarDate.date(from: daemonConnection.currentDate),
-            CronaCalendarDate.string(from: date) == daemonConnection.currentDate
-        else { return DailyFocusService.todayString() }
-        return daemonConnection.currentDate
-    }
-
-    var defaultIssueCreateDate: Date {
-        CronaCalendarDate.date(from: issueCreatorLogicalDate) ?? Date()
-    }
-
-    func startFocusFromCreatedIssue() {
-        guard let success = issueCreationSuccess,
-            success.plannedForToday,
-            !hasActiveFocusSession
-        else { return }
-        issueCreationSuccessDismissTask?.cancel()
-        issueCreationSuccess = nil
-        selectedPopoverTab = .now
-        selectedFocusIssue = success.issue
-    }
-
-    func dismissIssueCreationSuccess() {
-        issueCreationSuccessDismissTask?.cancel()
-        issueCreationSuccess = nil
-    }
-
-    private func scheduleIssueCreationSuccessDismissal() {
-        issueCreationSuccessDismissTask?.cancel()
-        issueCreationSuccessDismissTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(6))
-            guard !Task.isCancelled else { return }
-            self?.issueCreationSuccess = nil
-        }
-    }
-
-    private func dismissIssueCreatorPresentation() {
-        guard isIssueCreatorPresented else { return }
-        issueCreatorPresentationGeneration &+= 1
-        let presentationGeneration = issueCreatorPresentationGeneration
-        withAnimation(.easeInOut(duration: 0.18)) {
-            isIssueCreatorContentVisible = false
-        }
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(180))
-            guard let self,
-                !self.isIssueCreatorContentVisible,
-                presentationGeneration == self.issueCreatorPresentationGeneration
-            else { return }
-            self.isIssueCreatorPresented = false
-            await Task.yield()
-        }
-    }
-
-    private func dismissIssueCreatorPresentationAndWait() async {
-        issueCreatorPresentationGeneration &+= 1
-        let presentationGeneration = issueCreatorPresentationGeneration
-        withAnimation(.easeInOut(duration: 0.18)) {
-            isIssueCreatorContentVisible = false
-        }
-        try? await Task.sleep(for: .milliseconds(180))
-        guard !isIssueCreatorContentVisible,
-            presentationGeneration == issueCreatorPresentationGeneration
-        else { return }
-        isIssueCreatorPresented = false
-        await Task.yield()
     }
 
     func requestIssueStatusChange(

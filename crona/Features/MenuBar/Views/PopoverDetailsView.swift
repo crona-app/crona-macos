@@ -54,7 +54,7 @@ struct IssueDetailView: View {
                 Menu {
                     Button {
                         appState.dismissDetails()
-                        appState.presentIssueEditor(for: issue)
+                        appState.issueCreator.presentEditor(for: issue)
                     } label: {
                         Label("Edit Issue", systemImage: "pencil")
                     }
