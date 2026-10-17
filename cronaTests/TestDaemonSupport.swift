@@ -33,6 +33,11 @@ class DaemonTestCase: XCTestCase {
         return (connection, transport)
     }
 
+    final func postDaemonEvent(_ json: String) throws {
+        let event = try JSONDecoder().decode(CronaProtocolEvent.self, from: Data(json.utf8))
+        NotificationCenter.default.post(name: .cronaDaemonEventReceived, object: event)
+    }
+
     final func settleAsyncTasks() async {
         for _ in 0..<6 {
             await Task.yield()
@@ -48,6 +53,7 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
     var failCreation = false
     var failEnd = false
     var hasAdhocSession = false
+    var timerStateFixture: [String: Any]?
     var provideDestinations = false
     var creationStatus = "planned"
     var createdFixture: [String: Any]?
@@ -92,7 +98,9 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
         case "daily_plan.get":
             result = ["id": "plan", "date": logicalDate, "createdAt": "", "updatedAt": "", "entries": []] as [String: Any]
         case "timer.get_state":
-            if hasAdhocSession {
+            if let timerStateFixture {
+                result = timerStateFixture
+            } else if hasAdhocSession {
                 result = ["state": "running", "sessionId": "adhoc-test", "adhoc": true, "elapsedSeconds": 901] as [String: Any]
             } else {
                 result = ["state": "idle"]
@@ -100,6 +108,7 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
         case "timer.end":
             if failEnd { throw NSError(domain: "AdhocTests", code: 1) }
             hasAdhocSession = false
+            timerStateFixture = nil
             result = ["state": "idle"]
         case "issue.list_all":
             result = createdFixture.map { [$0] } ?? []
