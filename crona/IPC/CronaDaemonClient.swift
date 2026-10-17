@@ -612,8 +612,9 @@ nonisolated private func readLine(_ fileDescriptor: Int32) throws -> Data {
             }
             throw CronaConnectionFailure.transport("Failed to read from the daemon socket.")
         }
+        // The daemon terminates every response with a newline, so EOF first means it was cut off.
         guard bytesRead > 0 else {
-            break
+            throw CronaConnectionFailure.transport("The daemon closed the connection before responding.")
         }
 
         if let newline = buffer[..<bytesRead].firstIndex(of: 0x0A) {

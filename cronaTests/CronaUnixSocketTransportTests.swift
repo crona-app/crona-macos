@@ -68,6 +68,82 @@ final class CronaUnixSocketTransportTests: XCTestCase {
         let sawEOF = await Task.detached { server.waitForEOF(on: connection, timeout: 2) }.value
         XCTAssertTrue(sawEOF, "Cancelling the consumer should close the daemon socket.")
     }
+
+    func testUnixSocketTransportAssemblesResponseSplitAcrossWrites() async throws {
+        let server = server!
+        Task.detached {
+            guard let connection = server.acceptConnection(timeout: 2) else { return }
+            defer { close(connection) }
+            _ = server.readRequestLine(from: connection, timeout: 2)
+            server.write(#"{"id":1,"res"#, to: connection)
+            usleep(50_000)
+            server.write(#"ult":true}"# + "\n", to: connection)
+        }
+        let transport = CronaUnixDomainSocketTransport(endpoint: server.path)
+
+        let response = try await transport.send(Data("{}".utf8))
+
+        XCTAssertEqual(String(decoding: response, as: UTF8.self), #"{"id":1,"result":true}"#)
+    }
+
+    func testUnixSocketTransportFailsWhenDaemonClosesMidResponse() async throws {
+        let server = server!
+        Task.detached {
+            guard let connection = server.acceptConnection(timeout: 2) else { return }
+            _ = server.readRequestLine(from: connection, timeout: 2)
+            server.write(#"{"id":1,"res"#, to: connection)
+            close(connection)
+        }
+        let transport = CronaUnixDomainSocketTransport(endpoint: server.path)
+
+        do {
+            let response = try await transport.send(Data("{}".utf8))
+            XCTFail("Expected a truncated response to fail, got \(String(decoding: response, as: UTF8.self))")
+        } catch {
+            XCTAssertTrue(error is CronaConnectionFailure)
+        }
+    }
+
+    func testUnixSocketTransportFailsWhenDaemonClosesWithoutResponding() async throws {
+        let server = server!
+        Task.detached {
+            guard let connection = server.acceptConnection(timeout: 2) else { return }
+            _ = server.readRequestLine(from: connection, timeout: 2)
+            close(connection)
+        }
+        let transport = CronaUnixDomainSocketTransport(endpoint: server.path)
+
+        do {
+            _ = try await transport.send(Data("{}".utf8))
+            XCTFail("Expected an empty response to fail.")
+        } catch {
+            XCTAssertTrue(error is CronaConnectionFailure)
+        }
+    }
+
+    func testUnixSocketTransportSkipsMalformedEventFramesAndKeepsStreaming() async throws {
+        let server = server!
+        let transport = CronaUnixDomainSocketTransport(endpoint: server.path)
+        let stream = try await transport.openEventStream(with: Data("{}".utf8))
+        Task.detached {
+            guard let connection = server.acceptConnection(timeout: 2) else { return }
+            defer { close(connection) }
+            _ = server.readRequestLine(from: connection, timeout: 2)
+            server.write("not json\n", to: connection)
+            server.write(#"{"payload":{}}"# + "\n", to: connection)
+            server.write(#"{"type":"timer.st"#, to: connection)
+            usleep(50_000)
+            server.write(#"arted","payload":{"sessionId":"s1"}}"# + "\n", to: connection)
+        }
+
+        var received: [CronaProtocolEvent] = []
+        for try await event in stream {
+            received.append(event)
+        }
+
+        XCTAssertEqual(received.map(\.type), ["timer.started"])
+        XCTAssertEqual(received.first?.sessionID, "s1")
+    }
 }
 
 nonisolated private final class TestUnixSocketServer: @unchecked Sendable {
@@ -115,6 +191,11 @@ nonisolated private final class TestUnixSocketServer: @unchecked Sendable {
             if byte == 0x0A { return true }
         }
         return false
+    }
+
+    func write(_ text: String, to connection: Int32) {
+        let bytes = Array(text.utf8)
+        _ = bytes.withUnsafeBytes { Darwin.write(connection, $0.baseAddress, $0.count) }
     }
 
     func waitForEOF(on connection: Int32, timeout: TimeInterval) -> Bool {
