@@ -468,9 +468,10 @@ struct CronaCreateIssueRequest: Codable, Equatable {
     let description: String?
     let estimateMinutes: Int?
     let todoForDate: String?
+    var tags: [String]? = nil
 
     enum CodingKeys: String, CodingKey {
-        case title, description, estimateMinutes, todoForDate
+        case title, description, estimateMinutes, todoForDate, tags
         case streamID = "streamId"
     }
 }
@@ -493,9 +494,10 @@ struct CronaCreateHabitRequest: Codable, Equatable {
     let scheduleType: String
     let weekdays: [Int]
     let targetMinutes: Int?
+    var tags: [String]? = nil
 
     enum CodingKeys: String, CodingKey {
-        case name, description, scheduleType, weekdays, targetMinutes
+        case name, description, scheduleType, weekdays, targetMinutes, tags
         case streamID = "streamId"
     }
 }
@@ -558,6 +560,7 @@ struct CronaTimerState: Codable, Equatable {
 
 struct CronaIssue: Codable, Equatable, Identifiable {
     var adhoc: Bool? = nil
+    var tags: [String]? = nil
     let id: Int64
     let streamID: Int64
     let title: String
@@ -606,7 +609,7 @@ struct CronaIssue: Codable, Equatable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case adhoc
+        case adhoc, tags
         case id = "id"
         case streamID = "streamId"
         case title = "title"
@@ -830,8 +833,10 @@ struct CronaHabitWithMeta: Decodable, Equatable, Identifiable {
     let repoID: Int64
     let repoName: String
     let streamName: String
+    var tags: [String]? = nil
 
     enum CodingKeys: String, CodingKey {
+        case tags
         case id = "id"
         case streamID = "streamId"
         case name = "name"
@@ -1336,5 +1341,50 @@ struct AnyEncodable: Encodable {
 
     func encode(to encoder: Encoder) throws {
         try encodeClosure(encoder)
+    }
+}
+
+struct CronaTag: Codable, Equatable, Identifiable {
+    let name: String
+    var color: String? = nil
+    let system: Bool
+    let issueCount: Int
+    let habitCount: Int
+
+    var id: String { name }
+}
+
+struct CronaSetTagsRequest: Codable, Equatable {
+    let id: Int64
+    let tags: [String]
+}
+
+struct CronaTimeDistributionRow: Codable, Equatable, Identifiable {
+    let key: String
+    let label: String
+    let workedSeconds: Int
+    let percent: Double
+
+    var id: String { key }
+}
+
+struct CronaTimeDistributionSummary: Decodable, Equatable {
+    let startDate: String
+    let endDate: String
+    let groupBy: String
+    let totalSeconds: Int
+    let rows: [CronaTimeDistributionRow]
+
+    enum CodingKeys: String, CodingKey {
+        case startDate, endDate, groupBy, totalSeconds, rows
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        startDate = try values.decode(String.self, forKey: .startDate)
+        endDate = try values.decode(String.self, forKey: .endDate)
+        groupBy = try values.decode(String.self, forKey: .groupBy)
+        totalSeconds = try values.decode(Int.self, forKey: .totalSeconds)
+        rows = try values.decodeIfPresent([CronaTimeDistributionRow].self, forKey: .rows) ?? []
     }
 }

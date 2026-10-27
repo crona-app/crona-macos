@@ -79,6 +79,10 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
     var captureProposalsFixture: [[String: Any]] = []
     var failCaptureImport = false
     var failCaptureParse = false
+    var tagsFixture: [[String: Any]] = []
+    var failTagList = false
+    var tagFiltersFixture: [String: String]?
+    var distributionRowsFixture: [[String: Any]] = []
     var suspendCaptureImport = false
     private var captureImportContinuation: CheckedContinuation<Void, Never>?
     private(set) var lastImportProposalCount: Int?
@@ -161,6 +165,26 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
             result = ["state": "idle"]
         case "settings.get_all" where awayModeEnabled:
             result = ["local": ["awayModeEnabled": true]]
+        case "settings.get_all":
+            result = ["local": tagFiltersFixture.map { ["tagFilters": $0] } ?? [String: Any]()]
+        case "settings.patch" where probe.params["key"]?.stringValue == "tagFilters":
+            if case let .object(values)? = probe.params["value"] {
+                tagFiltersFixture = values.compactMapValues(\.stringValue)
+            }
+            result = ["ok": true]
+        case "tag.list":
+            if failTagList { throw NSError(domain: "TagsTests", code: 1) }
+            result = tagsFixture
+        case "issue.tags.set":
+            result = ["id": probe.params["id"]?.intValue ?? 0, "streamId": 7, "title": "Tagged", "status": "ready",
+                "workedSeconds": 0, "pinnedDaily": false, "tags": probe.params["tags"]?.stringArrayValue ?? []]
+                as [String: Any]
+        case "habit.tags.set":
+            result = ["id": probe.params["id"]?.intValue ?? 0]
+        case "dashboard.distribution":
+            result = ["startDate": probe.params["start"]?.stringValue ?? "", "endDate": probe.params["end"]?.stringValue ?? "",
+                "groupBy": probe.params["groupBy"]?.stringValue ?? "", "totalSeconds": 0, "rows": distributionRowsFixture]
+                as [String: Any]
         case "timer.extend":
             if failExtend { throw NSError(domain: "PopupTests", code: 1) }
             result = timerStateFixture ?? ["state": "idle"]
@@ -289,6 +313,11 @@ enum JSONScalar: Decodable {
 
     var intValue: Int? {
         if case let .int(value) = self { return value }
+        return nil
+    }
+
+    var stringArrayValue: [String]? {
+        if case let .array(values) = self { return values.compactMap(\.stringValue) }
         return nil
     }
 
