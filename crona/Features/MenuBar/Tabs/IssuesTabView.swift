@@ -641,6 +641,14 @@ struct FocusIssueRow: View {
         self.issueActionsService = appState.issueActionsService
     }
 
+    private var editTagsButton: some View {
+        Button {
+            appState.tagEditor.present(.issue(id: issue.id, title: issue.title), tags: issue.tags)
+        } label: {
+            Label("Edit Tags…", systemImage: TagPresentation.icon)
+        }
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
@@ -699,6 +707,7 @@ struct FocusIssueRow: View {
                 } label: {
                     Label("Edit Issue", systemImage: "pencil")
                 }
+                editTagsButton
 
                 Button(role: .destructive) {
                     appState.issueActions.presentDelete(for: issue)
@@ -767,6 +776,7 @@ struct FocusIssueRow: View {
             } label: {
                 Label("Edit Issue", systemImage: "pencil")
             }
+            editTagsButton
             Button(role: .destructive) {
                 appState.issueActions.presentDelete(for: issue)
             } label: {

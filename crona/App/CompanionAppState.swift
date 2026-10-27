@@ -168,6 +168,15 @@ final class CompanionAppState: ObservableObject {
 
     private(set) lazy var tags = TagsModel(daemonConnection: daemonConnection)
 
+    private(set) lazy var tagEditor = TagEditorModel(
+        daemonConnection: daemonConnection,
+        onSaved: { [weak self] in
+            await self?.dailyIssues.refresh()
+            await self?.dailyFocusService.refresh()
+            await self?.habitsService.refresh()
+        }
+    )
+
     /// Points every day-based tab at the shared day and reloads them.
     func refreshSelectedDay() async {
         let date = day.selectedDate
@@ -466,6 +475,7 @@ final class CompanionAppState: ObservableObject {
             || issueCreator.isPresented
             || endSession.isSheetPresented
             || issueCapture.isPresented
+            || tagEditor.isPresented
     }
 
     var isUpdatePresentationBlocked: Bool {
@@ -476,6 +486,7 @@ final class CompanionAppState: ObservableObject {
             || issueActions.editor != nil
             || issueCreator.isPresented
             || issueCapture.isPresented
+            || tagEditor.isPresented
     }
 
     func start() {

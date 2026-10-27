@@ -97,6 +97,9 @@ struct HabitsTabView: View {
                                 appState.openHabitDetails(habit)
                             },
                             editHabit: { appState.habitEditor.presentEditor(for: habit) },
+                            editTags: {
+                                appState.tagEditor.present(.habit(id: habit.id, name: habit.name), tags: habit.tags)
+                            },
                             deleteHabit: { appState.habitEditor.presentDelete(for: habit) }
                         )
                     }
@@ -129,6 +132,7 @@ struct HabitRow: View {
     let onClear: () -> Void
     let openDetails: () -> Void
     let editHabit: () -> Void
+    let editTags: () -> Void
     let deleteHabit: () -> Void
 
     var body: some View {
@@ -166,6 +170,9 @@ struct HabitRow: View {
                     }
                     Button(action: editHabit) {
                         Label("Edit Habit", systemImage: "pencil")
+                    }
+                    Button(action: editTags) {
+                        Label("Edit Tags…", systemImage: TagPresentation.icon)
                     }
                     Button(role: .destructive, action: deleteHabit) {
                         Label("Delete Habit", systemImage: "trash")
@@ -231,6 +238,9 @@ struct HabitRow: View {
             }
             Button(action: editHabit) {
                 Label("Edit Habit", systemImage: "pencil")
+            }
+            Button(action: editTags) {
+                Label("Edit Tags…", systemImage: TagPresentation.icon)
             }
             Button(role: .destructive, action: deleteHabit) {
                 Label("Delete Habit", systemImage: "trash")

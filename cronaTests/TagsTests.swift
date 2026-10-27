@@ -277,4 +277,64 @@ final class TagsTests: DaemonTestCase {
         XCTAssertEqual(TagInput.adding("home", to: ["work"]), ["work", "home"])
         XCTAssertEqual(TagInput.adding("!!", to: ["work"]), ["work"])
     }
+
+    // MARK: - Editor
+
+    private func makeEditor(onSaved: (() -> Void)? = nil) async throws -> (TagEditorModel, IssueCreatorTestTransport) {
+        let (connection, transport) = try await issueCreatorConnection()
+        addTeardownBlock { connection.stop() }
+        return (TagEditorModel(daemonConnection: connection, onSaved: { onSaved?() }), transport)
+    }
+
+    func testTagEditorSavesIssueTags() async throws {
+        var saved = 0
+        let (editor, transport) = try await makeEditor { saved += 1 }
+        editor.present(.issue(id: 5, title: "Fix"), tags: ["work"])
+        editor.tags.append("urgent")
+
+        let ok = await editor.save()
+
+        XCTAssertTrue(ok)
+        let request = try XCTUnwrap(transport.requests.last { $0.method == "issue.tags.set" })
+        XCTAssertEqual(request.params["id"]?.intValue, 5)
+        XCTAssertEqual(request.params["tags"]?.stringArrayValue, ["work", "urgent"])
+        XCTAssertEqual(saved, 1)
+        XCTAssertNil(editor.target)
+    }
+
+    func testTagEditorSavesHabitTags() async throws {
+        let (editor, transport) = try await makeEditor()
+        editor.present(.habit(id: 8, name: "Walk"), tags: [])
+        editor.tags = ["health"]
+
+        let ok = await editor.save()
+
+        XCTAssertTrue(ok)
+        let request = try XCTUnwrap(transport.requests.last { $0.method == "habit.tags.set" })
+        XCTAssertEqual(request.params["id"]?.intValue, 8)
+        XCTAssertEqual(request.params["tags"]?.stringArrayValue, ["health"])
+    }
+
+    func testTagEditorFailureKeepsEdit() async throws {
+        let (editor, transport) = try await makeEditor()
+        transport.failTagSet = true
+        editor.present(.issue(id: 5, title: "Fix"), tags: [])
+        editor.tags = ["work"]
+
+        let ok = await editor.save()
+
+        XCTAssertFalse(ok)
+        XCTAssertEqual(editor.target, .issue(id: 5, title: "Fix"))
+        XCTAssertEqual(editor.tags, ["work"])
+        XCTAssertNotNil(editor.errorMessage)
+    }
+
+    func testTagEditorCountsAsPopoverModal() async throws {
+        let (connection, _) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+        appState.tagEditor.present(.issue(id: 1, title: "T"), tags: [])
+        XCTAssertTrue(appState.isPopoverModalPresented)
+        XCTAssertTrue(appState.isUpdatePresentationBlocked)
+    }
 }

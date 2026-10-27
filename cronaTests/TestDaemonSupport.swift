@@ -81,6 +81,7 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
     var failCaptureParse = false
     var tagsFixture: [[String: Any]] = []
     var failTagList = false
+    var failTagSet = false
     var tagFiltersFixture: [String: String]?
     var distributionRowsFixture: [[String: Any]] = []
     var suspendCaptureImport = false
@@ -175,6 +176,8 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
         case "tag.list":
             if failTagList { throw NSError(domain: "TagsTests", code: 1) }
             result = tagsFixture
+        case "issue.tags.set" where failTagSet, "habit.tags.set" where failTagSet:
+            throw NSError(domain: "TagsTests", code: 2)
         case "issue.tags.set":
             result = ["id": probe.params["id"]?.intValue ?? 0, "streamId": 7, "title": "Tagged", "status": "ready",
                 "workedSeconds": 0, "pinnedDaily": false, "tags": probe.params["tags"]?.stringArrayValue ?? []]
