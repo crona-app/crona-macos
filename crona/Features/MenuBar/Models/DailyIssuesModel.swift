@@ -13,20 +13,32 @@ final class DailyIssuesModel: ObservableObject {
     private let daemonConnection: DaemonConnectionService
     private let day: PopoverDayModel
     private let issueCreationService: IssueCreationService
+    private let tags: TagsModel
     private var eventObserver: NSObjectProtocol?
+    private var tagFilterSubscription: AnyCancellable?
+    /// Every section before the Issues tag filter applies.
+    private var unfilteredSections = DailyIssueSections()
     private let logger = Logger(subsystem: "com.crona.macos", category: "dailyIssues")
 
+    /// The sections after the Issues tag filter.
     @Published private(set) var sections = DailyIssueSections()
     @Published var section: DailySection = .planned
     @Published private(set) var isLoading = false
 
     init(
         daemonConnection: DaemonConnectionService, day: PopoverDayModel,
-        issueCreationService: IssueCreationService
+        issueCreationService: IssueCreationService, tags: TagsModel
     ) {
         self.daemonConnection = daemonConnection
         self.day = day
         self.issueCreationService = issueCreationService
+        self.tags = tags
+        // @Published emits before the change lands, so filter with the emitted values.
+        tagFilterSubscription = tags.$filters.combineLatest(tags.$tags)
+            .dropFirst()
+            .sink { [weak self] filters, list in
+                self?.applyFilter(filters[.issues] ?? CronaTagFilter(), known: Set(list.map(\.name)))
+            }
         eventObserver = NotificationCenter.default.addObserver(
             forName: .cronaDaemonEventReceived,
             object: nil,
@@ -72,12 +84,19 @@ final class DailyIssuesModel: ObservableObject {
                 systemStreamIDs: issueCreationService.systemStreamIDs)
             // A newer day may have been picked while this one loaded.
             guard date == day.selectedDate else { return }
-            sections = built
-            if !built.visibleSections.contains(section) {
-                section = .planned
-            }
+            unfilteredSections = built
+            applyFilter(tags.filter(for: .issues), known: tags.knownNames)
         } catch {
             logger.error("Daily issues refresh failed: \(error.localizedDescription, privacy: .private)")
+        }
+    }
+
+    private func applyFilter(_ filter: CronaTagFilter, known: Set<String>) {
+        let filtered = filter.isEmpty
+            ? unfilteredSections : unfilteredSections.filtered { filter.matches($0.tags, known: known) }
+        sections = filtered
+        if !filtered.visibleSections.contains(section) {
+            section = .planned
         }
     }
 }

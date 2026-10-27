@@ -187,4 +187,74 @@ final class TagsTests: DaemonTestCase {
         let item = try JSONDecoder().decode(CronaHabitDailyItem.self, from: Data(json.utf8))
         XCTAssertEqual(HabitsService.project(item).tags, ["health"])
     }
+
+    // MARK: - Filtering
+
+    private static func tagged(_ id: Int64, _ tags: [String], streamID: Int64 = 7) -> DailyFocusIssue {
+        DailyFocusIssue(
+            id: id, streamID: streamID, title: "I\(id)", status: "ready", estimateMinutes: nil, workedSeconds: 0,
+            todoForDate: nil, tags: tags)
+    }
+
+    func testSectionsFilteredByTag() {
+        let sections = DailyIssueSections(
+            planned: [Self.tagged(1, ["work"]), Self.tagged(2, [])],
+            overdue: [Self.tagged(3, ["home"])],
+            upcoming: [Self.tagged(4, ["work"])],
+            inbox: [Self.tagged(5, ["home"])])
+        let filtered = sections.filtered { $0.tags.contains("work") }
+        XCTAssertEqual(filtered.planned.map(\.id), [1])
+        XCTAssertEqual(filtered.overdue, [])
+        XCTAssertEqual(filtered.upcoming.map(\.id), [4])
+        XCTAssertEqual(filtered.inbox, [])
+    }
+
+    private func inboxAppState() async throws -> (CompanionAppState, IssueCreatorTestTransport) {
+        let (connection, transport) = try await issueCreatorConnection()
+        addTeardownBlock { connection.stop() }
+        transport.provideInbox = true
+        transport.tagsFixture = [
+            ["name": "work", "system": false, "issueCount": 1, "habitCount": 0],
+            ["name": "home", "system": false, "issueCount": 1, "habitCount": 0],
+        ]
+        transport.todaySummaryIssuesFixture = [
+            ["id": 1, "streamId": 91, "title": "A", "status": "backlog", "workedSeconds": 0, "pinnedDaily": false,
+                "tags": ["home"]],
+            ["id": 2, "streamId": 91, "title": "B", "status": "backlog", "workedSeconds": 0, "pinnedDaily": false,
+                "tags": ["work"]],
+        ]
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+        await appState.tags.refresh()
+        await appState.dailyIssues.refresh()
+        return (appState, transport)
+    }
+
+    func testInboxCountReflectsFilter() async throws {
+        let (appState, _) = try await inboxAppState()
+        XCTAssertEqual(appState.dailyIssues.sections.inbox.count, 2)
+        await appState.tags.setFilter(CronaTagFilter(query: "+work"), for: .issues)
+        await waitForIssueCreator { appState.dailyIssues.sections.inbox.count == 1 }
+        XCTAssertEqual(appState.dailyIssues.sections.inbox.map(\.id), [2])
+    }
+
+    func testFilteredOutInboxFallsBackToPlanned() async throws {
+        let (appState, _) = try await inboxAppState()
+        appState.dailyIssues.section = .inbox
+        await appState.tags.setFilter(CronaTagFilter(query: "-work -home"), for: .issues)
+        await waitForIssueCreator { appState.dailyIssues.section == .planned }
+        XCTAssertEqual(appState.dailyIssues.section, .planned)
+    }
+
+    func testHabitRowsFilteredByTag() {
+        let rows = [
+            HabitRowModel(id: 1, name: "A", repoName: "R", streamName: "S", status: "pending", completed: false,
+                durationMinutes: nil, targetMinutes: nil, tags: ["health"]),
+            HabitRowModel(id: 2, name: "B", repoName: "R", streamName: "S", status: "pending", completed: false,
+                durationMinutes: nil, targetMinutes: nil),
+        ]
+        let snapshot = HabitsSnapshot(items: rows)
+        let filtered = snapshot.filtered(by: CronaTagFilter(query: "+health"), known: ["health"])
+        XCTAssertEqual(filtered.items.map(\.id), [1])
+        XCTAssertEqual(snapshot.filtered(by: CronaTagFilter(), known: []).items.count, 2)
+    }
 }

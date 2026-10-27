@@ -307,7 +307,10 @@ struct IdleFocusView: View {
                     .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.9))
             }
 
-            DailySectionPicker(dailyIssues: dailyIssues)
+            HStack(spacing: 6) {
+                DailySectionPicker(dailyIssues: dailyIssues)
+                TagFilterMenu(pane: .issues, tagsModel: appState.tags)
+            }
 
             ViewThatFits(in: .vertical) {
                 issueList

@@ -4,16 +4,19 @@ import SwiftUI
 struct HabitsTabView: View {
     @ObservedObject var appState: CompanionAppState
     @ObservedObject private var habitsService: HabitsService
+    @ObservedObject private var tagsModel: TagsModel
     @State private var loggingHabitID: Int64?
     @State private var logSeconds = 60
 
     init(appState: CompanionAppState) {
         self.appState = appState
         self.habitsService = appState.habitsService
+        self.tagsModel = appState.tags
     }
 
     var body: some View {
-        let snapshot = habitsService.snapshot
+        let snapshot = habitsService.snapshot.filtered(
+            by: tagsModel.filter(for: .habits), known: tagsModel.knownNames)
 
         ViewThatFits(in: .vertical) {
             habitsContent(snapshot: snapshot)
@@ -31,12 +34,22 @@ struct HabitsTabView: View {
     private func habitsContent(snapshot: HabitsSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             PopoverDayHeader(appState: appState)
+                .overlay(alignment: .leading) {
+                    TagFilterMenu(pane: .habits, tagsModel: tagsModel)
+                        .padding(.leading, 2)
+                }
 
             if snapshot.isLoading && snapshot.items.isEmpty {
                 PlaceholderPanel(
                     icon: "arrow.triangle.2.circlepath",
                     title: "Loading habits",
                     subtitle: "Refreshing today’s due habits from the daemon."
+                )
+            } else if snapshot.items.isEmpty && !habitsService.snapshot.items.isEmpty {
+                PlaceholderPanel(
+                    icon: "line.3.horizontal.decrease.circle",
+                    title: "No matching habits",
+                    subtitle: "The tag filter hides every habit due on this date."
                 )
             } else if snapshot.items.isEmpty {
                 PlaceholderPanel(

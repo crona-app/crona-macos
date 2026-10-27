@@ -148,7 +148,7 @@ final class CompanionAppState: ObservableObject {
     }()
 
     private(set) lazy var dailyIssues = DailyIssuesModel(
-        daemonConnection: daemonConnection, day: day, issueCreationService: issueCreationService)
+        daemonConnection: daemonConnection, day: day, issueCreationService: issueCreationService, tags: tags)
 
     private(set) lazy var carryOver = CarryOverModel(
         daemonConnection: daemonConnection,
