@@ -369,9 +369,13 @@ struct IdleFocusView: View {
             )
         } else {
             VStack(spacing: 12) {
-                let canCarry = appState.day.isToday && dailyIssues.section != .upcoming
+                let isToday = appState.day.isToday
                 ForEach(sectionIssues) { issue in
-                    FocusIssueRow(appState: appState, issue: issue, canCarry: canCarry) {
+                    FocusIssueRow(
+                        appState: appState, issue: issue,
+                        carryAction: CronaCarryPresentation.menuAction(
+                            for: issue, isToday: isToday, section: dailyIssues.section)
+                    ) {
                         appState.selectFocusIssue(issue)
                     }
                 }
@@ -600,16 +604,15 @@ struct FocusIssueRow: View {
     let onStart: () -> Void
     @State private var isActionsHovered = false
 
-    /// Carrying is offered on today's Planned and Overdue rows only.
-    let canCarry: Bool
+    let carryAction: CronaCarryAction?
 
     init(
-        appState: CompanionAppState, issue: DailyFocusIssue, canCarry: Bool = false,
+        appState: CompanionAppState, issue: DailyFocusIssue, carryAction: CronaCarryAction? = nil,
         onStart: @escaping () -> Void
     ) {
         self.appState = appState
         self.issue = issue
-        self.canCarry = canCarry
+        self.carryAction = carryAction
         self.onStart = onStart
         self.issueActionsService = appState.issueActionsService
     }
@@ -836,20 +839,23 @@ struct FocusIssueRow: View {
 
     @ViewBuilder
     private var carryMenuItem: some View {
-        if issue.carriedAway {
+        switch carryAction {
+        case .undo?:
             Button {
                 Task { await appState.carryOver.undoCarry(issueID: issue.id) }
             } label: {
                 Label("Undo Carry", systemImage: "arrow.uturn.backward")
             }
             .disabled(appState.carryOver.inFlightIssueID != nil)
-        } else if canCarry {
+        case .carry?:
             Button {
                 Task { await appState.carryOver.carry(issue) }
             } label: {
                 Label("Carry to Tomorrow", systemImage: CronaCarryPresentation.carriedIcon)
             }
             .disabled(appState.carryOver.inFlightIssueID != nil)
+        case nil:
+            EmptyView()
         }
     }
 

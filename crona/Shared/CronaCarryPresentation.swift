@@ -1,11 +1,28 @@
 import SwiftUI
 
+enum CronaCarryAction: Equatable {
+    case carry
+    case undo
+}
+
 enum CronaCarryPresentation {
     static let carriedChipText = "Carried"
     static let carriedIcon = "arrow.uturn.right"
     static let stalledIcon = "exclamationmark.arrow.circlepath"
 
     static var carriedColor: Color { PopupVisualTheme.semantic(.carried) }
+
+    /// The carry item a row's menu offers, limited to calls the core accepts.
+    static func menuAction(for issue: DailyFocusIssue, isToday: Bool, section: DailySection) -> CronaCarryAction? {
+        if issue.carriedAway {
+            // The core undoes only the issue's latest carry, the one that landed on its current due date.
+            guard let carriedTo = issue.carriedToDate, carriedTo == issue.todoForDate else { return nil }
+            return .undo
+        }
+        let isOpen = issue.status != "done" && issue.status != "abandoned"
+        guard isToday, section != .upcoming, isOpen, issue.todoForDate != nil else { return nil }
+        return .carry
+    }
 
     static func undoMessage(title: String) -> String {
         "Carried \u{201C}\(title)\u{201D} to tomorrow"

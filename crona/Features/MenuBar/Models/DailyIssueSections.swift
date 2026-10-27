@@ -27,12 +27,12 @@ struct DailyIssueSections: Equatable {
         let listed = issues.filter { $0.adhoc != true }
         let open = listed.filter { !isClosed($0) }
         var plannedEntries: [Int64: CronaDailyPlanEntry] = [:]
-        var carriedAwayIDs = Set<Int64>()
+        var carriedAwayEntries: [Int64: CronaDailyPlanEntry] = [:]
         if let plan, plan.date == date {
             for entry in plan.entries {
                 switch entry.status {
                 case "planned": plannedEntries[entry.issueID] = entry
-                case "carried": carriedAwayIDs.insert(entry.issueID)
+                case "carried": carriedAwayEntries[entry.issueID] = entry
                 default: break
                 }
             }
@@ -43,7 +43,8 @@ struct DailyIssueSections: Equatable {
                 issue: issue,
                 penalty: entry.flatMap(DailyFocusPenalty.from),
                 carry: entry.flatMap(DailyFocusCarry.from),
-                carriedAway: carriedAwayIDs.contains(issue.id)
+                carriedAway: carriedAwayEntries[issue.id] != nil,
+                carriedToDate: carriedAwayEntries[issue.id]?.carriedToDate
             )
         }
 
@@ -56,7 +57,7 @@ struct DailyIssueSections: Equatable {
             + listed.filter { !leadsPlanned($0) && due($0) == date }.map(project)
             // The day keeps the worked copy of issues it carried to a later day.
             + listed.filter {
-                carriedAwayIDs.contains($0.id) && !leadsPlanned($0) && due($0) != date
+                carriedAwayEntries[$0.id] != nil && !leadsPlanned($0) && due($0) != date
             }.map(project)
         sections.overdue = open.filter { issue in
             guard let due = due(issue) else { return false }

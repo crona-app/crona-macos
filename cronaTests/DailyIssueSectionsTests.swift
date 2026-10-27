@@ -97,7 +97,7 @@ final class DailyIssueSectionsTests: XCTestCase {
     }
 
     private func carriedEntry(_ issueID: Int64) -> CronaDailyPlanEntry {
-        CronaDailyPlanEntry(id: "c\(issueID)", date: day, issueID: issueID, source: "todo_for_date", status: "carried", committedAt: "", baselineDate: day, currentPlannedDate: "2026-10-28", postponeCount: 0, currentDelayedDays: 0, maxDelayedDays: 0, failScore: 0)
+        CronaDailyPlanEntry(id: "c\(issueID)", date: day, issueID: issueID, source: "todo_for_date", status: "carried", committedAt: "", baselineDate: day, currentPlannedDate: "2026-10-28", postponeCount: 0, currentDelayedDays: 0, maxDelayedDays: 0, failScore: 0, carriedToDate: "2026-10-28")
     }
 
     func testPlannedIncludesCarriedAwayIssuesNotDueThatDay() {
@@ -106,6 +106,7 @@ final class DailyIssueSectionsTests: XCTestCase {
             plan([carriedEntry(2), carriedEntry(3)]))
         XCTAssertEqual(sections.planned.map(\.id), [3, 1, 2])
         XCTAssertEqual(sections.planned.first { $0.id == 2 }?.carriedAway, true)
+        XCTAssertEqual(sections.planned.first { $0.id == 2 }?.carriedToDate, "2026-10-28")
         XCTAssertEqual(sections.planned.first { $0.id == 1 }?.carriedAway, false)
         XCTAssertEqual(sections.upcoming.map(\.id), [2, 3])
     }

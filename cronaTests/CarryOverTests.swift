@@ -118,4 +118,31 @@ final class CarryOverTests: DaemonTestCase {
     func testUndoMessage() {
         XCTAssertEqual(CronaCarryPresentation.undoMessage(title: "Fix sync"), "Carried \u{201C}Fix sync\u{201D} to tomorrow")
     }
+
+    private func row(
+        status: String = "planned", due: String? = "2026-10-27", carriedAway: Bool = false,
+        carriedTo: String? = nil
+    ) -> DailyFocusIssue {
+        DailyFocusIssue(id: 1, streamID: 7, title: "A", status: status, estimateMinutes: nil, workedSeconds: 0,
+            todoForDate: due, carriedAway: carriedAway, carriedToDate: carriedTo)
+    }
+
+    func testCarryOfferedOnlyForOpenPlannedIssuesToday() {
+        XCTAssertEqual(CronaCarryPresentation.menuAction(for: row(), isToday: true, section: .planned), .carry)
+        XCTAssertEqual(CronaCarryPresentation.menuAction(for: row(due: "2026-10-20"), isToday: true, section: .overdue), .carry)
+        XCTAssertNil(CronaCarryPresentation.menuAction(for: row(status: "done"), isToday: true, section: .planned))
+        XCTAssertNil(CronaCarryPresentation.menuAction(for: row(status: "abandoned"), isToday: true, section: .planned))
+        XCTAssertNil(CronaCarryPresentation.menuAction(for: row(due: nil), isToday: true, section: .planned))
+        XCTAssertNil(CronaCarryPresentation.menuAction(for: row(), isToday: false, section: .planned))
+        XCTAssertNil(CronaCarryPresentation.menuAction(for: row(), isToday: true, section: .upcoming))
+    }
+
+    func testUndoOfferedOnlyForTheIssuesLatestCarry() {
+        let latest = row(due: "2026-10-28", carriedAway: true, carriedTo: "2026-10-28")
+        XCTAssertEqual(CronaCarryPresentation.menuAction(for: latest, isToday: false, section: .planned), .undo)
+        let older = row(due: "2026-10-28", carriedAway: true, carriedTo: "2026-10-26")
+        XCTAssertNil(CronaCarryPresentation.menuAction(for: older, isToday: false, section: .planned))
+        let unknown = row(due: "2026-10-28", carriedAway: true, carriedTo: nil)
+        XCTAssertNil(CronaCarryPresentation.menuAction(for: unknown, isToday: false, section: .planned))
+    }
 }

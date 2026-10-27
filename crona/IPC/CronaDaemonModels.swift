@@ -722,6 +722,7 @@ struct CronaDailyPlanEntry: Codable, Equatable, Identifiable {
     var carriedFromDate: String? = nil
     var carryCount: Int? = nil
     var stalled: Bool? = nil
+    var carriedToDate: String? = nil
 
     enum CodingKeys: String, CodingKey {
         case id = "id"
@@ -740,6 +741,7 @@ struct CronaDailyPlanEntry: Codable, Equatable, Identifiable {
         case carriedFromDate = "carriedFromDate"
         case carryCount = "carryCount"
         case stalled = "stalled"
+        case carriedToDate = "carriedToDate"
     }
 }
 
