@@ -78,6 +78,7 @@ enum CronaCarryPresentation {
 
 struct CarryBadge: View {
     let carry: DailyFocusCarry?
+    var formatDate: (String) -> String = { $0 }
 
     var body: some View {
         if let carry, let text = CronaCarryPresentation.badgeText(for: carry) {
@@ -88,6 +89,11 @@ struct CarryBadge: View {
             }
             .font(.caption)
             .foregroundStyle(CronaCarryPresentation.badgeColor(for: carry))
+            .hoverInfo {
+                HoverInfoLines(
+                    lines: CronaCarryPresentation.detailLines(carry: carry, carriedToDate: nil, formatDate: formatDate)
+                        .map { ($0.text, $0.stalled ? CronaCarryPresentation.badgeColor(for: carry) : nil) })
+            }
         }
     }
 }

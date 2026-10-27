@@ -39,6 +39,9 @@ struct PenaltyRiskMarker: View {
             }
             .font(.caption)
             .foregroundStyle(CronaPenaltyPresentation.colorKey.color)
+            .hoverInfo {
+                HoverInfoLines(lines: CronaPenaltyPresentation.detailLines(for: penalty).map { ($0, nil) })
+            }
         }
     }
 }

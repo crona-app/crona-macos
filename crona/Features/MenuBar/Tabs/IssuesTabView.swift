@@ -687,7 +687,7 @@ struct FocusIssueRow: View {
                     if issue.pinnedDaily == true {
                         metaLabel(icon: "pin.fill", text: "Pinned")
                     }
-                    CarryBadge(carry: issue.carry)
+                    CarryBadge(carry: issue.carry) { formattedPopoverDate($0, appState: appState) }
                     PenaltyRiskMarker(penalty: issue.penalty)
                 }
                 .padding(.leading, 24)

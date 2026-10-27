@@ -27,7 +27,6 @@ private struct TagDots: View {
     let tags: [String]
     let limit: Int
     let tagsModel: TagsModel
-    @State private var isHovered = false
 
     var body: some View {
         let split = TagChipLayout.split(tags, limit: limit)
@@ -48,16 +47,13 @@ private struct TagDots: View {
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 3)
-        .contentShape(Rectangle())
         .fixedSize()
-        .onHover { isHovered = $0 }
-        .popover(isPresented: $isHovered, arrowEdge: .bottom) {
+        .hoverInfo {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(tags, id: \.self) { name in
                     TagChip(name: name, color: TagPresentation.color(named: tagsModel.color(for: name)))
                 }
             }
-            .padding(10)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Tags: " + tags.map(TagPresentation.label(for:)).joined(separator: ", "))
