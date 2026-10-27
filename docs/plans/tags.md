@@ -12,7 +12,7 @@ Show tags on issues and habits, filter by them the same way the TUI does, tag it
 
 | Surface | Behavior |
 |---|---|
-| Issues and Habits rows | Up to 2 tag chips beside the title in each tag's color, then `+N`. |
+| Issues and Habits rows | Up to 3 overlapping color dots beside the title, then `+N`; hovering shows every tag as a chip. |
 | Issue and habit details | All tags. |
 | Filter | A tag filter icon menu (Show / Hide / Clear, including `Untagged`) beside the Issues section switch and at the left of the Habits day pill. It reads and writes the `issues` and `habits` entries of the shared `tagFilters` core setting (`+a -b` queries, the TUI's format) and reloads on `settings.changed`, so the TUI and the Mac app stay in sync. Tags in a saved filter that no longer exist are ignored. |
 | Stats tab | `Focus by tag`: top 5 tags by focused time for the shown day or its week (Monday through that day), from distribution data grouped by `tag`. |
