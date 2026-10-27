@@ -76,6 +76,9 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
     var failCheckIn = false
     var failCarry = false
     var provideInbox = false
+    var captureProposalsFixture: [[String: Any]] = []
+    var failCaptureImport = false
+    private(set) var lastImportProposalCount: Int?
     var failCarryUndo = false
     var suspendCarry = false
     private var carryContinuation: CheckedContinuation<Void, Never>?
@@ -171,6 +174,12 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
                 "active": true, "repoId": 3, "repoName": "Repo", "streamName": "Stream"] as [String: Any]
         case "habit.delete", "issue.delete":
             result = ["ok": true]
+        case "issue.capture.parse":
+            result = captureProposalsFixture
+        case "issue.capture.import":
+            if failCaptureImport { throw NSError(domain: "IssueCaptureTests", code: 1) }
+            if case let .array(proposals)? = probe.params["proposals"] { lastImportProposalCount = proposals.count }
+            result = ["issues": [Any]()]
         case "issue.move":
             result = ["id": probe.params["id"]?.intValue ?? 0, "streamId": probe.params["streamId"]?.intValue ?? 7,
                 "title": probe.params["title"]?.stringValue ?? "", "status": "backlog", "workedSeconds": 0,
@@ -240,6 +249,7 @@ enum JSONScalar: Decodable {
     case int(Int)
     case bool(Bool)
     case array([JSONScalar])
+    case object([String: JSONScalar])
     case null
 
     init(from decoder: Decoder) throws {
@@ -252,6 +262,8 @@ enum JSONScalar: Decodable {
             self = .bool(bool)
         } else if let array = try? container.decode([JSONScalar].self) {
             self = .array(array)
+        } else if let object = try? container.decode([String: JSONScalar].self) {
+            self = .object(object)
         } else {
             self = .string(try container.decode(String.self))
         }

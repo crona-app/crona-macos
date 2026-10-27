@@ -111,4 +111,91 @@ final class IssueCaptureTests: DaemonTestCase {
         XCTAssertTrue(CronaCaptureProposal(line: 1, title: "A", flags: []).isImportable)
         XCTAssertFalse(CronaCaptureProposal(line: 1, title: "A", flags: ["no title"]).isImportable)
     }
+
+    private func makeCapture(onImported: (() -> Void)? = nil) async throws -> (IssueCaptureModel, IssueCreatorTestTransport) {
+        let (connection, transport) = try await issueCreatorConnection()
+        addTeardownBlock { connection.stop() }
+        transport.captureProposalsFixture = [["line": 1, "title": "One", "inbox": true], ["line": 2, "title": "Two", "inbox": true]]
+        let model = IssueCaptureModel(
+            daemonConnection: connection, onImported: { onImported?() }, debounce: .milliseconds(30))
+        return (model, transport)
+    }
+
+    private func parseRequests(_ transport: IssueCreatorTestTransport) -> [RequestWithParamsProbe] {
+        transport.requests.filter { $0.method == "issue.capture.parse" }
+    }
+
+    func testTypingParsesOnceAfterPause() async throws {
+        let (model, transport) = try await makeCapture()
+        model.text = "- O"
+        model.text = "- On"
+        model.text = "- One"
+        await waitForIssueCreator { model.proposals.count == 2 }
+        try await Task.sleep(for: .milliseconds(60))
+        XCTAssertEqual(parseRequests(transport).count, 1)
+        XCTAssertEqual(parseRequests(transport).first?.params["text"]?.stringValue, "- One")
+    }
+
+    func testBlankTextClearsProposalsWithoutRequest() async throws {
+        let (model, transport) = try await makeCapture()
+        model.text = "- One"
+        await model.parseNow()
+        XCTAssertEqual(model.proposals.count, 2)
+        let before = parseRequests(transport).count
+        model.text = "   \n"
+        await model.parseNow()
+        XCTAssertEqual(model.proposals, [])
+        XCTAssertEqual(parseRequests(transport).count, before)
+    }
+
+    func testFlaggedProposalBlocksImport() async throws {
+        let (model, transport) = try await makeCapture()
+        transport.captureProposalsFixture = [["line": 1, "title": "One", "flags": ["unknown stream"]]]
+        model.text = "- One #nope"
+        await model.parseNow()
+        XCTAssertFalse(model.canImport)
+        let imported = await model.importAll()
+        XCTAssertFalse(imported)
+        XCTAssertNil(transport.lastImportProposalCount)
+    }
+
+    func testImportSendsProposalsAndDismisses() async throws {
+        var importedCalls = 0
+        let (model, transport) = try await makeCapture { importedCalls += 1 }
+        model.present()
+        model.text = "- One\n- Two"
+        await model.parseNow()
+        XCTAssertTrue(model.canImport)
+        XCTAssertEqual(model.importableCount, 2)
+
+        let imported = await model.importAll()
+
+        XCTAssertTrue(imported)
+        XCTAssertEqual(transport.lastImportProposalCount, 2)
+        XCTAssertEqual(importedCalls, 1)
+        XCTAssertEqual(model.text, "")
+        XCTAssertFalse(model.isPresented)
+    }
+
+    func testImportFailureKeepsTextAndShowsError() async throws {
+        let (model, transport) = try await makeCapture()
+        transport.failCaptureImport = true
+        model.present()
+        model.text = "- One\n- Two"
+        await model.parseNow()
+
+        let imported = await model.importAll()
+
+        XCTAssertFalse(imported)
+        XCTAssertEqual(model.text, "- One\n- Two")
+        XCTAssertEqual(model.proposals.count, 2)
+        XCTAssertNotNil(model.errorMessage)
+        XCTAssertTrue(model.isPresented)
+    }
+
+    func testImportButtonTitle() {
+        XCTAssertEqual(IssueCaptureModel.importButtonTitle(count: 0), "Import 0 Issues")
+        XCTAssertEqual(IssueCaptureModel.importButtonTitle(count: 1), "Import 1 Issue")
+        XCTAssertEqual(IssueCaptureModel.importButtonTitle(count: 3), "Import 3 Issues")
+    }
 }
