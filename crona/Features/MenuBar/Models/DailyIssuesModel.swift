@@ -60,8 +60,15 @@ final class DailyIssuesModel: ObservableObject {
         do {
             async let issues = daemonConnection.withClient { try await $0.listAllIssues() }
             async let plan = daemonConnection.withClient { try await $0.dailyPlanGet(date: date) }
+            let fetchedIssues = try await issues
+            // A stream we have not seen (such as an Inbox created by capture) means the destinations are stale.
+            let knownStreamIDs = Set(issueCreationService.destinations.map(\.streamID))
+                .union(issueCreationService.systemStreamIDs)
+            if fetchedIssues.contains(where: { !knownStreamIDs.contains($0.streamID) }) {
+                await issueCreationService.loadDestinations()
+            }
             let built = DailyIssueSections.build(
-                issues: try await issues, plan: try await plan, date: date,
+                issues: fetchedIssues, plan: try await plan, date: date,
                 systemStreamIDs: issueCreationService.systemStreamIDs)
             // A newer day may have been picked while this one loaded.
             guard date == day.selectedDate else { return }

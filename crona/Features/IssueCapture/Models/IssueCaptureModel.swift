@@ -9,6 +9,8 @@ final class IssueCaptureModel: ObservableObject {
     private let onImported: () async -> Void
     private let debounce: Duration
     private var parseTask: Task<Void, Never>?
+    /// The text the current proposals were parsed from; import waits until it matches what is on screen.
+    private var parsedText: String?
     private let logger = Logger(subsystem: "com.crona.macos", category: "issueCapture")
 
     @Published var text = "" {
@@ -40,7 +42,7 @@ final class IssueCaptureModel: ObservableObject {
     var importableCount: Int { proposals.filter(\.isImportable).count }
 
     var canImport: Bool {
-        !proposals.isEmpty && importableCount == proposals.count && !isImporting
+        !proposals.isEmpty && importableCount == proposals.count && !isImporting && parsedText == text
     }
 
     static func importButtonTitle(count: Int) -> String {
@@ -57,6 +59,7 @@ final class IssueCaptureModel: ObservableObject {
         parseTask?.cancel()
         parseTask = nil
         proposals = []
+        parsedText = nil
         isParsing = false
         errorMessage = nil
     }
@@ -99,6 +102,7 @@ final class IssueCaptureModel: ObservableObject {
     private func parse(_ snapshot: String) async {
         guard !snapshot.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             proposals = []
+            parsedText = nil
             isParsing = false
             return
         }
@@ -108,9 +112,12 @@ final class IssueCaptureModel: ObservableObject {
             let parsed = try await daemonConnection.withClient { try await $0.parseCapture(text: snapshot) }
             guard snapshot == text else { return }
             proposals = parsed
+            parsedText = snapshot
             errorMessage = nil
         } catch {
             guard snapshot == text else { return }
+            proposals = []
+            parsedText = nil
             errorMessage = error.localizedDescription
         }
     }

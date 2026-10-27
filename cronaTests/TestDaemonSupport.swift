@@ -78,6 +78,7 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
     var provideInbox = false
     var captureProposalsFixture: [[String: Any]] = []
     var failCaptureImport = false
+    var failCaptureParse = false
     private(set) var lastImportProposalCount: Int?
     var failCarryUndo = false
     var suspendCarry = false
@@ -175,6 +176,7 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
         case "habit.delete", "issue.delete":
             result = ["ok": true]
         case "issue.capture.parse":
+            if failCaptureParse { throw NSError(domain: "IssueCaptureTests", code: 2) }
             result = captureProposalsFixture
         case "issue.capture.import":
             if failCaptureImport { throw NSError(domain: "IssueCaptureTests", code: 1) }

@@ -457,6 +457,14 @@ final class CompanionAppState: ObservableObject {
             && timerService.snapshot.state != "disconnected"
     }
 
+    /// Sheets that keep the popover open when focus moves to another app.
+    var isPopoverModalPresented: Bool {
+        issueActions.editor != nil
+            || issueCreator.isPresented
+            || endSession.isSheetPresented
+            || issueCapture.isPresented
+    }
+
     var isUpdatePresentationBlocked: Bool {
         hasActiveFocusSession
             || windowService.breakScreensVisible

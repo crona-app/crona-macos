@@ -198,4 +198,54 @@ final class IssueCaptureTests: DaemonTestCase {
         XCTAssertEqual(IssueCaptureModel.importButtonTitle(count: 1), "Import 1 Issue")
         XCTAssertEqual(IssueCaptureModel.importButtonTitle(count: 3), "Import 3 Issues")
     }
+
+    func testInboxCreatedAfterFirstLoadStillFillsInboxSection() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        transport.provideDestinations = true
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+        await appState.dailyIssues.refresh()
+
+        transport.provideInbox = true
+        transport.todaySummaryIssuesFixture = [[
+            "id": 1, "streamId": 91, "title": "Idea", "status": "backlog", "workedSeconds": 0, "pinnedDaily": false,
+        ]]
+        await appState.dailyIssues.refresh()
+
+        XCTAssertEqual(appState.dailyIssues.sections.inbox.map(\.id), [1])
+    }
+
+    func testImportBeforePendingParseDoesNotSendStaleProposals() async throws {
+        let (model, transport) = try await makeCapture()
+        model.text = "- One\n- Two"
+        await model.parseNow()
+        model.text = "- One\n- Two\n- Three"
+
+        XCTAssertFalse(model.canImport)
+        let imported = await model.importAll()
+        XCTAssertFalse(imported)
+        XCTAssertNil(transport.lastImportProposalCount)
+    }
+
+    func testFailedParseClearsPreviousProposals() async throws {
+        let (model, transport) = try await makeCapture()
+        model.text = "- One\n- Two"
+        await model.parseNow()
+        transport.failCaptureParse = true
+        model.text = "- Changed"
+        await model.parseNow()
+
+        XCTAssertEqual(model.proposals, [])
+        XCTAssertNotNil(model.errorMessage)
+        XCTAssertFalse(model.canImport)
+    }
+
+    func testCaptureSheetCountsAsPopoverModal() async throws {
+        let (connection, _) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+        XCTAssertFalse(appState.isPopoverModalPresented)
+        appState.issueCapture.present()
+        XCTAssertTrue(appState.isPopoverModalPresented)
+    }
 }

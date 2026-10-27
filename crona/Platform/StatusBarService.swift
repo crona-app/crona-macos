@@ -716,9 +716,7 @@ final class StatusBarService: NSObject {
 
     private var isModalPresentationActive: Bool {
         guard let appState else { return false }
-        return appState.issueActions.editor != nil
-            || appState.issueCreator.isPresented
-            || appState.endSession.isSheetPresented
+        return appState.isPopoverModalPresented
     }
 
     private func stopDismissalMonitoring() {
