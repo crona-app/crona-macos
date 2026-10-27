@@ -4,6 +4,32 @@ All notable changes to **Crona for macOS** are documented here.
 
 ## Unreleased
 
+## [1.1.0-beta.2] - 2026-10-27
+
+The second 1.1.0 beta adds the delay penalty, carry-over, tags, and bulk issue capture with an Inbox, and organizes the Issues tab around a shared day.
+
+### Added
+
+- Share one selected day across the Issues, Habits, Wellbeing, and Stats tabs; future days are blocked.
+- Split the Issues tab into Planned, Overdue, and Upcoming sections like the TUI, with pinned issues first.
+- Show a High risk marker for delay-penalized issues in the Issues tab, issue details, and Stats.
+- Show Carried ×N and Stalled badges, carry an issue to tomorrow with Undo, and show carry and stall history in issue details. Past days keep issues they carried away.
+- Add a capture sheet that imports several `- ` lines at once with a live preview, and autocompletes `#` targets, `~` estimates, `@` dates, and `+` tags.
+- Show the system Inbox as a fourth Issues section with Move to, and hide it from repo and stream pickers.
+- Show tags as color dots on issue and habit rows and in details, filter the Issues and Habits tabs by tag in sync with the TUI, tag items in the creators and with Edit Tags, and show focus time by tag in Stats.
+- Explain carry, stall, risk, and tag markers in delayed hover popovers.
+
+### Changed
+
+- Require daemon protocol `1.7` for the new core planning, tag, and capture contracts.
+- Pin the day pill and section switch, scroll only the issue list, and move Start Ad Hoc below it.
+- Drop the repeated status icon beside issue titles.
+
+### Fixed
+
+- Fail daemon requests whose response is cut off instead of hanging, and guard the socket against SIGPIPE.
+- Skip malformed alert deliveries instead of stopping the alert stream.
+
 ## [1.1.0-beta.1] - 2026-10-10
 
 The first 1.1.0 beta adds ad hoc focus sessions, updates core compatibility, and refines the menu-bar popup and floating timer.
