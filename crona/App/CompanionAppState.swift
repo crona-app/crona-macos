@@ -168,6 +168,8 @@ final class CompanionAppState: ObservableObject {
 
     private(set) lazy var tags = TagsModel(daemonConnection: daemonConnection)
 
+    private(set) lazy var tagFocus = TagFocusModel(daemonConnection: daemonConnection)
+
     private(set) lazy var tagEditor = TagEditorModel(
         daemonConnection: daemonConnection,
         onSaved: { [weak self] in

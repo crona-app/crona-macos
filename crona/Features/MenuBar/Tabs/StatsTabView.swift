@@ -123,6 +123,8 @@ struct StatsTabView: View {
                             ("Failed", metrics.habitFailedCount),
                         ]
                     )
+
+                    FocusByTagSection(date: snapshot.date, tagFocus: appState.tagFocus, tagsModel: appState.tags)
                 } else if !snapshot.isLoading {
                     PlaceholderPanel(
                         icon: "chart.xyaxis.line",

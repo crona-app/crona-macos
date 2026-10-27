@@ -337,4 +337,55 @@ final class TagsTests: DaemonTestCase {
         XCTAssertTrue(appState.isPopoverModalPresented)
         XCTAssertTrue(appState.isUpdatePresentationBlocked)
     }
+
+    // MARK: - Focus by tag
+
+    private static func row(_ key: String, _ seconds: Int) -> [String: Any] {
+        ["key": key, "label": key, "workedSeconds": seconds, "percent": 0.0]
+    }
+
+    func testTagFocusKeepsTopFiveByTime() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        transport.distributionRowsFixture = [
+            Self.row("a", 10), Self.row("b", 60), Self.row("c", 30), Self.row("d", 50), Self.row("e", 20),
+            Self.row("f", 40),
+        ]
+        let model = TagFocusModel(daemonConnection: connection)
+
+        await model.refresh(date: "2026-10-28")
+
+        XCTAssertEqual(model.today.map(\.key), ["b", "d", "f", "c", "e"])
+        XCTAssertEqual(model.week.map(\.key), ["b", "d", "f", "c", "e"])
+    }
+
+    func testTagFocusRequestsTodayAndWeek() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let model = TagFocusModel(daemonConnection: connection)
+
+        // 2026-10-28 is a Wednesday; the week starts Monday 2026-10-26.
+        await model.refresh(date: "2026-10-28")
+
+        let requests = transport.requests.filter { $0.method == "dashboard.distribution" }
+        XCTAssertEqual(requests.map { $0.params["groupBy"]?.stringValue }, ["tag", "tag"])
+        let ranges = Set(requests.map { "\($0.params["start"]?.stringValue ?? "")..\($0.params["end"]?.stringValue ?? "")" })
+        XCTAssertEqual(ranges, ["2026-10-28..2026-10-28", "2026-10-26..2026-10-28"])
+    }
+
+    func testTagFocusWeekStartsMondayOnSunday() {
+        XCTAssertEqual(TagFocusModel.weekStart(for: "2026-11-01"), "2026-10-26")
+        XCTAssertEqual(TagFocusModel.weekStart(for: "2026-10-26"), "2026-10-26")
+    }
+
+    func testTagFocusDropsZeroRows() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        transport.distributionRowsFixture = [Self.row("a", 0), Self.row("b", 5)]
+        let model = TagFocusModel(daemonConnection: connection)
+
+        await model.refresh(date: "2026-10-28")
+
+        XCTAssertEqual(model.today.map(\.key), ["b"])
+    }
 }
