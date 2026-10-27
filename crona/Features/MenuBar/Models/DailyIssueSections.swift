@@ -1,7 +1,7 @@
 import Foundation
 
 enum DailySection: String, CaseIterable, Identifiable {
-    case planned, overdue, upcoming
+    case planned, overdue, upcoming, inbox
 
     var id: String { rawValue }
 }
@@ -14,16 +14,26 @@ struct DailyIssueSections: Equatable {
     var planned: [DailyFocusIssue] = []
     var overdue: [DailyFocusIssue] = []
     var upcoming: [DailyFocusIssue] = []
+    /// Open issues waiting in Crona's system Inbox stream to be sorted into a real stream.
+    var inbox: [DailyFocusIssue] = []
 
     func issues(in section: DailySection) -> [DailyFocusIssue] {
         switch section {
         case .planned: return planned
         case .overdue: return overdue
         case .upcoming: return upcoming
+        case .inbox: return inbox
         }
     }
 
-    static func build(issues: [CronaIssue], plan: CronaDailyPlan?, date: String) -> DailyIssueSections {
+    /// The Inbox segment only appears while it has something to sort.
+    var visibleSections: [DailySection] {
+        inbox.isEmpty ? [.planned, .overdue, .upcoming] : DailySection.allCases
+    }
+
+    static func build(
+        issues: [CronaIssue], plan: CronaDailyPlan?, date: String, systemStreamIDs: Set<Int64> = []
+    ) -> DailyIssueSections {
         let listed = issues.filter { $0.adhoc != true }
         let open = listed.filter { !isClosed($0) }
         var plannedEntries: [Int64: CronaDailyPlanEntry] = [:]
@@ -71,6 +81,7 @@ struct DailyIssueSections: Equatable {
         }
         .sorted { ($0.0, $0.1) < ($1.0, $1.1) }
         .map { project($0.2) }
+        sections.inbox = open.filter { systemStreamIDs.contains($0.streamID) }.map(project)
         return sections
     }
 

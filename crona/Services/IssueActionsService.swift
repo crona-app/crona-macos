@@ -136,6 +136,16 @@ final class IssueActionsService: ObservableObject {
         }
     }
 
+    func moveIssue(_ issue: DailyFocusIssue, to destination: IssueDestination) async -> Bool {
+        let request = CronaMoveIssueRequest(
+            id: issue.id, streamId: destination.streamID, title: issue.title,
+            description: issue.description, estimateMinutes: issue.estimateMinutes,
+            todoForDate: issue.todoForDate)
+        return await perform(issueID: issue.id) {
+            _ = try await self.daemonConnection.withClient { try await $0.moveIssue(request) }
+        }
+    }
+
     func deleteIssue(_ issue: DailyFocusIssue) async -> Bool {
         await perform(issueID: issue.id) {
             _ = try await self.daemonConnection.withClient {

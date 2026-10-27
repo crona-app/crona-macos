@@ -10,14 +10,22 @@ struct DailySectionPicker: View {
     }
 
     var body: some View {
-        let overdueCount = dailyIssues.sections.overdue.count
+        let sections = dailyIssues.sections
         SegmentedControl(
             selection: Binding(
                 get: { dailyIssues.section },
                 set: { dailyIssues.section = $0 }
             ),
-            title: { Self.title(for: $0, overdueCount: overdueCount) }
+            title: { Self.title(for: $0, sections: sections) },
+            items: sections.visibleSections
         )
+    }
+
+    static func title(for section: DailySection, sections: DailyIssueSections) -> String {
+        switch section {
+        case .inbox: return "Inbox (\(sections.inbox.count))"
+        default: return title(for: section, overdueCount: sections.overdue.count)
+        }
     }
 
     static func title(for section: DailySection, overdueCount: Int) -> String {
@@ -25,6 +33,7 @@ struct DailySectionPicker: View {
         case .planned: return "Planned"
         case .overdue: return overdueCount > 0 ? "Overdue (\(overdueCount))" : "Overdue"
         case .upcoming: return "Upcoming"
+        case .inbox: return "Inbox"
         }
     }
 
@@ -33,6 +42,7 @@ struct DailySectionPicker: View {
         case .planned: return "Nothing planned"
         case .overdue: return "Nothing overdue"
         case .upcoming: return "Nothing in the next \(DailyIssueSections.upcomingDays) days"
+        case .inbox: return "Inbox is empty"
         }
     }
 
@@ -41,6 +51,7 @@ struct DailySectionPicker: View {
         case .planned: return "Pin an issue or give it this day's due date to plan it."
         case .overdue: return "Every issue due before this day is closed."
         case .upcoming: return "Issues due in the coming week show up here."
+        case .inbox: return "Captured issues without a stream land here."
         }
     }
 }

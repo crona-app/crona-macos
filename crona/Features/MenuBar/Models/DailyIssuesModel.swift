@@ -12,6 +12,7 @@ final class DailyIssuesModel: ObservableObject {
 
     private let daemonConnection: DaemonConnectionService
     private let day: PopoverDayModel
+    private let issueCreationService: IssueCreationService
     private var eventObserver: NSObjectProtocol?
     private let logger = Logger(subsystem: "com.crona.macos", category: "dailyIssues")
 
@@ -19,9 +20,13 @@ final class DailyIssuesModel: ObservableObject {
     @Published var section: DailySection = .planned
     @Published private(set) var isLoading = false
 
-    init(daemonConnection: DaemonConnectionService, day: PopoverDayModel) {
+    init(
+        daemonConnection: DaemonConnectionService, day: PopoverDayModel,
+        issueCreationService: IssueCreationService
+    ) {
         self.daemonConnection = daemonConnection
         self.day = day
+        self.issueCreationService = issueCreationService
         eventObserver = NotificationCenter.default.addObserver(
             forName: .cronaDaemonEventReceived,
             object: nil,
@@ -41,20 +46,29 @@ final class DailyIssuesModel: ObservableObject {
     }
 
     var allIssues: [DailyFocusIssue] {
-        sections.planned + sections.overdue + sections.upcoming
+        sections.planned + sections.overdue + sections.upcoming + sections.inbox
     }
 
     func refresh() async {
         let date = day.selectedDate
         isLoading = true
         defer { isLoading = false }
+        // The Inbox is recognised by its system stream, which comes with the destinations list.
+        if issueCreationService.destinations.isEmpty && issueCreationService.systemStreamIDs.isEmpty {
+            await issueCreationService.loadDestinations()
+        }
         do {
             async let issues = daemonConnection.withClient { try await $0.listAllIssues() }
             async let plan = daemonConnection.withClient { try await $0.dailyPlanGet(date: date) }
-            let built = DailyIssueSections.build(issues: try await issues, plan: try await plan, date: date)
+            let built = DailyIssueSections.build(
+                issues: try await issues, plan: try await plan, date: date,
+                systemStreamIDs: issueCreationService.systemStreamIDs)
             // A newer day may have been picked while this one loaded.
             guard date == day.selectedDate else { return }
             sections = built
+            if !built.visibleSections.contains(section) {
+                section = .planned
+            }
         } catch {
             logger.error("Daily issues refresh failed: \(error.localizedDescription, privacy: .private)")
         }

@@ -147,7 +147,8 @@ final class CompanionAppState: ObservableObject {
         return day
     }()
 
-    private(set) lazy var dailyIssues = DailyIssuesModel(daemonConnection: daemonConnection, day: day)
+    private(set) lazy var dailyIssues = DailyIssuesModel(
+        daemonConnection: daemonConnection, day: day, issueCreationService: issueCreationService)
 
     private(set) lazy var carryOver = CarryOverModel(
         daemonConnection: daemonConnection,
@@ -828,7 +829,7 @@ final class CompanionAppState: ObservableObject {
         // Row menus need status transitions for today's focus issues and every section's issues.
         dailyFocusService.$snapshot
             .map(\.issues)
-            .combineLatest(dailyIssues.$sections.map { $0.planned + $0.overdue + $0.upcoming })
+            .combineLatest(dailyIssues.$sections.map { $0.planned + $0.overdue + $0.upcoming + $0.inbox })
             .map { focus, sections in
                 var seen = Set<Int64>()
                 return (focus + sections).filter { seen.insert($0.id).inserted }

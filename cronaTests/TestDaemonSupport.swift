@@ -171,6 +171,10 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
                 "active": true, "repoId": 3, "repoName": "Repo", "streamName": "Stream"] as [String: Any]
         case "habit.delete", "issue.delete":
             result = ["ok": true]
+        case "issue.move":
+            result = ["id": probe.params["id"]?.intValue ?? 0, "streamId": probe.params["streamId"]?.intValue ?? 7,
+                "title": probe.params["title"]?.stringValue ?? "", "status": "backlog", "workedSeconds": 0,
+                "pinnedDaily": false] as [String: Any]
         case "issue.carry", "issue.carry.undo":
             if probe.method == "issue.carry", suspendCarry {
                 await withCheckedContinuation { carryContinuation = $0 }

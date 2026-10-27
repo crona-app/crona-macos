@@ -370,11 +370,13 @@ struct IdleFocusView: View {
         } else {
             VStack(spacing: 12) {
                 let isToday = appState.day.isToday
+                let inboxIDs = Set(dailyIssues.sections.inbox.map(\.id))
                 ForEach(sectionIssues) { issue in
                     FocusIssueRow(
                         appState: appState, issue: issue,
                         carryAction: CronaCarryPresentation.menuAction(
-                            for: issue, isToday: isToday, section: dailyIssues.section)
+                            for: issue, isToday: isToday, section: dailyIssues.section),
+                        isInbox: inboxIDs.contains(issue.id)
                     ) {
                         appState.selectFocusIssue(issue)
                     }
@@ -605,14 +607,17 @@ struct FocusIssueRow: View {
     @State private var isActionsHovered = false
 
     let carryAction: CronaCarryAction?
+    /// Inbox rows can be moved into a regular stream.
+    let isInbox: Bool
 
     init(
         appState: CompanionAppState, issue: DailyFocusIssue, carryAction: CronaCarryAction? = nil,
-        onStart: @escaping () -> Void
+        isInbox: Bool = false, onStart: @escaping () -> Void
     ) {
         self.appState = appState
         self.issue = issue
         self.carryAction = carryAction
+        self.isInbox = isInbox
         self.onStart = onStart
         self.issueActionsService = appState.issueActionsService
     }
@@ -687,6 +692,9 @@ struct FocusIssueRow: View {
                 }
 
                 Divider()
+                if isInbox {
+                    moveMenu
+                }
                 statusMenu
                 dueDateMenu
                 carryMenuItem
@@ -835,6 +843,23 @@ struct FocusIssueRow: View {
 
     private var isWorking: Bool {
         issueActionsService.actionInFlightIssueID == issue.id
+    }
+
+    private var moveMenu: some View {
+        Menu {
+            ForEach(appState.issueCreationService.destinations) { destination in
+                Button(destination.label) {
+                    Task {
+                        if await issueActionsService.moveIssue(issue, to: destination) {
+                            await appState.dailyIssues.refresh()
+                        }
+                    }
+                }
+            }
+        } label: {
+            Label("Move to", systemImage: "tray.and.arrow.up")
+        }
+        .disabled(appState.issueCreationService.destinations.isEmpty)
     }
 
     @ViewBuilder

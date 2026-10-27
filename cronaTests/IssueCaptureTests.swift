@@ -41,4 +41,49 @@ final class IssueCaptureTests: DaemonTestCase {
         XCTAssertEqual(service.destinations.map(\.streamID), [7])
         XCTAssertEqual(service.systemStreamIDs, [91])
     }
+
+    func testSectionTitlesIncludeInboxCount() {
+        XCTAssertEqual(DailySectionPicker.title(for: .inbox, sections: DailyIssueSections(inbox: [Self.inboxIssue(1), Self.inboxIssue(2), Self.inboxIssue(3)])), "Inbox (3)")
+    }
+
+    static func inboxIssue(_ id: Int64) -> DailyFocusIssue {
+        DailyFocusIssue(id: id, streamID: 91, title: "Idea \(id)", status: "backlog", estimateMinutes: 30,
+            workedSeconds: 0, todoForDate: "2001-02-04", description: "Notes")
+    }
+
+    func testMoveIssueSendsCurrentFieldsAndTargetStream() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let service = IssueActionsService(daemonConnection: connection, dailyFocusService: DailyFocusService(daemonConnection: connection))
+
+        let moved = await service.moveIssue(
+            Self.inboxIssue(5), to: IssueDestination(repoID: 3, repoName: "Repo", streamID: 7, streamName: "Stream"))
+
+        XCTAssertTrue(moved)
+        let request = try XCTUnwrap(transport.requests.last { $0.method == "issue.move" })
+        XCTAssertEqual(request.params["id"]?.intValue, 5)
+        XCTAssertEqual(request.params["streamId"]?.intValue, 7)
+        XCTAssertEqual(request.params["title"]?.stringValue, "Idea 5")
+        XCTAssertEqual(request.params["estimateMinutes"]?.intValue, 30)
+        XCTAssertEqual(request.params["todoForDate"]?.stringValue, "2001-02-04")
+        XCTAssertEqual(request.params["description"]?.stringValue, "Notes")
+    }
+
+    func testSelectedInboxFallsBackToPlannedWhenEmptied() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        transport.provideInbox = true
+        transport.todaySummaryIssuesFixture = [[
+            "id": 1, "streamId": 91, "title": "Idea", "status": "backlog", "workedSeconds": 0, "pinnedDaily": false,
+        ]]
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+        await appState.dailyIssues.refresh()
+        XCTAssertEqual(appState.dailyIssues.sections.inbox.map(\.id), [1])
+        appState.dailyIssues.section = .inbox
+
+        transport.todaySummaryIssuesFixture = []
+        await appState.dailyIssues.refresh()
+
+        XCTAssertEqual(appState.dailyIssues.section, .planned)
+    }
 }

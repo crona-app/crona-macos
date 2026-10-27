@@ -749,6 +749,15 @@ struct CronaDailyPlanEntry: Codable, Equatable, Identifiable {
     }
 }
 
+struct CronaMoveIssueRequest: Codable, Equatable {
+    let id: Int64
+    let streamId: Int64
+    let title: String
+    let description: String?
+    let estimateMinutes: Int?
+    let todoForDate: String?
+}
+
 struct CronaCarryIssueRequest: Codable, Equatable {
     let id: Int64
 }

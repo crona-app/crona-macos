@@ -275,6 +275,11 @@ final class CronaDaemonClient {
         )
     }
 
+    /// Moves an Inbox issue into a regular stream; the core rejects any other move.
+    func moveIssue(_ input: CronaMoveIssueRequest) async throws -> CronaIssue {
+        try await request(method: "issue.move", params: AnyEncodable(input))
+    }
+
     /// Carries the issue to the next working day; the core picks the date.
     func carryIssue(issueID: Int64) async throws -> CronaIssue {
         try await request(method: "issue.carry", params: AnyEncodable(CronaCarryIssueRequest(id: issueID)))

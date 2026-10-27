@@ -7,10 +7,12 @@ where T.AllCases: RandomAccessCollection {
     let title: (T) -> String
     var icon: ((T) -> String?)? = nil
     var fitsContent = false
+    /// The segments to show; every case when nil.
+    var items: [T]? = nil
 
     var body: some View {
         HStack(spacing: 6) {
-            ForEach(Array(T.allCases)) { item in
+            ForEach(items ?? Array(T.allCases)) { item in
                 let isSelected = selection == item
                 Button {
                     withAnimation(SystemGlassSettings.shared.reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.9)) {

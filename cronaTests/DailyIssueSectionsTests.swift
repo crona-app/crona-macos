@@ -118,4 +118,30 @@ final class DailyIssueSectionsTests: XCTestCase {
         let sections = build([issue(1, due: day)], plan([planned]))
         XCTAssertEqual(sections.planned.first?.carry, DailyFocusCarry(count: 1, stalled: false, fromDate: "2026-10-26"))
     }
+
+    private func streamIssue(_ id: Int64, stream: Int64, status: String = "backlog", due: String? = nil) -> CronaIssue {
+        CronaIssue(id: id, streamID: stream, title: "Issue \(id)", status: status, estimateMinutes: nil, workedSeconds: 0, pinnedDaily: false, todoForDate: due, completedAt: nil, abandonedAt: nil)
+    }
+
+    func testInboxListsOpenIssuesInSystemStreams() {
+        let sections = DailyIssueSections.build(
+            issues: [streamIssue(1, stream: 91), streamIssue(2, stream: 91, status: "done"), streamIssue(3, stream: 7)],
+            plan: nil, date: day, systemStreamIDs: [91])
+        XCTAssertEqual(sections.inbox.map(\.id), [1])
+        XCTAssertEqual(sections.issues(in: .inbox).map(\.id), [1])
+    }
+
+    func testInboxIssueWithDueDateAlsoAppearsInPlanned() {
+        let sections = DailyIssueSections.build(
+            issues: [streamIssue(1, stream: 91, due: day)], plan: nil, date: day, systemStreamIDs: [91])
+        XCTAssertEqual(sections.inbox.map(\.id), [1])
+        XCTAssertEqual(sections.planned.map(\.id), [1])
+    }
+
+    func testVisibleSectionsIncludeInboxOnlyWhenNonEmpty() {
+        XCTAssertEqual(DailyIssueSections().visibleSections, [.planned, .overdue, .upcoming])
+        let withInbox = DailyIssueSections.build(
+            issues: [streamIssue(1, stream: 91)], plan: nil, date: day, systemStreamIDs: [91])
+        XCTAssertEqual(withInbox.visibleSections, [.planned, .overdue, .upcoming, .inbox])
+    }
 }
