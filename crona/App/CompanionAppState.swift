@@ -134,6 +134,12 @@ final class CompanionAppState: ObservableObject {
         #endif
         return popups
     }()
+    private(set) lazy var day = PopoverDayModel(today: { [weak self] in
+        guard let date = self?.daemonConnection.currentDate, !date.isEmpty else {
+            return DailyFocusService.todayString()
+        }
+        return date
+    })
     private(set) lazy var issueActions = IssueActionEditorModel(
         daemonConnection: daemonConnection,
         issueActionsService: issueActionsService,
@@ -897,6 +903,7 @@ final class CompanionAppState: ObservableObject {
             await wellbeingService.refresh()
             await coreSettingsService.refresh()
             await popoverStatsService.handleDayStart(date: date, previousDate: previousDate)
+            day.handleDayStart(date: date, previousDate: previousDate)
             statusBarService.updateStatusItem()
         }
     }
