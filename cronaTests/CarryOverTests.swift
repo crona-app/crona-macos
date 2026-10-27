@@ -114,4 +114,8 @@ final class CarryOverTests: DaemonTestCase {
         XCTAssertEqual(transport.requests.last { $0.method == "issue.carry.undo" }?.params["id"]?.intValue, 9)
         XCTAssertNil(model.errorMessage)
     }
+
+    func testUndoMessage() {
+        XCTAssertEqual(CronaCarryPresentation.undoMessage(title: "Fix sync"), "Carried \u{201C}Fix sync\u{201D} to tomorrow")
+    }
 }

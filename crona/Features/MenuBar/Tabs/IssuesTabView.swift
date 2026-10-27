@@ -318,6 +318,8 @@ struct IdleFocusView: View {
                 .frame(maxHeight: Self.listMaxHeight)
             }
 
+            CarryUndoToast(carryOver: appState.carryOver)
+
             Button(action: appState.beginAdhocStart) {
                 HStack(spacing: 10) {
                     Image(systemName: "timer").foregroundStyle(PopupVisualTheme.semantic(.focus))
@@ -367,8 +369,9 @@ struct IdleFocusView: View {
             )
         } else {
             VStack(spacing: 12) {
+                let canCarry = appState.day.isToday && dailyIssues.section != .upcoming
                 ForEach(sectionIssues) { issue in
-                    FocusIssueRow(appState: appState, issue: issue) {
+                    FocusIssueRow(appState: appState, issue: issue, canCarry: canCarry) {
                         appState.selectFocusIssue(issue)
                     }
                 }
@@ -597,9 +600,16 @@ struct FocusIssueRow: View {
     let onStart: () -> Void
     @State private var isActionsHovered = false
 
-    init(appState: CompanionAppState, issue: DailyFocusIssue, onStart: @escaping () -> Void) {
+    /// Carrying is offered on today's Planned and Overdue rows only.
+    let canCarry: Bool
+
+    init(
+        appState: CompanionAppState, issue: DailyFocusIssue, canCarry: Bool = false,
+        onStart: @escaping () -> Void
+    ) {
         self.appState = appState
         self.issue = issue
+        self.canCarry = canCarry
         self.onStart = onStart
         self.issueActionsService = appState.issueActionsService
     }
@@ -676,6 +686,7 @@ struct FocusIssueRow: View {
                 Divider()
                 statusMenu
                 dueDateMenu
+                carryMenuItem
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 14, weight: .bold))
@@ -821,6 +832,25 @@ struct FocusIssueRow: View {
 
     private var isWorking: Bool {
         issueActionsService.actionInFlightIssueID == issue.id
+    }
+
+    @ViewBuilder
+    private var carryMenuItem: some View {
+        if issue.carriedAway {
+            Button {
+                Task { await appState.carryOver.undoCarry(issueID: issue.id) }
+            } label: {
+                Label("Undo Carry", systemImage: "arrow.uturn.backward")
+            }
+            .disabled(appState.carryOver.inFlightIssueID != nil)
+        } else if canCarry {
+            Button {
+                Task { await appState.carryOver.carry(issue) }
+            } label: {
+                Label("Carry to Tomorrow", systemImage: CronaCarryPresentation.carriedIcon)
+            }
+            .disabled(appState.carryOver.inFlightIssueID != nil)
+        }
     }
 
     private var metaLine: String {

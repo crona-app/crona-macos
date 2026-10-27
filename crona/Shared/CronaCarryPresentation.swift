@@ -7,6 +7,10 @@ enum CronaCarryPresentation {
 
     static var carriedColor: Color { PopupVisualTheme.semantic(.carried) }
 
+    static func undoMessage(title: String) -> String {
+        "Carried \u{201C}\(title)\u{201D} to tomorrow"
+    }
+
     static func badgeText(for carry: DailyFocusCarry?) -> String? {
         guard let carry else { return nil }
         if carry.stalled { return "Stalled" }
