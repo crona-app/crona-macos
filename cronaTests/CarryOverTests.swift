@@ -165,4 +165,25 @@ final class CarryOverTests: DaemonTestCase {
             [CarryDetailLine(text: "Carried to <2026-10-28>", stalled: false)])
         XCTAssertEqual(CronaCarryPresentation.detailLines(carry: nil, carriedToDate: nil, formatDate: fmt), [])
     }
+
+    func testDetailsIssueComesFromSectionsWithCarryData() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        transport.todaySummaryIssuesFixture = [[
+            "id": 1, "streamId": 7, "title": "Chain", "status": "in_progress", "workedSeconds": 0,
+            "pinnedDaily": false, "todoForDate": transport.logicalDate,
+        ]]
+        transport.planEntriesFixture = [[
+            "id": "e1", "date": transport.logicalDate, "issueId": 1, "source": "carry_over", "status": "planned",
+            "committedAt": "", "baselineDate": transport.logicalDate, "currentPlannedDate": transport.logicalDate,
+            "postponeCount": 0, "currentDelayedDays": 0, "maxDelayedDays": 0, "failScore": 0,
+            "carryCount": 3, "stalled": true, "carriedFromDate": "2001-02-02",
+        ]]
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+        await appState.dailyIssues.refresh()
+
+        let issue = try XCTUnwrap(appState.detailsIssue(id: 1))
+
+        XCTAssertEqual(issue.carry, DailyFocusCarry(count: 3, stalled: true, fromDate: "2001-02-02"))
+    }
 }

@@ -496,6 +496,12 @@ final class CompanionAppState: ObservableObject {
         daemonConnection.manualReconnect()
     }
 
+    /// Section issues carry plan data (penalty, carry); today's focus list is the fallback.
+    func detailsIssue(id: Int64) -> DailyFocusIssue? {
+        dailyIssues.allIssues.first { $0.id == id }
+            ?? dailyFocusService.snapshot.issues.first { $0.id == id }
+    }
+
     func openIssueDetails(_ issue: DailyFocusIssue) {
         popoverDetailsRoute = .issueDetails(issueID: issue.id)
     }

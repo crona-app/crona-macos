@@ -3,19 +3,21 @@ import SwiftUI
 struct PopoverDetailView: View {
     @ObservedObject var appState: CompanionAppState
     @ObservedObject private var habitsService: HabitsService
+    @ObservedObject private var dailyIssues: DailyIssuesModel
     let route: PopoverDetailRoute
 
     init(appState: CompanionAppState, route: PopoverDetailRoute) {
         self.appState = appState
         self.route = route
         self.habitsService = appState.habitsService
+        self.dailyIssues = appState.dailyIssues
     }
 
     var body: some View {
         Group {
             switch route {
             case .issueDetails(let issueID):
-                if let issue = appState.dailyFocusService.snapshot.issues.first(where: { $0.id == issueID }) {
+                if let issue = appState.detailsIssue(id: issueID) {
                     IssueDetailView(appState: appState, issue: issue)
                 } else {
                     missingDetail(title: "Issue unavailable")
@@ -104,23 +106,7 @@ struct IssueDetailView: View {
                 )
             }
 
-            let riskLines = CronaPenaltyPresentation.detailLines(for: issue.penalty)
-            if !riskLines.isEmpty {
-                DetailSection(title: "Risk", icon: CronaPenaltyPresentation.markerIcon) {
-                    ForEach(riskLines, id: \.self) { line in
-                        DetailStatusRow(title: line, tint: CronaPenaltyPresentation.colorKey.color)
-                    }
-                }
-            }
-
-            let carryLines = CronaCarryPresentation.detailLines(for: issue) { formattedPopoverDate($0, appState: appState) }
-            if !carryLines.isEmpty {
-                DetailSection(title: "Carry", icon: CronaCarryPresentation.carriedIcon) {
-                    ForEach(carryLines, id: \.text) { line in
-                        DetailStatusRow(title: line.text, tint: line.stalled ? CronaPenaltyPresentation.colorKey.color : CronaCarryPresentation.carriedColor)
-                    }
-                }
-            }
+            IssueRiskAndCarrySections(appState: appState, issue: issue)
 
             if let description = nonEmpty(issue.description) {
                 DetailSection(title: "Description", icon: "text.alignleft") {
@@ -410,7 +396,7 @@ private struct DetailHeader<Actions: View>: View {
     }
 }
 
-private struct DetailSection<Content: View>: View {
+struct DetailSection<Content: View>: View {
     let title: String
     let icon: String
     @ViewBuilder let content: () -> Content
@@ -428,7 +414,7 @@ private struct DetailSection<Content: View>: View {
     }
 }
 
-private struct DetailStatusRow: View {
+struct DetailStatusRow: View {
     let title: String
     let tint: Color
 
