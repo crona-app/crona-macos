@@ -2,6 +2,21 @@ import Combine
 import Foundation
 import OSLog
 
+struct DailyFocusPenalty: Equatable {
+    let highRisk: Bool
+    let delayedDays: Int
+    let becomesHighRiskIfPostponed: Bool
+
+    static func from(_ entry: CronaDailyPlanEntry) -> DailyFocusPenalty? {
+        guard let penalty = entry.penalty else { return nil }
+        return DailyFocusPenalty(
+            highRisk: penalty.highRisk,
+            delayedDays: entry.currentDelayedDays,
+            becomesHighRiskIfPostponed: penalty.ifPostponedOneDay?.becomesHighRisk ?? false
+        )
+    }
+}
+
 struct DailyFocusIssue: Equatable, Identifiable {
     let id: Int64
     let streamID: Int64
@@ -15,6 +30,7 @@ struct DailyFocusIssue: Equatable, Identifiable {
     let description: String?
     let notes: String?
     let pinnedDaily: Bool?
+    let penalty: DailyFocusPenalty?
 
     init(
         id: Int64,
@@ -28,7 +44,8 @@ struct DailyFocusIssue: Equatable, Identifiable {
         streamName: String? = nil,
         description: String? = nil,
         notes: String? = nil,
-        pinnedDaily: Bool? = nil
+        pinnedDaily: Bool? = nil,
+        penalty: DailyFocusPenalty? = nil
     ) {
         self.id = id
         self.streamID = streamID
@@ -42,6 +59,7 @@ struct DailyFocusIssue: Equatable, Identifiable {
         self.description = description
         self.notes = notes
         self.pinnedDaily = pinnedDaily
+        self.penalty = penalty
     }
 }
 
@@ -49,6 +67,10 @@ struct DailyFocusSnapshot: Equatable {
     var date = ""
     var issues: [DailyFocusIssue] = []
     var isConnected = false
+
+    var highRiskCount: Int {
+        issues.filter { $0.penalty?.highRisk == true }.count
+    }
 }
 
 @MainActor
@@ -135,7 +157,7 @@ final class DailyFocusService: ObservableObject {
             guard let issue = issuesByID.removeValue(forKey: entry.issueID) else { continue }
             guard Self.isEligible(issue, anchorDate: summary.date, validStatuses: validStatuses)
             else { continue }
-            ordered.append(Self.project(issue))
+            ordered.append(Self.project(issue, penalty: DailyFocusPenalty.from(entry)))
             seen.insert(issue.id)
         }
 
@@ -160,7 +182,9 @@ final class DailyFocusService: ObservableObject {
         return validStatuses.contains(issue.status)
     }
 
-    private static func project(_ issue: CronaIssue) -> DailyFocusIssue {
+    private static func project(_ issue: CronaIssue, penalty: DailyFocusPenalty? = nil)
+        -> DailyFocusIssue
+    {
         DailyFocusIssue(
             id: issue.id,
             streamID: issue.streamID,
@@ -173,7 +197,8 @@ final class DailyFocusService: ObservableObject {
             streamName: issue.streamName,
             description: issue.description,
             notes: issue.notes,
-            pinnedDaily: issue.pinnedDaily
+            pinnedDaily: issue.pinnedDaily,
+            penalty: penalty
         )
     }
 
