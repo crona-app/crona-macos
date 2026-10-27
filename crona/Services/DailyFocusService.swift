@@ -49,6 +49,7 @@ struct DailyFocusIssue: Equatable, Identifiable {
     let carriedAway: Bool
     /// Where the shown day's carry sent this issue, when it was carried away.
     let carriedToDate: String?
+    let tags: [String]
 
     init(
         id: Int64,
@@ -66,7 +67,8 @@ struct DailyFocusIssue: Equatable, Identifiable {
         penalty: DailyFocusPenalty? = nil,
         carry: DailyFocusCarry? = nil,
         carriedAway: Bool = false,
-        carriedToDate: String? = nil
+        carriedToDate: String? = nil,
+        tags: [String] = []
     ) {
         self.id = id
         self.streamID = streamID
@@ -84,6 +86,7 @@ struct DailyFocusIssue: Equatable, Identifiable {
         self.carry = carry
         self.carriedAway = carriedAway
         self.carriedToDate = carriedToDate
+        self.tags = tags
     }
 }
 
@@ -108,7 +111,8 @@ extension DailyFocusIssue {
             penalty: penalty,
             carry: carry,
             carriedAway: carriedAway,
-            carriedToDate: carriedToDate
+            carriedToDate: carriedToDate,
+            tags: issue.tags ?? []
         )
     }
 }

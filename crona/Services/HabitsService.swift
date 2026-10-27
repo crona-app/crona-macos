@@ -18,6 +18,7 @@ struct HabitRowModel: Equatable, Identifiable {
     let notes: String?
     let completionDate: String?
     let completionID: Int64?
+    let tags: [String]
 
     init(
         id: Int64,
@@ -34,7 +35,8 @@ struct HabitRowModel: Equatable, Identifiable {
         weekdays: [Int] = [],
         notes: String? = nil,
         completionDate: String? = nil,
-        completionID: Int64? = nil
+        completionID: Int64? = nil,
+        tags: [String] = []
     ) {
         self.id = id
         self.name = name
@@ -51,6 +53,7 @@ struct HabitRowModel: Equatable, Identifiable {
         self.notes = notes
         self.completionDate = completionDate
         self.completionID = completionID
+        self.tags = tags
     }
 
     var supportsClearAction: Bool {
@@ -288,7 +291,7 @@ final class HabitsService: ObservableObject {
         Task { await refresh() }
     }
 
-    private static func project(_ item: CronaHabitDailyItem) -> HabitRowModel {
+    static func project(_ item: CronaHabitDailyItem) -> HabitRowModel {
         HabitRowModel(
             id: item.id,
             name: item.name,
@@ -304,7 +307,8 @@ final class HabitsService: ObservableObject {
             weekdays: item.habit.weekdays,
             notes: item.notes,
             completionDate: item.completionDate,
-            completionID: item.completionID
+            completionID: item.completionID,
+            tags: item.habit.tags ?? []
         )
     }
 }

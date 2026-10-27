@@ -108,6 +108,8 @@ struct IssueDetailView: View {
 
             IssueRiskAndCarrySections(appState: appState, issue: issue)
 
+            TagDetailSection(tags: issue.tags, tagsModel: appState.tags)
+
             if let description = nonEmpty(issue.description) {
                 DetailSection(title: "Description", icon: "text.alignleft") {
                     DetailBodyText(description)
@@ -218,6 +220,8 @@ struct HabitDetailView: View {
             DetailSection(title: "Today", icon: habitStatusIcon) {
                 DetailStatusRow(title: habitStatusTitle, tint: habitTint)
             }
+
+            TagDetailSection(tags: habit.tags, tagsModel: appState.tags)
 
             if let description = nonEmpty(habit.description) {
                 DetailSection(title: "Description", icon: "text.alignleft") {

@@ -158,4 +158,33 @@ final class TagsTests: DaemonTestCase {
         await waitForIssueCreator { !model.filter(for: .issues).isEmpty }
         XCTAssertEqual(model.filter(for: .issues).query, "+work")
     }
+
+    // MARK: - Chips
+
+    func testChipOverflow() {
+        XCTAssertEqual(TagChipLayout.split([]).shown, [])
+        XCTAssertEqual(TagChipLayout.split([]).overflow, 0)
+        XCTAssertNil(TagChipLayout.overflowLabel(0))
+        XCTAssertEqual(TagChipLayout.split(["a", "b"]).shown, ["a", "b"])
+        XCTAssertEqual(TagChipLayout.split(["a", "b"]).overflow, 0)
+        let split = TagChipLayout.split(["a", "b", "c", "d"])
+        XCTAssertEqual(split.shown, ["a", "b"])
+        XCTAssertEqual(split.overflow, 2)
+        XCTAssertEqual(TagChipLayout.overflowLabel(split.overflow), "+2")
+    }
+
+    func testSectionsCarryIssueTags() {
+        var issue = CronaIssue(
+            id: 1, streamID: 7, title: "T", status: "ready", estimateMinutes: nil, workedSeconds: 0,
+            pinnedDaily: false, todoForDate: "2001-02-03")
+        issue.tags = ["work"]
+        let sections = DailyIssueSections.build(issues: [issue], plan: nil, date: "2001-02-03")
+        XCTAssertEqual(sections.planned.first?.tags, ["work"])
+    }
+
+    func testHabitRowCarriesTags() throws {
+        let json = #"{"id":1,"streamId":2,"name":"H","scheduleType":"daily","weekdays":[],"active":true,"repoId":3,"repoName":"R","streamName":"S","tags":["health"],"status":"pending","completed":false}"#
+        let item = try JSONDecoder().decode(CronaHabitDailyItem.self, from: Data(json.utf8))
+        XCTAssertEqual(HabitsService.project(item).tags, ["health"])
+    }
 }

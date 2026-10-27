@@ -191,7 +191,8 @@ final class IssueCreatorModel: ObservableObject {
                 streamName: created.streamName,
                 description: created.description,
                 notes: created.notes,
-                pinnedDaily: created.pinnedDaily
+                pinnedDaily: created.pinnedDaily,
+                tags: created.tags ?? []
             )
             await dailyFocusService.refresh()
 

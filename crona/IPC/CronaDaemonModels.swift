@@ -884,6 +884,7 @@ struct CronaHabitDailyItem: Decodable, Equatable, Identifiable {
         case completionDate = "completionDate"
         case durationMinutes = "durationMinutes"
         case notes = "notes"
+        case tags
     }
 
     init(from decoder: Decoder) throws {
@@ -899,7 +900,8 @@ struct CronaHabitDailyItem: Decodable, Equatable, Identifiable {
             active: try container.decode(Bool.self, forKey: .active),
             repoID: try container.decode(Int64.self, forKey: .repoID),
             repoName: try container.decode(String.self, forKey: .repoName),
-            streamName: try container.decode(String.self, forKey: .streamName)
+            streamName: try container.decode(String.self, forKey: .streamName),
+            tags: try container.decodeIfPresent([String].self, forKey: .tags)
         )
         self.habit = habit
         self.status = try container.decodeIfPresent(String.self, forKey: .status) ?? "completed"

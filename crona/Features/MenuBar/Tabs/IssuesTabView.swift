@@ -642,12 +642,15 @@ struct FocusIssueRow: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 Label {
-                    Text(issue.title)
-                        .font(.headline)
-                        .foregroundStyle(PopupVisualTheme.primaryText)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .help(issue.title)
+                    HStack(spacing: 6) {
+                        Text(issue.title)
+                            .font(.headline)
+                            .foregroundStyle(PopupVisualTheme.primaryText)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .help(issue.title)
+                        TagChipsView(tags: issue.tags, tagsModel: appState.tags)
+                    }
                 } icon: {
                     Image(systemName: CronaIssueStatusPresentation.icon(for: issue.status))
                         .foregroundStyle(CronaIssueStatusPresentation.color(for: issue.status))

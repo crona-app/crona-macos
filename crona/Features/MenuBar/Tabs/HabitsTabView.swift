@@ -48,6 +48,7 @@ struct HabitsTabView: View {
                 VStack(spacing: 10) {
                     ForEach(snapshot.items) { habit in
                         HabitRow(
+                            tagsModel: appState.tags,
                             habit: habit,
                             isWorking: habitsService.actionInFlightHabitID == habit.id,
                             activeAction: habitsService.actionInFlightHabitID == habit.id
@@ -100,6 +101,7 @@ struct HabitsTabView: View {
 }
 
 struct HabitRow: View {
+    let tagsModel: TagsModel
     let habit: HabitRowModel
     let isWorking: Bool
     let activeAction: String?
@@ -123,10 +125,13 @@ struct HabitRow: View {
 
                 Button(action: openDetails) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(habit.name)
-                        .font(.headline)
-                        .foregroundStyle(PopupVisualTheme.primaryText)
-                        .lineLimit(2)
+                    HStack(spacing: 6) {
+                        Text(habit.name)
+                            .font(.headline)
+                            .foregroundStyle(PopupVisualTheme.primaryText)
+                            .lineLimit(2)
+                        TagChipsView(tags: habit.tags, tagsModel: tagsModel)
+                    }
 
                     HStack(spacing: 12) {
                         metaLabel(icon: "folder.fill", text: habit.repoName)
