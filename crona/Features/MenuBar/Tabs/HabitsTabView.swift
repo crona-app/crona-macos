@@ -31,16 +31,6 @@ struct HabitsTabView: View {
     private func habitsContent(snapshot: HabitsSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             PopoverDayHeader(appState: appState)
-            HStack(spacing: 12) {
-                Image(systemName: "checklist.checked")
-                    .foregroundStyle(PopupVisualTheme.semantic(.success))
-                    .frame(width: 22)
-                Text("Habits")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(PopupVisualTheme.primaryText)
-                Spacer()
-            }
-            .padding(.horizontal, 13)
 
             if snapshot.isLoading && snapshot.items.isEmpty {
                 PlaceholderPanel(

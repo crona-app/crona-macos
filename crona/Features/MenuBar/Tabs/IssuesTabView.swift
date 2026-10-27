@@ -294,16 +294,6 @@ struct IdleFocusView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             PopoverDayHeader(appState: appState)
-            HStack(spacing: 10) {
-                Image(systemName: "scope")
-                    .foregroundStyle(PopupVisualTheme.semantic(.focus))
-                    .frame(width: 22)
-                Text("Focus")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(PopupVisualTheme.primaryText)
-                Spacer()
-            }
-            .padding(.horizontal, 14)
 
             if appState.coreSettingsService.isSaving {
                 ProgressView().controlSize(.small)
@@ -338,7 +328,7 @@ struct IdleFocusView: View {
                 PlaceholderPanel(
                     icon: "checkmark.circle",
                     title: DailySectionPicker.emptyText(for: dailyIssues.section),
-                    subtitle: ""
+                    subtitle: DailySectionPicker.emptyHint(for: dailyIssues.section)
                 )
             } else {
                 VStack(spacing: 12) {

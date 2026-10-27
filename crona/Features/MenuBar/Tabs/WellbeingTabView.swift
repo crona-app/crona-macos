@@ -41,7 +41,6 @@ struct WellbeingTabView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
             PopoverDayHeader(appState: appState)
-            header
             ratingRow(
                 title: "Mood",
                 subtitle: "Your mood today",
@@ -152,22 +151,6 @@ struct WellbeingTabView: View {
         .contentTransition(.opacity)
     }
 
-    private var header: some View {
-        HStack {
-            Image(systemName: "heart.text.square.fill")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(PopupVisualTheme.semantic(.mood))
-                .frame(width: leadingRailWidth)
-            Text("Check-in")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(PopupVisualTheme.primaryText)
-            Spacer()
-            if wellbeingService.snapshot.isLoading {
-                ProgressView().controlSize(.small)
-            }
-        }
-        .padding(.horizontal, 12)
-    }
 
     private func ratingRow(
         title: String,
