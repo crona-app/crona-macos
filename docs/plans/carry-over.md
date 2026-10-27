@@ -14,32 +14,33 @@ Show which issues were carried to today, flag ones that keep getting carried, an
 |---|---|
 | Issues tab row | Lavender `Carried ×N` badge when `carryCount > 0`. When `stalled == true`, the badge reads `Stalled` in the red risk color instead. |
 | Issue details | `Carried from <date>` from `carriedFromDate`, formatted like other dates in the popover. |
+| Past day, Planned section | Issues the day carried to a later day still appear, with a lavender `Carried` chip in place of their status (matches the TUI). Reached through the shared day picker. |
 | Auto carry | No notification. The day-boundary carry is silent; the badge is the signal. |
 
 The issue keeps its real status. `IssueStatus "carried"` is display-only in the core and is never sent on an issue, so `CronaIssueStatus` does not gain a case.
 
 ## Actions
 
-- **Carry to tomorrow**: in the issue actions menu for a planned issue that is overdue or not done today. Calls `issue.carry`.
-- **Undo carry**: a toast for about 5 seconds after a manual carry, and an `Undo carry` item in details for an issue carried today. Calls `issue.carry.undo`.
+- **Carry to Tomorrow**: in the row menu of every non-carried row in today's Planned and Overdue sections. Calls `issue.carry` without a date, so the core picks the next working day.
+- **Undo Carry**: a toast for 5 seconds after a manual carry (above the Start Ad Hoc footer), and an `Undo Carry` item in the row menu of a carried row on a past day. Calls `issue.carry.undo`; if the core's rollback window has passed, its error shows in the toast area.
 - On failure, show the daemon error in the existing popover error style and leave the plan untouched.
 
 Out of scope: `carryOverEnabled`, `carryOverMinMinutes`, `carryOverStallAfter` settings; carry history views.
 
 ## Data
 
-- Extend `CronaDailyPlanEntry` with optional `carriedFromEntryID`, `carriedToEntryID`, `carriedFromDate`, `carriedToDate`, `carryCount` (default 0), `stalled` (default false), `workedSeconds` (default 0). Decode missing fields to defaults.
-- `CronaDaemonClient`: `carryIssue(issueID:)` and `undoCarry(issueID:)`. Confirm exact param shapes against `crona/shared/dto/requests.go` and `docs/reference/socket-api.md` when planning.
+- `CronaDailyPlanEntry` gains optional `carriedFromDate`, `carryCount` and `stalled`; other carry wire fields are ignored. Missing fields decode to nil.
+- `CronaDaemonClient`: `carryIssue(issueID:)` (`{ "id" }`) and `undoCarry(issueID:)` (`CronaNumericIDRequest`).
 
 ## Ownership
 
-- New `CarryOverModel` in `Features/MenuBar/Models/`, owned by `CompanionAppState` as a `private(set) lazy var`, wired with `[weak self]` closures. It owns the action state (in-flight, undo toast, error) and asks `DailyFocusService` to refresh after success.
-- Badge display reads plan entries from `DailyFocusService`.
-- Badge color goes in the shared presentation helpers.
+- `CarryOverModel` in `Features/MenuBar/Models/`, owned by `CompanionAppState` as `private(set) lazy var carryOver`. It owns in-flight, undo offer and error state, and its `onChanged` closure refreshes `DailyIssuesModel` and `DailyFocusService` after a success.
+- `DailyIssueSections.build` turns plan entries into `DailyFocusIssue.carry` (`DailyFocusCarry`) and `carriedAway`.
+- Copy, icons and the lavender `.carried` semantic color live in `crona/Shared/CronaCarryPresentation.swift` and `PopupVisualTheme`; the toast is `Components/CarryUndoToast.swift`.
 
 ## Testing
 
-New `cronaTests/CarryOverModelTests.swift`, subclassing `DaemonTestCase`; extend the fake daemon with `issue.carry` / `issue.carry.undo`.
+`cronaTests/CarryOverTests.swift` (model, copy, color) and `DailyIssueSectionsTests.swift` (decoding, carried-away rows), subclassing `DaemonTestCase`; extend the fake daemon with `issue.carry` / `issue.carry.undo`.
 
 - Carry calls the daemon and refreshes the plan; undo reverses it.
 - Undo toast expires.
