@@ -134,12 +134,28 @@ final class CompanionAppState: ObservableObject {
         #endif
         return popups
     }()
-    private(set) lazy var day = PopoverDayModel(today: { [weak self] in
-        guard let date = self?.daemonConnection.currentDate, !date.isEmpty else {
-            return DailyFocusService.todayString()
+    private(set) lazy var day: PopoverDayModel = {
+        let day = PopoverDayModel(today: { [weak self] in
+            guard let date = self?.daemonConnection.currentDate, !date.isEmpty else {
+                return DailyFocusService.todayString()
+            }
+            return date
+        })
+        day.onChange = { [weak self] _ in
+            Task { await self?.refreshSelectedDay() }
         }
-        return date
-    })
+        return day
+    }()
+
+    /// Points every day-based tab at the shared day and reloads them.
+    func refreshSelectedDay() async {
+        let date = day.selectedDate
+        habitsService.selectedDate = date
+        wellbeingService.selectedDate = date
+        popoverStatsService.selectDate(date)
+        await habitsService.refresh()
+        await wellbeingService.refresh()
+    }
     private(set) lazy var issueActions = IssueActionEditorModel(
         daemonConnection: daemonConnection,
         issueActionsService: issueActionsService,
@@ -552,6 +568,7 @@ final class CompanionAppState: ObservableObject {
             }
 
             let storedDates = [
+                day.selectedDate,
                 dailyFocusService.snapshot.date,
                 habitsService.snapshot.date,
                 wellbeingService.snapshot.date,
@@ -564,9 +581,9 @@ final class CompanionAppState: ObservableObject {
 
             logger.info("Reconciling popup date to daemon logical date \(daemonDate, privacy: .public)")
             await dailyFocusService.refresh(date: daemonDate)
-            await habitsService.refresh(date: daemonDate)
-            await wellbeingService.refresh(date: daemonDate)
+            day.select(daemonDate)
             await popoverStatsService.reconcileToDate(daemonDate)
+            await refreshSelectedDay()
         } catch {
             logger.error("Popup date reconciliation failed: \(error.localizedDescription, privacy: .private)")
         }
@@ -899,11 +916,10 @@ final class CompanionAppState: ObservableObject {
         Task { @MainActor [weak self] in
             guard let self else { return }
             await dailyFocusService.refresh(date: date)
-            await habitsService.refresh(date: date)
-            await wellbeingService.refresh()
+            day.handleDayStart(date: date, previousDate: previousDate)
             await coreSettingsService.refresh()
             await popoverStatsService.handleDayStart(date: date, previousDate: previousDate)
-            day.handleDayStart(date: date, previousDate: previousDate)
+            await refreshSelectedDay()
             statusBarService.updateStatusItem()
         }
     }

@@ -18,8 +18,11 @@ final class WellbeingService: ObservableObject {
         self.daemonConnection = daemonConnection
     }
 
+    /// The shared popover day; nil follows the daemon's current date.
+    var selectedDate: String?
+
     func refresh(date requestedDate: String? = nil) async {
-        let date = requestedDate ?? daemonConnection.currentDate
+        let date = requestedDate ?? selectedDate ?? daemonConnection.currentDate
         let resolvedDate = date.isEmpty ? DailyFocusService.todayString() : date
         snapshot.date = resolvedDate
         snapshot.isLoading = true

@@ -27,59 +27,7 @@ struct StatsTabView: View {
                         ))
             } else {
                 VStack(spacing: StatsLayout.sectionSpacing) {
-                    ZStack {
-                        HStack(spacing: 8) {
-                            Button {
-                                appState.popoverStatsService.showPreviousDay()
-                            } label: {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .frame(width: 28, height: 28)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Previous day")
-
-                            Text(statsTitle(for: snapshot.date))
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(PopupVisualTheme.primaryText)
-                                .lineLimit(1)
-
-                            Button {
-                                appState.popoverStatsService.showNextDay()
-                            } label: {
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .frame(width: 28, height: 28)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(!appState.popoverStatsService.canShowNextDay())
-                            .accessibilityLabel("Next day")
-                        }
-                        .frame(height: 22)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .modifier(StatsDatePillSurfaceModifier())
-                        .frame(height: 32)
-
-                    }
-                    .frame(maxWidth: .infinity)
-                    .overlay(alignment: .trailing) {
-                        if snapshot.date != statsTodayDate {
-                            Button {
-                                appState.popoverStatsService.showToday()
-                            } label: {
-                                Image(systemName: "calendar")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .frame(width: 24, height: 24)
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.78))
-                            .background(Circle().fill(PopupVisualTheme.primaryText.opacity(0.08)))
-                            .help("Return to today")
-                            .accessibilityLabel("Return to today")
-                            .padding(.trailing, 6)
-                        }
-                    }
+                    PopoverDayHeader(appState: appState)
                     statsSummaryContent(snapshot: snapshot)
                 }
             }
@@ -313,7 +261,7 @@ struct StatsTabView: View {
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .modifier(StatsDatePillSurfaceModifier())
+            .modifier(PopoverDatePillSurfaceModifier())
             .frame(height: 32)
 
             LazyVGrid(
@@ -404,6 +352,7 @@ struct StatsTabView: View {
                     calendarDateString(for: date),
                     isHistoricalAway: isAway
                 )
+                appState.day.select(calendarDateString(for: date))
                 appState.isStatsCalendarPresented = false
                 appState.popoverStatsService.endCalendar()
             }
@@ -527,23 +476,6 @@ struct StatsTabView: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    private struct StatsDatePillSurfaceModifier: ViewModifier {
-        @ViewBuilder
-        func body(content: Content) -> some View {
-            if SystemGlassSettings.shared.reduceTransparency {
-                content.background(Capsule().fill(PopupVisualTheme.controlBackground))
-            } else if #available(macOS 26.0, *) {
-                content.glassEffect(.regular.interactive(), in: Capsule())
-            } else {
-                content
-                    .background(Capsule().fill(.regularMaterial))
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(PopupVisualTheme.surfaceStroke, lineWidth: 0.7)
-                    }
-            }
-        }
-    }
 
     private struct HistoricalAwayStatsView: View {
         let date: String
@@ -676,30 +608,7 @@ struct StatsTabView: View {
         MenuBarTextFormatter.formatCompactDuration(seconds: seconds)
     }
 
-    private func statsTitle(for date: String) -> String {
-        let today =
-            appState.daemonConnection.currentDate.isEmpty
-            ? DailyFocusService.todayString()
-            : appState.daemonConnection.currentDate
-        let resolvedDate = date.isEmpty ? today : date
-        let semanticDate: String
-        if resolvedDate == today {
-            semanticDate = "Today"
-        } else if resolvedDate == CronaCalendarDate.adding(days: -1, to: today) {
-            semanticDate = "Yesterday"
-        } else if resolvedDate == CronaCalendarDate.adding(days: 1, to: today) {
-            semanticDate = "Tomorrow"
-        } else {
-            semanticDate = formattedPopoverDate(resolvedDate, appState: appState)
-        }
-        return semanticDate
-    }
 
-    private var statsTodayDate: String {
-        appState.daemonConnection.currentDate.isEmpty
-            ? DailyFocusService.todayString()
-            : appState.daemonConnection.currentDate
-    }
 
     private func displayDate(_ date: String) -> String {
         formattedPopoverDate(date, appState: appState)

@@ -30,11 +30,12 @@ struct HabitsTabView: View {
     @ViewBuilder
     private func habitsContent(snapshot: HabitsSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 16) {
+            PopoverDayHeader(appState: appState)
             HStack(spacing: 12) {
                 Image(systemName: "checklist.checked")
                     .foregroundStyle(PopupVisualTheme.semantic(.success))
                     .frame(width: 22)
-                Text(formattedPopoverDate(snapshot.date, appState: appState))
+                Text("Habits")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(PopupVisualTheme.primaryText)
                 Spacer()

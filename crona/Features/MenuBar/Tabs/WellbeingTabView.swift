@@ -40,6 +40,7 @@ struct WellbeingTabView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
+            PopoverDayHeader(appState: appState)
             header
             ratingRow(
                 title: "Mood",
@@ -156,7 +157,7 @@ struct WellbeingTabView: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(PopupVisualTheme.semantic(.mood))
                 .frame(width: leadingRailWidth)
-            Text(formattedPopoverDate(appState.daemonConnection.currentDate, appState: appState))
+            Text("Check-in")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(PopupVisualTheme.primaryText)
             Spacer()
@@ -355,7 +356,7 @@ struct WellbeingTabView: View {
         notes: String
     ) -> CronaDailyCheckInUpsertRequest {
         CronaDailyCheckInUpsertRequest(
-            date: DailyFocusService.todayString(),
+            date: wellbeingService.snapshot.date.nilIfEmpty ?? DailyFocusService.todayString(),
             mood: mood,
             energy: energy,
             sleepHours: sleepHours,

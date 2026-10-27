@@ -112,8 +112,11 @@ final class HabitsService: ObservableObject {
         }
     }
 
+    /// The shared popover day; nil follows the daemon's current date.
+    var selectedDate: String?
+
     func refresh(date requestedDate: String? = nil) async {
-        let daemonDate = requestedDate ?? daemonConnection.currentDate
+        let daemonDate = requestedDate ?? selectedDate ?? daemonConnection.currentDate
         let date = daemonDate.isEmpty ? DailyFocusService.todayString() : daemonDate
         snapshot.date = date
         snapshot.isLoading = true

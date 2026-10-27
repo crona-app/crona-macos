@@ -158,6 +158,9 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
                 "active": true, "repoId": 3, "repoName": "Repo", "streamName": "Stream"] as [String: Any]
         case "habit.delete", "issue.delete":
             result = ["ok": true]
+        case "habit.complete":
+            result = ["id": 1, "habitId": probe.params["habitId"]?.intValue ?? 0,
+                "date": probe.params["date"]?.stringValue ?? "", "status": "completed"] as [String: Any]
         case "habit.list_due":
             result = [Any]()
         case "repo.list":
