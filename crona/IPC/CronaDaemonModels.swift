@@ -437,15 +437,19 @@ struct CronaActiveContext: Codable, Equatable {
 struct CronaRepo: Codable, Equatable, Identifiable {
     let id: Int64
     let name: String
+    /// Made by Crona itself, like the Inbox; never offered as a destination.
+    var system: Bool? = nil
 }
 
 struct CronaStream: Codable, Equatable, Identifiable {
     let id: Int64
     let repoID: Int64
     let name: String
+    /// Made by Crona itself, like the Inbox; never offered as a destination.
+    var system: Bool? = nil
 
     enum CodingKeys: String, CodingKey {
-        case id, name
+        case id, name, system
         case repoID = "repoId"
     }
 }

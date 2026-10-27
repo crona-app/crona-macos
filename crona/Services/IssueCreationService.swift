@@ -18,6 +18,8 @@ final class IssueCreationService: ObservableObject {
     private let logger = Logger(subsystem: "com.crona.macos", category: "issueCreation")
 
     @Published private(set) var destinations: [IssueDestination] = []
+    /// Streams Crona made itself (the Inbox), kept out of `destinations`.
+    @Published private(set) var systemStreamIDs: Set<Int64> = []
     @Published private(set) var isLoadingDestinations = false
     @Published private(set) var isCreating = false
     @Published private(set) var lastErrorMessage: String?
@@ -33,14 +35,13 @@ final class IssueCreationService: ObservableObject {
         defer { isLoadingDestinations = false }
         do {
             let repos = try await daemonConnection.withClient { try await $0.listRepos() }
-            var loaded: [IssueDestination] = []
+            var streams: [Int64: [CronaStream]] = [:]
             for repo in repos {
-                let streams = try await daemonConnection.withClient { try await $0.listStreams(repoID: repo.id) }
-                loaded.append(contentsOf: streams.map {
-                    IssueDestination(repoID: repo.id, repoName: repo.name, streamID: $0.id, streamName: $0.name)
-                })
+                streams[repo.id] = try await daemonConnection.withClient { try await $0.listStreams(repoID: repo.id) }
             }
-            destinations = loaded.sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+            let visible = Self.visibleDestinations(repos: repos, streams: streams)
+            destinations = visible.destinations
+            systemStreamIDs = visible.systemStreamIDs
         } catch {
             logger.error("Loading issue destinations failed: \(error.localizedDescription, privacy: .private)")
             lastErrorMessage = error.localizedDescription
@@ -62,4 +63,24 @@ final class IssueCreationService: ObservableObject {
     }
 
     func clearError() { lastErrorMessage = nil }
+
+    /// Destinations a user may pick: every stream except the ones Crona made itself.
+    static func visibleDestinations(repos: [CronaRepo], streams: [Int64: [CronaStream]])
+        -> (destinations: [IssueDestination], systemStreamIDs: Set<Int64>)
+    {
+        var destinations: [IssueDestination] = []
+        var systemStreamIDs = Set<Int64>()
+        for repo in repos {
+            for stream in streams[repo.id] ?? [] {
+                if repo.system == true || stream.system == true {
+                    systemStreamIDs.insert(stream.id)
+                    continue
+                }
+                destinations.append(
+                    IssueDestination(repoID: repo.id, repoName: repo.name, streamID: stream.id, streamName: stream.name))
+            }
+        }
+        destinations.sort { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+        return (destinations, systemStreamIDs)
+    }
 }

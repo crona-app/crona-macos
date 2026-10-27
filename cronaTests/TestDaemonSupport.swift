@@ -75,6 +75,7 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
     var checkInByDate: [String: [String: Any]] = [:]
     var failCheckIn = false
     var failCarry = false
+    var provideInbox = false
     var failCarryUndo = false
     var suspendCarry = false
     private var carryContinuation: CheckedContinuation<Void, Never>?
@@ -188,9 +189,14 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
         case "habit.list_due":
             result = [Any]()
         case "repo.list":
-            result = provideDestinations ? [["id": 3, "name": "Repo"]] : []
+            result = (provideDestinations ? [["id": 3, "name": "Repo"]] : [])
+                + (provideInbox ? [["id": 90, "name": "Inbox", "system": true] as [String: Any]] : [])
         case "stream.list":
-            result = provideDestinations ? [["id": 7, "repoId": 3, "name": "Stream"]] : []
+            if probe.params["repoId"]?.intValue == 90 {
+                result = [["id": 91, "repoId": 90, "name": "Inbox", "system": true] as [String: Any]]
+            } else {
+                result = provideDestinations ? [["id": 7, "repoId": 3, "name": "Stream"]] : []
+            }
         default:
             result = NSNull()
         }
