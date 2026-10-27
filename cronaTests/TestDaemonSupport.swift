@@ -72,6 +72,8 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
     var healthDate: String?
     var todaySummaryIssuesFixture: [[String: Any]] = []
     var planEntriesFixture: [[String: Any]] = []
+    var checkInByDate: [String: [String: Any]] = [:]
+    var failCheckIn = false
     var refreshContinuation: CheckedContinuation<Void, Never>?
     private var startContinuation: CheckedContinuation<Void, Never>?
 
@@ -158,6 +160,9 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
                 "active": true, "repoId": 3, "repoName": "Repo", "streamName": "Stream"] as [String: Any]
         case "habit.delete", "issue.delete":
             result = ["ok": true]
+        case "checkin.get":
+            if failCheckIn { throw NSError(domain: "WellbeingTests", code: 1) }
+            result = checkInByDate[probe.params["date"]?.stringValue ?? ""] ?? NSNull()
         case "habit.complete":
             result = ["id": 1, "habitId": probe.params["habitId"]?.intValue ?? 0,
                 "date": probe.params["date"]?.stringValue ?? "", "status": "completed"] as [String: Any]

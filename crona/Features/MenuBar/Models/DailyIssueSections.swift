@@ -24,7 +24,8 @@ struct DailyIssueSections: Equatable {
     }
 
     static func build(issues: [CronaIssue], plan: CronaDailyPlan?, date: String) -> DailyIssueSections {
-        let open = issues.filter { $0.adhoc != true && !isClosed($0) }
+        let listed = issues.filter { $0.adhoc != true }
+        let open = listed.filter { !isClosed($0) }
         var plannedEntries: [Int64: CronaDailyPlanEntry] = [:]
         if let plan, plan.date == date {
             for entry in plan.entries where entry.status == "planned" {
@@ -36,10 +37,12 @@ struct DailyIssueSections: Equatable {
         }
 
         var sections = DailyIssueSections()
-        // Open pinned issues lead whatever their date, then the rest due that day.
+        // Open pinned issues lead whatever their date, then everything else due that day,
+        // closed or not, so a day keeps the work finished on it.
+        let leadsPlanned: (CronaIssue) -> Bool = { $0.pinnedDaily && !isClosed($0) }
         sections.planned =
-            open.filter(\.pinnedDaily).map(project)
-            + open.filter { !$0.pinnedDaily && due($0) == date }.map(project)
+            open.filter(leadsPlanned).map(project)
+            + listed.filter { !leadsPlanned($0) && due($0) == date }.map(project)
         sections.overdue = open.filter { issue in
             guard let due = due(issue) else { return false }
             return due < date

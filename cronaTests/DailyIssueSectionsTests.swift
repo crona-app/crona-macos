@@ -28,9 +28,12 @@ final class DailyIssueSectionsTests: XCTestCase {
         XCTAssertEqual(sections.planned.map(\.id), [2, 1])
     }
 
-    func testPlannedExcludesClosedPinnedAndClosedDueToday() {
-        let sections = build([issue(1, status: "done", pinned: true), issue(2, status: "abandoned", due: day)])
-        XCTAssertEqual(sections.planned.map(\.id), [])
+    func testPlannedExcludesClosedPinnedButKeepsClosedDueThatDay() {
+        let sections = build([
+            issue(1, status: "done", pinned: true), issue(2, status: "abandoned", due: day),
+            issue(3, status: "done", due: day),
+        ])
+        XCTAssertEqual(sections.planned.map(\.id), [2, 3])
     }
 
     func testOverdueIncludesOpenIssuesDueBeforeDay() {

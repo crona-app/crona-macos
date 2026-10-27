@@ -108,6 +108,7 @@ struct WellbeingTabView: View {
         .fixedSize(horizontal: false, vertical: true)
         .task { await wellbeingService.refresh() }
         .onChange(of: wellbeingService.snapshot.checkIn) { _, entry in load(entry) }
+        .onChange(of: wellbeingService.snapshot.date) { _, _ in load(wellbeingService.snapshot.checkIn) }
         .onChange(of: currentRequest) { _, _ in
             guard saveFeedback != nil else { return }
             feedbackDismissTask?.cancel()

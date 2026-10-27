@@ -24,6 +24,10 @@ final class WellbeingService: ObservableObject {
     func refresh(date requestedDate: String? = nil) async {
         let date = requestedDate ?? selectedDate ?? daemonConnection.currentDate
         let resolvedDate = date.isEmpty ? DailyFocusService.todayString() : date
+        if resolvedDate != snapshot.date {
+            // Never let one day's check-in stand in for another while loading or after a failure.
+            snapshot.checkIn = nil
+        }
         snapshot.date = resolvedDate
         snapshot.isLoading = true
         snapshot.lastErrorDescription = nil

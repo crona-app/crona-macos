@@ -117,4 +117,18 @@ final class PopoverDayModelTests: DaemonTestCase {
         XCTAssertEqual(appState.day.selectedDate, transport.logicalDate)
         XCTAssertEqual(dates(transport, "habit.list_due").last, transport.logicalDate)
     }
+
+    func testWellbeingDropsPreviousDayCheckInWhenDayChanges() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        transport.checkInByDate[transport.logicalDate] = ["date": transport.logicalDate, "mood": 4, "energy": 3]
+        let wellbeing = WellbeingService(daemonConnection: connection)
+        await wellbeing.refresh()
+        XCTAssertEqual(wellbeing.snapshot.checkIn?.mood, 4)
+
+        transport.failCheckIn = true
+        await wellbeing.refresh(date: CronaCalendarDate.adding(days: -1, to: transport.logicalDate))
+
+        XCTAssertNil(wellbeing.snapshot.checkIn)
+    }
 }
