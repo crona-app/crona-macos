@@ -69,13 +69,17 @@ struct TagChip: View {
     let color: Color
 
     var body: some View {
-        Text(TagPresentation.label(for: name))
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(color)
-            .lineLimit(1)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(color.opacity(0.16)))
+        HStack(spacing: 5) {
+            Circle().fill(color).frame(width: 7, height: 7)
+            Text(name == CronaTagFilter.untagged ? "Untagged" : name)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(PopupVisualTheme.primaryText)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(PopupVisualTheme.primaryText.opacity(0.08)))
+        .overlay(Capsule().strokeBorder(color.opacity(0.45), lineWidth: 1))
     }
 }
 
@@ -87,12 +91,9 @@ struct TagDetailSection: View {
     var body: some View {
         if !tags.isEmpty {
             DetailSection(title: "Tags", icon: TagPresentation.icon) {
-                ViewThatFits(in: .horizontal) {
-                    TagChipsView(tags: tags, tagsModel: tagsModel, limit: nil)
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(tags, id: \.self) { name in
-                            TagChipsView(tags: [name], tagsModel: tagsModel, limit: nil)
-                        }
+                TagFlowLayout(spacing: 6) {
+                    ForEach(tags, id: \.self) { name in
+                        TagChip(name: name, color: TagPresentation.color(named: tagsModel.color(for: name)))
                     }
                 }
             }

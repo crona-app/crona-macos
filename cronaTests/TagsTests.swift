@@ -405,4 +405,16 @@ final class TagsTests: DaemonTestCase {
         XCTAssertEqual(TagInput.committing("a, b,a", into: ["x"]), ["x", "a", "b"])
         XCTAssertEqual(TagInput.committing("  ", into: ["x"]), ["x"])
     }
+
+    func testTagSuggestionsMatchAndOfferNew() {
+        let existing = ["work", "workout", "home", "deep-work"]
+        XCTAssertEqual(
+            TagSuggestions.make(draft: "wo", existing: existing, selected: ["work"]),
+            [.existing("workout"), .existing("deep-work"), .create("wo")])
+        XCTAssertEqual(
+            TagSuggestions.make(draft: "Home", existing: existing, selected: []), [.existing("home")])
+        XCTAssertEqual(TagSuggestions.make(draft: "", existing: existing, selected: ["home"]).count, 3)
+        XCTAssertEqual(TagSuggestions.make(draft: "!!", existing: existing, selected: []), [])
+        XCTAssertEqual(TagSuggestions.make(draft: "work", existing: existing, selected: ["work"]), [.existing("workout"), .existing("deep-work")])
+    }
 }

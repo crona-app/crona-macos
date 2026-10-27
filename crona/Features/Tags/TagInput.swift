@@ -29,3 +29,34 @@ enum TagInput {
         ("a"..."z").contains(scalar) || ("0"..."9").contains(scalar)
     }
 }
+
+enum TagSuggestion: Hashable {
+    case existing(String)
+    case create(String)
+
+    var name: String {
+        switch self {
+        case .existing(let name), .create(let name): name
+        }
+    }
+}
+
+/// What the tag field offers for the typed text: matching tags (prefix matches first), then the typed name as new.
+enum TagSuggestions {
+    static let limit = 6
+
+    static func make(draft: String, existing: [String], selected: [String]) -> [TagSuggestion] {
+        let query = draft.trimmingCharacters(in: .whitespaces).lowercased()
+        let available = existing.filter { !selected.contains($0) }
+        guard !query.isEmpty else { return available.prefix(limit).map(TagSuggestion.existing) }
+        let normalized = TagInput.normalize(query)
+        let needle = normalized ?? query
+        let prefixed = available.filter { $0.hasPrefix(needle) }
+        let contained = available.filter { !$0.hasPrefix(needle) && $0.contains(needle) }
+        var result = (prefixed + contained).prefix(limit).map(TagSuggestion.existing)
+        if let normalized, !existing.contains(normalized), !selected.contains(normalized) {
+            result.append(.create(normalized))
+        }
+        return result
+    }
+}
