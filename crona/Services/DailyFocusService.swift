@@ -63,6 +63,26 @@ struct DailyFocusIssue: Equatable, Identifiable {
     }
 }
 
+extension DailyFocusIssue {
+    init(issue: CronaIssue, penalty: DailyFocusPenalty? = nil) {
+        self.init(
+            id: issue.id,
+            streamID: issue.streamID,
+            title: issue.title,
+            status: issue.status,
+            estimateMinutes: issue.estimateMinutes,
+            workedSeconds: issue.workedSeconds,
+            todoForDate: issue.todoForDate,
+            repoName: issue.repoName,
+            streamName: issue.streamName,
+            description: issue.description,
+            notes: issue.notes,
+            pinnedDaily: issue.pinnedDaily,
+            penalty: penalty
+        )
+    }
+}
+
 struct DailyFocusSnapshot: Equatable {
     var date = ""
     var issues: [DailyFocusIssue] = []
@@ -185,21 +205,7 @@ final class DailyFocusService: ObservableObject {
     private static func project(_ issue: CronaIssue, penalty: DailyFocusPenalty? = nil)
         -> DailyFocusIssue
     {
-        DailyFocusIssue(
-            id: issue.id,
-            streamID: issue.streamID,
-            title: issue.title,
-            status: issue.status,
-            estimateMinutes: issue.estimateMinutes,
-            workedSeconds: issue.workedSeconds,
-            todoForDate: issue.todoForDate,
-            repoName: issue.repoName,
-            streamName: issue.streamName,
-            description: issue.description,
-            notes: issue.notes,
-            pinnedDaily: issue.pinnedDaily,
-            penalty: penalty
-        )
+        DailyFocusIssue(issue: issue, penalty: penalty)
     }
 
     static func todayString(now: Date = Date()) -> String {
