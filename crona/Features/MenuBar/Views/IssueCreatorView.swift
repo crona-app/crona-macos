@@ -60,6 +60,11 @@ struct IssueCreatorView: View {
                 }
                 .creatorField(isFocused: focusedField == .description)
 
+            if issueCreator.issueBeingEdited == nil {
+                Text("Tags (optional)").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                TagFieldView(tags: $issueCreator.tags, tagsModel: appState.tags)
+            }
+
             Text("Estimate (optional) and scheduled date").font(.caption.weight(.medium)).foregroundStyle(.secondary)
             HStack(spacing: 10) {
                 TextField("Estimate (e.g. 45m, 1h30m)", text: $issueCreator.estimate)
@@ -435,6 +440,10 @@ struct HabitCreatorView: View {
                 .textFieldStyle(.plain)
                 .lineLimit(2...4)
                 .creatorField()
+
+            if habitEditor.habitBeingEdited == nil {
+                TagFieldView(tags: $habitEditor.tags, tagsModel: appState.tags)
+            }
 
             if habitEditor.habitBeingEdited != nil {
                 Toggle("Active", isOn: $habitEditor.active)

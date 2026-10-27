@@ -257,4 +257,24 @@ final class TagsTests: DaemonTestCase {
         XCTAssertEqual(filtered.items.map(\.id), [1])
         XCTAssertEqual(snapshot.filtered(by: CronaTagFilter(), known: []).items.count, 2)
     }
+
+    // MARK: - Input
+
+    func testTagInputNormalizes() {
+        XCTAssertEqual(TagInput.normalize("Deep Work"), "deep-work")
+        XCTAssertEqual(TagInput.normalize(" +Urgent "), "urgent")
+        XCTAssertEqual(TagInput.normalize("team/api_v2"), "team/api_v2")
+        XCTAssertNil(TagInput.normalize(""))
+        XCTAssertNil(TagInput.normalize("untagged"))
+        XCTAssertNil(TagInput.normalize("-x"))
+        XCTAssertNil(TagInput.normalize("a!"))
+        XCTAssertNil(TagInput.normalize(String(repeating: "a", count: 33)))
+        XCTAssertEqual(TagInput.normalize(String(repeating: "a", count: 32))?.count, 32)
+    }
+
+    func testTagInputAddsWithoutDuplicates() {
+        XCTAssertEqual(TagInput.adding("Work", to: ["work"]), ["work"])
+        XCTAssertEqual(TagInput.adding("home", to: ["work"]), ["work", "home"])
+        XCTAssertEqual(TagInput.adding("!!", to: ["work"]), ["work"])
+    }
 }

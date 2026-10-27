@@ -7,6 +7,7 @@ final class IssueCreatorModel: ObservableObject {
     @Published var title = ""
     @Published var description = ""
     @Published var estimate = ""
+    @Published var tags: [String] = []
     @Published var dueDate: Date?
     @Published var destinationID: Int64?
     @Published private(set) var isPresented = false
@@ -72,6 +73,7 @@ final class IssueCreatorModel: ObservableObject {
         title = ""
         description = ""
         estimate = ""
+        tags = []
         dueDate = defaultDueDate
         destinationID = contextService.snapshot.streamID
         isContentVisible = false
@@ -174,7 +176,8 @@ final class IssueCreatorModel: ObservableObject {
             title: title,
             description: description.isEmpty ? nil : description,
             estimateMinutes: estimate,
-            todoForDate: logicalDate
+            todoForDate: logicalDate,
+            tags: tags.isEmpty ? nil : tags
         )
         Task {
             defer { isSubmitting = false }
@@ -203,6 +206,7 @@ final class IssueCreatorModel: ObservableObject {
                 self.title = ""
                 self.description = ""
                 self.estimate = ""
+                self.tags = []
                 destinationID = created.streamID
             case .focus:
                 successDismissTask?.cancel()

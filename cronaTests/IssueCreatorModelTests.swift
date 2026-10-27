@@ -216,4 +216,38 @@ final class IssueCreatorModelTests: DaemonTestCase {
         await waitForIssueCreator { !appState.issueCreator.isSubmitting }
         XCTAssertEqual(appState.selectedFocusIssue?.id, 42)
     }
+
+    func testIssueCreatorSendsTags() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+        appState.issueCreator.presentCreator()
+        await settleAsyncTasks()
+        appState.issueCreator.title = "Tagged"
+        appState.issueCreator.destinationID = 7
+        appState.issueCreator.tags = ["work", "deep-work"]
+
+        appState.issueCreator.submit(followUp: .more)
+        await waitForIssueCreator { !appState.issueCreator.isSubmitting }
+
+        let create = try XCTUnwrap(transport.requests.first { $0.method == "issue.create" })
+        XCTAssertEqual(create.params["tags"]?.stringArrayValue, ["work", "deep-work"])
+        XCTAssertEqual(appState.issueCreator.tags, [])
+    }
+
+    func testIssueCreatorOmitsEmptyTags() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+        appState.issueCreator.presentCreator()
+        await settleAsyncTasks()
+        appState.issueCreator.title = "Plain"
+        appState.issueCreator.destinationID = 7
+
+        appState.issueCreator.submit(followUp: .more)
+        await waitForIssueCreator { !appState.issueCreator.isSubmitting }
+
+        let create = try XCTUnwrap(transport.requests.first { $0.method == "issue.create" })
+        XCTAssertNil(create.params["tags"])
+    }
 }

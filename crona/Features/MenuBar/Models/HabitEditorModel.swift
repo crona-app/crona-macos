@@ -5,6 +5,7 @@ import Foundation
 final class HabitEditorModel: ObservableObject {
     @Published var name = ""
     @Published var description = ""
+    @Published var tags: [String] = []
     @Published var destinationID: Int64?
     @Published var scheduleType = "daily"
     @Published var weekdays: Set<Int> = []
@@ -43,6 +44,7 @@ final class HabitEditorModel: ObservableObject {
         habitsService.clearManagementError()
         name = ""
         description = ""
+        tags = []
         destinationID = contextService.snapshot.streamID
         scheduleType = "daily"
         weekdays = []
@@ -146,7 +148,8 @@ final class HabitEditorModel: ObservableObject {
                         description: description.isEmpty ? nil : description,
                         scheduleType: schedule,
                         weekdays: weekdays,
-                        targetMinutes: targetMinutes
+                        targetMinutes: targetMinutes,
+                        tags: tags.isEmpty ? nil : tags
                     ),
                     refreshDate: refreshDate
                 )
