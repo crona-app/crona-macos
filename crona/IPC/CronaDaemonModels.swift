@@ -743,6 +743,10 @@ struct CronaDailyPlanEntry: Codable, Equatable, Identifiable {
     }
 }
 
+struct CronaCarryIssueRequest: Codable, Equatable {
+    let id: Int64
+}
+
 struct CronaDailyPlanEntryPenalty: Codable, Equatable {
     let highRisk: Bool
     let highRiskThreshold: Double

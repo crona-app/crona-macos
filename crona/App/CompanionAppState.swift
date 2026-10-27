@@ -149,6 +149,14 @@ final class CompanionAppState: ObservableObject {
 
     private(set) lazy var dailyIssues = DailyIssuesModel(daemonConnection: daemonConnection, day: day)
 
+    private(set) lazy var carryOver = CarryOverModel(
+        daemonConnection: daemonConnection,
+        onChanged: { [weak self] in
+            await self?.dailyIssues.refresh()
+            await self?.dailyFocusService.refresh()
+        }
+    )
+
     /// Points every day-based tab at the shared day and reloads them.
     func refreshSelectedDay() async {
         let date = day.selectedDate

@@ -74,6 +74,10 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
     var planEntriesFixture: [[String: Any]] = []
     var checkInByDate: [String: [String: Any]] = [:]
     var failCheckIn = false
+    var failCarry = false
+    var failCarryUndo = false
+    var suspendCarry = false
+    private var carryContinuation: CheckedContinuation<Void, Never>?
     var refreshContinuation: CheckedContinuation<Void, Never>?
     private var startContinuation: CheckedContinuation<Void, Never>?
 
@@ -81,6 +85,12 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
         suspendRefresh = false
         refreshContinuation?.resume()
         refreshContinuation = nil
+    }
+
+    func resumeCarry() {
+        suspendCarry = false
+        carryContinuation?.resume()
+        carryContinuation = nil
     }
 
     func resumeStart() {
@@ -160,6 +170,15 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
                 "active": true, "repoId": 3, "repoName": "Repo", "streamName": "Stream"] as [String: Any]
         case "habit.delete", "issue.delete":
             result = ["ok": true]
+        case "issue.carry", "issue.carry.undo":
+            if probe.method == "issue.carry", suspendCarry {
+                await withCheckedContinuation { carryContinuation = $0 }
+            }
+            if probe.method == "issue.carry" ? failCarry : failCarryUndo {
+                throw NSError(domain: "CarryOverTests", code: 1)
+            }
+            result = ["id": probe.params["id"]?.intValue ?? 0, "streamId": 7, "title": "Carried",
+                "status": "planned", "workedSeconds": 0, "pinnedDaily": false] as [String: Any]
         case "checkin.get":
             if failCheckIn { throw NSError(domain: "WellbeingTests", code: 1) }
             result = checkInByDate[probe.params["date"]?.stringValue ?? ""] ?? NSNull()

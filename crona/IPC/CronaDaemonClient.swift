@@ -275,6 +275,15 @@ final class CronaDaemonClient {
         )
     }
 
+    /// Carries the issue to the next working day; the core picks the date.
+    func carryIssue(issueID: Int64) async throws -> CronaIssue {
+        try await request(method: "issue.carry", params: AnyEncodable(CronaCarryIssueRequest(id: issueID)))
+    }
+
+    func undoCarry(issueID: Int64) async throws -> CronaIssue {
+        try await request(method: "issue.carry.undo", params: AnyEncodable(CronaNumericIDRequest(id: issueID)))
+    }
+
     func dailyPlanGet(date: String) async throws -> CronaDailyPlan {
         try await request(method: "daily_plan.get", params: AnyEncodable(CronaDailyPlanQuery(date: date)))
     }
