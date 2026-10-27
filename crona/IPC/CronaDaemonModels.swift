@@ -719,6 +719,9 @@ struct CronaDailyPlanEntry: Codable, Equatable, Identifiable {
     let maxDelayedDays: Int
     let failScore: Double
     var penalty: CronaDailyPlanEntryPenalty? = nil
+    var carriedFromDate: String? = nil
+    var carryCount: Int? = nil
+    var stalled: Bool? = nil
 
     enum CodingKeys: String, CodingKey {
         case id = "id"
@@ -734,6 +737,9 @@ struct CronaDailyPlanEntry: Codable, Equatable, Identifiable {
         case maxDelayedDays = "maxDelayedDays"
         case failScore = "failScore"
         case penalty = "penalty"
+        case carriedFromDate = "carriedFromDate"
+        case carryCount = "carryCount"
+        case stalled = "stalled"
     }
 }
 

@@ -17,6 +17,19 @@ struct DailyFocusPenalty: Equatable {
     }
 }
 
+struct DailyFocusCarry: Equatable {
+    let count: Int
+    let stalled: Bool
+    let fromDate: String?
+
+    static func from(_ entry: CronaDailyPlanEntry) -> DailyFocusCarry? {
+        let count = entry.carryCount ?? 0
+        let stalled = entry.stalled ?? false
+        guard count > 0 || stalled else { return nil }
+        return DailyFocusCarry(count: count, stalled: stalled, fromDate: entry.carriedFromDate)
+    }
+}
+
 struct DailyFocusIssue: Equatable, Identifiable {
     let id: Int64
     let streamID: Int64
@@ -31,6 +44,9 @@ struct DailyFocusIssue: Equatable, Identifiable {
     let notes: String?
     let pinnedDaily: Bool?
     let penalty: DailyFocusPenalty?
+    let carry: DailyFocusCarry?
+    /// The shown day's plan carried this issue to a later day.
+    let carriedAway: Bool
 
     init(
         id: Int64,
@@ -45,7 +61,9 @@ struct DailyFocusIssue: Equatable, Identifiable {
         description: String? = nil,
         notes: String? = nil,
         pinnedDaily: Bool? = nil,
-        penalty: DailyFocusPenalty? = nil
+        penalty: DailyFocusPenalty? = nil,
+        carry: DailyFocusCarry? = nil,
+        carriedAway: Bool = false
     ) {
         self.id = id
         self.streamID = streamID
@@ -60,11 +78,16 @@ struct DailyFocusIssue: Equatable, Identifiable {
         self.notes = notes
         self.pinnedDaily = pinnedDaily
         self.penalty = penalty
+        self.carry = carry
+        self.carriedAway = carriedAway
     }
 }
 
 extension DailyFocusIssue {
-    init(issue: CronaIssue, penalty: DailyFocusPenalty? = nil) {
+    init(
+        issue: CronaIssue, penalty: DailyFocusPenalty? = nil, carry: DailyFocusCarry? = nil,
+        carriedAway: Bool = false
+    ) {
         self.init(
             id: issue.id,
             streamID: issue.streamID,
@@ -78,7 +101,9 @@ extension DailyFocusIssue {
             description: issue.description,
             notes: issue.notes,
             pinnedDaily: issue.pinnedDaily,
-            penalty: penalty
+            penalty: penalty,
+            carry: carry,
+            carriedAway: carriedAway
         )
     }
 }

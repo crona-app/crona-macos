@@ -76,4 +76,45 @@ final class DailyIssueSectionsTests: XCTestCase {
         XCTAssertEqual(sections.issues(in: .overdue).map(\.id), [2])
         XCTAssertEqual(sections.issues(in: .upcoming).map(\.id), [3])
     }
+
+    private func planEntryJSON(_ extra: String) -> Data {
+        Data((#"{"id":"e","date":"2026-10-27","issueId":1,"source":"todo_for_date","status":"planned","committedAt":"","baselineDate":"2026-10-27","currentPlannedDate":"2026-10-27","postponeCount":0,"currentDelayedDays":0,"maxDelayedDays":0,"failScore":0"# + extra + "}").utf8)
+    }
+
+    func testPlanEntryDecodesCarryFields() throws {
+        let entry = try JSONDecoder().decode(CronaDailyPlanEntry.self,
+            from: planEntryJSON(#","carryCount":2,"stalled":true,"carriedFromDate":"2026-10-26""#))
+        XCTAssertEqual(entry.carryCount, 2)
+        XCTAssertEqual(entry.stalled, true)
+        XCTAssertEqual(entry.carriedFromDate, "2026-10-26")
+        XCTAssertEqual(DailyFocusCarry.from(entry), DailyFocusCarry(count: 2, stalled: true, fromDate: "2026-10-26"))
+    }
+
+    func testPlanEntryWithoutCarryFieldsDecodes() throws {
+        let entry = try JSONDecoder().decode(CronaDailyPlanEntry.self, from: planEntryJSON(""))
+        XCTAssertNil(entry.carryCount)
+        XCTAssertNil(DailyFocusCarry.from(entry))
+    }
+
+    private func carriedEntry(_ issueID: Int64) -> CronaDailyPlanEntry {
+        CronaDailyPlanEntry(id: "c\(issueID)", date: day, issueID: issueID, source: "todo_for_date", status: "carried", committedAt: "", baselineDate: day, currentPlannedDate: "2026-10-28", postponeCount: 0, currentDelayedDays: 0, maxDelayedDays: 0, failScore: 0)
+    }
+
+    func testPlannedIncludesCarriedAwayIssuesNotDueThatDay() {
+        let sections = build(
+            [issue(1, due: day), issue(2, due: "2026-10-28"), issue(3, due: "2026-10-28", pinned: true)],
+            plan([carriedEntry(2), carriedEntry(3)]))
+        XCTAssertEqual(sections.planned.map(\.id), [3, 1, 2])
+        XCTAssertEqual(sections.planned.first { $0.id == 2 }?.carriedAway, true)
+        XCTAssertEqual(sections.planned.first { $0.id == 1 }?.carriedAway, false)
+        XCTAssertEqual(sections.upcoming.map(\.id), [2, 3])
+    }
+
+    func testPlannedEntryAttachesCarry() {
+        var planned = entry(1)
+        planned.carryCount = 1
+        planned.carriedFromDate = "2026-10-26"
+        let sections = build([issue(1, due: day)], plan([planned]))
+        XCTAssertEqual(sections.planned.first?.carry, DailyFocusCarry(count: 1, stalled: false, fromDate: "2026-10-26"))
+    }
 }
