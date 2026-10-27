@@ -36,7 +36,7 @@ If the discovery file is missing, the app still boots, but runtime-backed surfac
 
 ## Protocol Compatibility
 
-The app requires daemon protocol `1.6`. Earlier or different protocol versions show a connection error before runtime-backed actions are enabled.
+The app requires daemon protocol `1.7`. Earlier or different protocol versions show a connection error before runtime-backed actions are enabled.
 
 Ad hoc timers preserve the daemon's active context. Completion can attach to an existing issue, create an issue and then attach, or keep a concluded ad hoc record. Issue creation and attachment are separate requests; a successful creation is retained in the session draft if attachment needs to be retried.
 

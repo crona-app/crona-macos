@@ -31,7 +31,7 @@ final class AdhocSessionTests: DaemonTestCase {
         XCTAssertEqual(object["issueId"] as? Int, 42)
         XCTAssertEqual(object["commitMessage"] as? String, "Work")
         XCTAssertNil(object["newIssueTitle"])
-        XCTAssertEqual(CronaProtocolVersion.current.rawValue, "1.6")
+        XCTAssertEqual(CronaProtocolVersion.current.rawValue, "1.7")
     }
 
     func testAdhocPickerFiltersEligibilityAndLogicalDate() throws {
