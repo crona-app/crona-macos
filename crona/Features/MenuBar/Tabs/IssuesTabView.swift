@@ -23,9 +23,8 @@ struct IssuesTabView: View {
             } else if appState.selectedFocusIssue != nil || appState.isAdhocStartSelected {
                 fitOrScroll { FocusStartConfigView(appState: appState, issue: appState.selectedFocusIssue) }
             } else {
-                fitOrScroll {
-                    IdleFocusView(appState: appState)
-                }
+                // Scrolls only its issue list, so the day pill and section switch stay put.
+                IdleFocusView(appState: appState)
             }
         case .connecting, .disconnected, .idle:
             fitOrScroll {
@@ -291,8 +290,11 @@ struct IdleFocusView: View {
         self.dailyIssues = appState.dailyIssues
     }
 
+    /// Room left for the issue list once the pinned header and footer are laid out.
+    private static let listMaxHeight: CGFloat = 340
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             PopoverDayHeader(appState: appState)
 
             if appState.coreSettingsService.isSaving {
@@ -303,6 +305,17 @@ struct IdleFocusView: View {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.9))
+            }
+
+            DailySectionPicker(dailyIssues: dailyIssues)
+
+            ViewThatFits(in: .vertical) {
+                issueList
+                ScrollView(.vertical) {
+                    issueList.padding(.vertical, 2)
+                }
+                .scrollIndicators(.hidden)
+                .frame(maxHeight: Self.listMaxHeight)
             }
 
             Button(action: appState.beginAdhocStart) {
@@ -320,25 +333,6 @@ struct IdleFocusView: View {
                 .contentShape(RoundedRectangle(cornerRadius: 16))
             }
             .buttonStyle(GlassPressButtonStyle())
-
-            DailySectionPicker(dailyIssues: dailyIssues)
-
-            let sectionIssues = dailyIssues.sections.issues(in: dailyIssues.section)
-            if sectionIssues.isEmpty {
-                PlaceholderPanel(
-                    icon: "checkmark.circle",
-                    title: DailySectionPicker.emptyText(for: dailyIssues.section),
-                    subtitle: DailySectionPicker.emptyHint(for: dailyIssues.section)
-                )
-            } else {
-                VStack(spacing: 12) {
-                    ForEach(sectionIssues) { issue in
-                        FocusIssueRow(appState: appState, issue: issue) {
-                            appState.selectFocusIssue(issue)
-                        }
-                    }
-                }
-            }
 
             if let error = issueActionsService.lastErrorMessage {
                 HStack(spacing: 7) {
@@ -358,6 +352,26 @@ struct IdleFocusView: View {
                 .font(.caption)
                 .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.72))
                 .padding(.horizontal, 4)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var issueList: some View {
+        let sectionIssues = dailyIssues.sections.issues(in: dailyIssues.section)
+        if sectionIssues.isEmpty {
+            PlaceholderPanel(
+                icon: "checkmark.circle",
+                title: DailySectionPicker.emptyText(for: dailyIssues.section),
+                subtitle: DailySectionPicker.emptyHint(for: dailyIssues.section)
+            )
+        } else {
+            VStack(spacing: 12) {
+                ForEach(sectionIssues) { issue in
+                    FocusIssueRow(appState: appState, issue: issue) {
+                        appState.selectFocusIssue(issue)
+                    }
+                }
             }
         }
     }
