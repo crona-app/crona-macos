@@ -464,6 +464,7 @@ final class CompanionAppState: ObservableObject {
             || endSession.isSheetPresented
             || issueActions.editor != nil
             || issueCreator.isPresented
+            || issueCapture.isPresented
     }
 
     func start() {

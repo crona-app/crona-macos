@@ -320,21 +320,37 @@ struct IdleFocusView: View {
 
             CarryUndoToast(carryOver: appState.carryOver)
 
-            Button(action: appState.beginAdhocStart) {
-                HStack(spacing: 10) {
-                    Image(systemName: "timer").foregroundStyle(PopupVisualTheme.semantic(.focus))
-                    Text("Start Ad Hoc").font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(PopupVisualTheme.tertiaryText)
+            HStack(spacing: 8) {
+                Button(action: appState.beginAdhocStart) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "timer").foregroundStyle(PopupVisualTheme.semantic(.focus))
+                        Text("Start Ad Hoc").font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(PopupVisualTheme.tertiaryText)
+                    }
+                    .foregroundStyle(PopupVisualTheme.primaryText)
+                    .padding(14)
+                    .background(subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 16))
+                    .contentShape(RoundedRectangle(cornerRadius: 16))
                 }
-                .foregroundStyle(PopupVisualTheme.primaryText)
-                .padding(14)
-                .background(subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 16))
-                .contentShape(RoundedRectangle(cornerRadius: 16))
+                .buttonStyle(GlassPressButtonStyle())
+
+                Button(action: appState.issueCapture.present) {
+                    Image(systemName: "text.badge.plus")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(PopupVisualTheme.primaryText)
+                        .frame(width: 48)
+                        .frame(maxHeight: .infinity)
+                        .background(subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 16))
+                        .contentShape(RoundedRectangle(cornerRadius: 16))
+                }
+                .buttonStyle(GlassPressButtonStyle())
+                .help("Capture issues")
+                .accessibilityLabel("Capture issues")
             }
-            .buttonStyle(GlassPressButtonStyle())
+            .fixedSize(horizontal: false, vertical: true)
 
             if let error = issueActionsService.lastErrorMessage {
                 HStack(spacing: 7) {
