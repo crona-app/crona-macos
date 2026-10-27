@@ -1,6 +1,6 @@
 # Spec: tags in the macOS app
 
-Status: **approved surface, awaiting implementation plan**. Core reference: `crona` commits `43ef99a` through `e86971c` (since `v1.10.0-beta.2`).
+Status: **built on `feat/tags`**. Core reference: `crona` commits `43ef99a` through `e86971c` (since `v1.10.0-beta.2`).
 
 ## Goal
 
@@ -12,15 +12,15 @@ Show tags on issues and habits, filter by them the same way the TUI does, tag it
 
 | Surface | Behavior |
 |---|---|
-| Issues and Habits rows | Up to 2 tag chips in each tag's color, then `+N`. |
+| Issues and Habits rows | Up to 2 tag chips beside the title in each tag's color, then `+N`. |
 | Issue and habit details | All tags. |
-| Filter | A tag filter menu at the top of the Issues and Habits tabs. Reads and writes the shared `tagFilters` core setting, so the TUI and the Mac app stay in sync. |
-| Stats tab | `Focus by tag`: top 5 tags by focused time for today and this week, from distribution data grouped by `tag`. |
+| Filter | A tag filter icon menu (Show / Hide / Clear, including `Untagged`) beside the Issues section switch and at the left of the Habits day pill. It reads and writes the `issues` and `habits` entries of the shared `tagFilters` core setting (`+a -b` queries, the TUI's format) and reloads on `settings.changed`, so the TUI and the Mac app stay in sync. Tags in a saved filter that no longer exist are ignored. |
+| Stats tab | `Focus by tag`: top 5 tags by focused time for the shown day or its week (Monday through that day), from distribution data grouped by `tag`. |
 
 ## Actions
 
-- **Tag field in the issue creator** (`IssueCreatorView` / `IssueCreatorModel`): suggests existing tags from `tag.list`, accepts new ones. Tags are sent with the create, or applied right after create with `issue.tags.set` if `issue.create` does not accept tags. Confirm when planning.
-- **Edit tags…** in the issue and habit action menus. Saves with `issue.tags.set` / `habit.tags.set`.
+- **Tag field in the issue and habit creators** (create only): suggests existing tags from `tag.list` and accepts new ones, normalized like the kernel. Tags are sent with `issue.create` / `habit.create`.
+- **Edit Tags…** in the issue and habit menus opens a small sheet (`TagEditorModel` / `TagEditorView`). Saves with `issue.tags.set` / `habit.tags.set`.
 
 Out of scope: `tag.rename`, `tag.set_color`, `tag.delete`, `tag.remove_unused`; a tag management screen.
 
@@ -33,14 +33,14 @@ Out of scope: `tag.rename`, `tag.set_color`, `tag.delete`, `tag.remove_unused`; 
 
 ## Ownership
 
-- New `TagsModel` in `Features/MenuBar/Models/`, owned by `CompanionAppState` as a `private(set) lazy var`. It caches `tag.list`, refreshes on tag op events (`OpEntityTag`), and owns the filter selection.
+- New feature folder `Features/Tags/`. `TagsModel` is owned by `CompanionAppState` as `private(set) lazy var tags`; it caches `tag.list`, reloads on `tags.changed` and `settings.changed`, and owns the filter selection. `TagEditorModel` (`tagEditor`) and `TagFocusModel` (`tagFocus`) are owned the same way.
 - Tag field state lives in `IssueCreatorModel` / `HabitEditorModel`, reusing `TagsModel` for suggestions.
 - Views that show chips or the filter hold `TagsModel` as `@ObservedObject`.
-- `StatsTabView.swift` is already large; put the Focus-by-tag section in a new view file.
+- `StatsTabView.swift` is already large; the Focus-by-tag section is `Features/Tags/Views/FocusByTagSection.swift`.
 
 ## Testing
 
-New `cronaTests/TagsModelTests.swift` on `DaemonTestCase`; extend the fake daemon with tag methods and `tagFilters`.
+New `cronaTests/TagsTests.swift` on `DaemonTestCase`; extend the fake daemon with tag methods and `tagFilters`.
 
 - Tag list loads and refreshes on a tag event.
 - Filter selection round-trips through `tagFilters`.
