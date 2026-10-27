@@ -30,8 +30,8 @@ No new daemon methods. The data arrives through the existing `daily_plan.get` ca
 
 ## Ownership
 
-- `DailyFocusService` already owns the daily plan; add a derived lookup `highRiskIssueIDs: Set<Int64>` and `highRiskCount`.
-- Row and details views read it through an `@ObservedObject` reference to the service (see AGENTS.md on nested `ObservableObject`s).
+- `DailyFocusService.buildIssues` copies a `DailyFocusPenalty` (high risk, delayed days, becomes-high-risk-if-postponed) onto each `DailyFocusIssue` built from a `planned` entry; `DailyFocusSnapshot.highRiskCount` counts them. Rows and details read the penalty from the issue they already hold.
+- Stats holds `DailyFocusService` as an `@ObservedObject` (see AGENTS.md on nested `ObservableObject`s) and shows the count only when its day matches the daily focus date.
 - Shared presentation (marker color, detail text) goes in a new `crona/Shared/CronaPenaltyPresentation.swift`, next to `CronaIssueStatusPresentation.swift`.
 
 ## Testing

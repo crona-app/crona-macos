@@ -116,4 +116,25 @@ final class DelayPenaltyTests: DaemonTestCase {
         let calm = DailyFocusSnapshot(date: "2026-10-27", issues: [], isConnected: true)
         XCTAssertNil(CronaPenaltyPresentation.statsHighRiskCount(statsDate: "2026-10-27", focus: calm))
     }
+
+    func testDailyFocusRefreshAppliesPenaltyFromDaemon() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        transport.todaySummaryIssuesFixture = [[
+            "id": 1, "streamId": 7, "title": "Risky", "status": "planned", "workedSeconds": 0,
+            "pinnedDaily": false, "todoForDate": transport.logicalDate,
+        ]]
+        transport.planEntriesFixture = [[
+            "id": "entry-1", "date": transport.logicalDate, "issueId": 1, "source": "todo_for_date",
+            "status": "planned", "committedAt": "", "baselineDate": transport.logicalDate,
+            "currentPlannedDate": transport.logicalDate, "postponeCount": 2, "currentDelayedDays": 2,
+            "maxDelayedDays": 2, "failScore": 3.1,
+            "penalty": ["highRisk": true, "highRiskThreshold": 2.5],
+        ]]
+        let daily = DailyFocusService(daemonConnection: connection)
+
+        await daily.refresh(date: transport.logicalDate)
+
+        XCTAssertEqual(daily.snapshot.highRiskCount, 1)
+        XCTAssertEqual(daily.snapshot.issues.first?.penalty?.delayedDays, 2)
+    }
 }

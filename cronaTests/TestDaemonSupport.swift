@@ -70,6 +70,8 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
     var suspendStart = false
     var awayModeEnabled = false
     var healthDate: String?
+    var todaySummaryIssuesFixture: [[String: Any]] = []
+    var planEntriesFixture: [[String: Any]] = []
     var refreshContinuation: CheckedContinuation<Void, Never>?
     private var startContinuation: CheckedContinuation<Void, Never>?
 
@@ -111,11 +113,13 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
             if suspendRefresh {
                 await withCheckedContinuation { refreshContinuation = $0 }
             }
-            result = ["date": logicalDate, "totalIssues": 0, "issues": [],
+            result = ["date": logicalDate, "totalIssues": todaySummaryIssuesFixture.count,
+                "issues": todaySummaryIssuesFixture,
                 "totalEstimatedMinutes": 0, "completedIssues": 0,
                 "abandonedIssues": 0, "workedSeconds": 0] as [String: Any]
         case "daily_plan.get":
-            result = ["id": "plan", "date": logicalDate, "createdAt": "", "updatedAt": "", "entries": []] as [String: Any]
+            result = ["id": "plan", "date": logicalDate, "createdAt": "", "updatedAt": "",
+                "entries": planEntriesFixture] as [String: Any]
         case "timer.get_state":
             if let timerStateFixture {
                 result = timerStateFixture
