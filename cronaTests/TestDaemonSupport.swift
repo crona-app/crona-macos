@@ -79,6 +79,8 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
     var captureProposalsFixture: [[String: Any]] = []
     var failCaptureImport = false
     var failCaptureParse = false
+    var suspendCaptureImport = false
+    private var captureImportContinuation: CheckedContinuation<Void, Never>?
     private(set) var lastImportProposalCount: Int?
     var failCarryUndo = false
     var suspendCarry = false
@@ -96,6 +98,12 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
         suspendCarry = false
         carryContinuation?.resume()
         carryContinuation = nil
+    }
+
+    func resumeCaptureImport() {
+        suspendCaptureImport = false
+        captureImportContinuation?.resume()
+        captureImportContinuation = nil
     }
 
     func resumeStart() {
@@ -179,6 +187,9 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
             if failCaptureParse { throw NSError(domain: "IssueCaptureTests", code: 2) }
             result = captureProposalsFixture
         case "issue.capture.import":
+            if suspendCaptureImport {
+                await withCheckedContinuation { captureImportContinuation = $0 }
+            }
             if failCaptureImport { throw NSError(domain: "IssueCaptureTests", code: 1) }
             if case let .array(proposals)? = probe.params["proposals"] { lastImportProposalCount = proposals.count }
             result = ["issues": [Any]()]

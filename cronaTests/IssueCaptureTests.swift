@@ -248,4 +248,35 @@ final class IssueCaptureTests: DaemonTestCase {
         appState.issueCapture.present()
         XCTAssertTrue(appState.isPopoverModalPresented)
     }
+
+    func testDismissIsIgnoredWhileImporting() async throws {
+        let (model, transport) = try await makeCapture()
+        transport.failCaptureImport = true
+        transport.suspendCaptureImport = true
+        model.present()
+        model.text = "- One"
+        await model.parseNow()
+
+        let importTask = Task { await model.importAll() }
+        await waitForIssueCreator { model.isImporting }
+        model.dismiss()
+        transport.resumeCaptureImport()
+        _ = await importTask.value
+
+        XCTAssertTrue(model.isPresented)
+        XCTAssertEqual(model.text, "- One")
+        XCTAssertNotNil(model.errorMessage)
+    }
+
+    func testPresentClearsPreviousError() async throws {
+        let (model, transport) = try await makeCapture()
+        transport.failCaptureParse = true
+        model.text = "- One"
+        await model.parseNow()
+        XCTAssertNotNil(model.errorMessage)
+
+        model.present()
+
+        XCTAssertNil(model.errorMessage)
+    }
 }

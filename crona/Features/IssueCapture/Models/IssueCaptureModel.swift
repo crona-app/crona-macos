@@ -50,10 +50,13 @@ final class IssueCaptureModel: ObservableObject {
     }
 
     func present() {
+        errorMessage = nil
         isPresented = true
     }
 
     func dismiss() {
+        // Closing mid-import would hide a failure and lose the text.
+        guard !isImporting else { return }
         isPresented = false
         text = ""
         parseTask?.cancel()
@@ -74,11 +77,12 @@ final class IssueCaptureModel: ObservableObject {
         guard canImport else { return false }
         isImporting = true
         errorMessage = nil
-        defer { isImporting = false }
         do {
             let proposals = self.proposals
             _ = try await daemonConnection.withClient { try await $0.importCapture(proposals) }
+            isImporting = false
         } catch {
+            isImporting = false
             logger.error("Capture import failed: \(error.localizedDescription, privacy: .private)")
             errorMessage = error.localizedDescription
             return false
