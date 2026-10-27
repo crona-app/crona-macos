@@ -4,12 +4,14 @@ import SwiftUI
 struct StatsTabView: View {
     @ObservedObject var appState: CompanionAppState
     @ObservedObject private var statsService: PopoverStatsService
+    @ObservedObject private var dailyFocusService: DailyFocusService
     @ObservedObject private var systemGlass = SystemGlassSettings.shared
     @Namespace private var calendarTransition
 
     init(appState: CompanionAppState) {
         self.appState = appState
         self._statsService = ObservedObject(wrappedValue: appState.popoverStatsService)
+        self._dailyFocusService = ObservedObject(wrappedValue: appState.dailyFocusService)
     }
 
     var body: some View {
@@ -160,7 +162,7 @@ struct StatsTabView: View {
                             ("Completed", metrics.completedIssues),
                             ("Planned", metrics.totalIssues),
                             ("Abandoned", metrics.abandonedIssues),
-                        ]
+                        ] + highRiskOutcome(statsDate: snapshot.date)
                     )
 
                     StatsOutcomeCard(
@@ -724,6 +726,14 @@ struct StatsTabView: View {
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
+    }
+}
+
+extension StatsTabView {
+    fileprivate func highRiskOutcome(statsDate: String) -> [(String, Int)] {
+        CronaPenaltyPresentation.statsHighRiskCount(
+            statsDate: statsDate, focus: dailyFocusService.snapshot
+        ).map { [("High risk", $0)] } ?? []
     }
 }
 

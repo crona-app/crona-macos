@@ -104,6 +104,15 @@ struct IssueDetailView: View {
                 )
             }
 
+            let riskLines = CronaPenaltyPresentation.detailLines(for: issue.penalty)
+            if !riskLines.isEmpty {
+                DetailSection(title: "Risk", icon: CronaPenaltyPresentation.markerIcon) {
+                    ForEach(riskLines, id: \.self) { line in
+                        DetailStatusRow(title: line, tint: CronaPenaltyPresentation.colorKey.color)
+                    }
+                }
+            }
+
             if let description = nonEmpty(issue.description) {
                 DetailSection(title: "Description", icon: "text.alignleft") {
                     DetailBodyText(description)

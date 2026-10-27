@@ -621,6 +621,7 @@ struct FocusIssueRow: View {
                             ?? issue.status.replacingOccurrences(of: "_", with: " ").capitalized,
                         color: CronaIssueStatusPresentation.color(for: issue.status))
                     metaLabel(icon: "clock.fill", text: metaLine)
+                    PenaltyRiskMarker(penalty: issue.penalty)
                 }
                 .padding(.leading, 24)
             }

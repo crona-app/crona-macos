@@ -73,4 +73,47 @@ final class DelayPenaltyTests: DaemonTestCase {
         let snapshot = DailyFocusSnapshot(date: "2026-10-27", issues: issues, isConnected: true)
         XCTAssertEqual(snapshot.highRiskCount, 1)
     }
+
+    private func focusPenalty(_ highRisk: Bool, _ days: Int, _ becomes: Bool) -> DailyFocusPenalty {
+        DailyFocusPenalty(highRisk: highRisk, delayedDays: days, becomesHighRiskIfPostponed: becomes)
+    }
+
+    func testDetailLinesForHighRisk() {
+        XCTAssertEqual(
+            CronaPenaltyPresentation.detailLines(for: focusPenalty(true, 3, false)),
+            ["High risk · delayed 3 days"])
+        XCTAssertEqual(
+            CronaPenaltyPresentation.detailLines(for: focusPenalty(true, 1, false)),
+            ["High risk · delayed 1 day"])
+    }
+
+    func testDetailLinesHideProjectionWhenAlreadyHighRisk() {
+        XCTAssertEqual(
+            CronaPenaltyPresentation.detailLines(for: focusPenalty(true, 0, true)),
+            ["High risk · delayed 0 days"])
+    }
+
+    func testDetailLinesShowProjectionWhenNotHighRisk() {
+        XCTAssertEqual(
+            CronaPenaltyPresentation.detailLines(for: focusPenalty(false, 1, true)),
+            ["Postponing 1 day makes this high risk"])
+    }
+
+    func testDetailLinesEmptyWithoutRisk() {
+        XCTAssertEqual(CronaPenaltyPresentation.detailLines(for: focusPenalty(false, 2, false)), [])
+        XCTAssertEqual(CronaPenaltyPresentation.detailLines(for: nil), [])
+        XCTAssertFalse(CronaPenaltyPresentation.showsMarker(nil))
+        XCTAssertTrue(CronaPenaltyPresentation.showsMarker(focusPenalty(true, 0, false)))
+    }
+
+    func testStatsHighRiskCountOnlyForFocusDate() {
+        let risky = DailyFocusIssue(
+            id: 1, streamID: 1, title: "A", status: "planned", estimateMinutes: nil, workedSeconds: 0,
+            todoForDate: nil, penalty: focusPenalty(true, 2, false))
+        let focus = DailyFocusSnapshot(date: "2026-10-27", issues: [risky], isConnected: true)
+        XCTAssertEqual(CronaPenaltyPresentation.statsHighRiskCount(statsDate: "2026-10-27", focus: focus), 1)
+        XCTAssertNil(CronaPenaltyPresentation.statsHighRiskCount(statsDate: "2026-10-26", focus: focus))
+        let calm = DailyFocusSnapshot(date: "2026-10-27", issues: [], isConnected: true)
+        XCTAssertNil(CronaPenaltyPresentation.statsHighRiskCount(statsDate: "2026-10-27", focus: calm))
+    }
 }
