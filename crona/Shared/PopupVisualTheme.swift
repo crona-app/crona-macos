@@ -16,6 +16,7 @@ enum PopupVisualTheme {
         case mood
         case energy
         case stats
+        case carried
     }
 
     static func semantic(_ role: SemanticColor) -> Color {
@@ -33,6 +34,9 @@ enum PopupVisualTheme {
             color = .systemBlue
         case .review, .stats:
             color = .systemPurple
+        case .carried:
+            // Lavender, the TUI's carried-over color (xterm 141).
+            color = NSColor(srgbRed: 0.686, green: 0.529, blue: 1.0, alpha: 1)
         }
         return Color(nsColor: color)
     }
