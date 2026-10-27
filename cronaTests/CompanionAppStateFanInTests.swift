@@ -43,9 +43,16 @@ final class CompanionAppStateFanInTests: DaemonTestCase {
         let (connection, _) = try await issueCreatorConnection()
         defer { connection.stop() }
         let appState = CompanionAppState(daemonConnection: connection)
-        await settleAsyncTasks()
         var publications = 0
         let cancellable = appState.objectWillChange.sink { publications += 1 }
+        // Startup refreshes land later in optimized builds; count only once app state has gone quiet.
+        var quietPasses = 0
+        for _ in 0..<50 where quietPasses < 3 {
+            let before = publications
+            try await Task.sleep(for: .milliseconds(20))
+            quietPasses = publications == before ? quietPasses + 1 : 0
+        }
+        publications = 0
 
         appState.diagnosticsService.snapshot = DiagnosticsSnapshot(lastError: "x")
         await settleAsyncTasks()
