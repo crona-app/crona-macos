@@ -275,6 +275,15 @@ final class CronaDaemonClient {
         )
     }
 
+    func parseCapture(text: String) async throws -> [CronaCaptureProposal] {
+        try await request(method: "issue.capture.parse", params: AnyEncodable(CronaCaptureParseRequest(text: text)))
+    }
+
+    func importCapture(_ proposals: [CronaCaptureProposal]) async throws -> CronaCaptureImportResult {
+        try await request(
+            method: "issue.capture.import", params: AnyEncodable(CronaCaptureImportRequest(proposals: proposals)))
+    }
+
     /// Moves an Inbox issue into a regular stream; the core rejects any other move.
     func moveIssue(_ input: CronaMoveIssueRequest) async throws -> CronaIssue {
         try await request(method: "issue.move", params: AnyEncodable(input))

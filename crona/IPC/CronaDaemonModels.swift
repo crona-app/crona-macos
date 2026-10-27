@@ -749,6 +749,44 @@ struct CronaDailyPlanEntry: Codable, Equatable, Identifiable {
     }
 }
 
+/// One parsed `- ` line from `issue.capture.parse`. It is sent back unchanged on import,
+/// where the core validates it again.
+struct CronaCaptureProposal: Codable, Equatable, Identifiable {
+    let line: Int
+    let title: String
+    var description: String? = nil
+    var estimateMinutes: Int? = nil
+    var todoForDate: String? = nil
+    var tags: [String]? = nil
+    var repoID: Int64? = nil
+    var repoName: String? = nil
+    var streamID: Int64? = nil
+    var streamName: String? = nil
+    var inbox: Bool? = nil
+    var flags: [String]? = nil
+
+    var id: Int { line }
+    var isImportable: Bool { (flags ?? []).isEmpty }
+
+    enum CodingKeys: String, CodingKey {
+        case line, title, description, estimateMinutes, todoForDate, tags, repoName, streamName, inbox, flags
+        case repoID = "repoId"
+        case streamID = "streamId"
+    }
+}
+
+struct CronaCaptureParseRequest: Codable, Equatable {
+    let text: String
+}
+
+struct CronaCaptureImportRequest: Codable, Equatable {
+    let proposals: [CronaCaptureProposal]
+}
+
+struct CronaCaptureImportResult: Decodable, Equatable {
+    let issues: [CronaIssue]
+}
+
 struct CronaMoveIssueRequest: Codable, Equatable {
     let id: Int64
     let streamId: Int64

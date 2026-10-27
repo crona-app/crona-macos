@@ -86,4 +86,29 @@ final class IssueCaptureTests: DaemonTestCase {
 
         XCTAssertEqual(appState.dailyIssues.section, .planned)
     }
+
+    static let proposalJSON = #"{"line":2,"title":"Write notes","estimateMinutes":30,"todoForDate":"2001-02-05","tags":["docs"],"repoId":3,"repoName":"Repo","streamId":7,"streamName":"Stream","flags":["unknown stream"]}"#
+
+    func testCaptureProposalRoundTripsCoreJSON() throws {
+        let proposal = try JSONDecoder().decode(CronaCaptureProposal.self, from: Data(Self.proposalJSON.utf8))
+        XCTAssertEqual(proposal.id, 2)
+        XCTAssertEqual(proposal.tags, ["docs"])
+        XCTAssertEqual(proposal.flags, ["unknown stream"])
+
+        let inbox = CronaCaptureProposal(line: 3, title: "Idea", inbox: true)
+        let data = try JSONEncoder().encode(CronaCaptureImportRequest(proposals: [proposal, inbox]))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let rows = try XCTUnwrap(object["proposals"] as? [[String: Any]])
+        XCTAssertEqual(rows[0]["line"] as? Int, 2)
+        XCTAssertEqual(rows[0]["streamId"] as? Int, 7)
+        XCTAssertEqual(rows[0]["tags"] as? [String], ["docs"])
+        XCTAssertEqual(rows[1]["inbox"] as? Bool, true)
+        XCTAssertEqual(rows[1]["title"] as? String, "Idea")
+    }
+
+    func testCaptureProposalIsImportableOnlyWithoutFlags() throws {
+        XCTAssertTrue(CronaCaptureProposal(line: 1, title: "A").isImportable)
+        XCTAssertTrue(CronaCaptureProposal(line: 1, title: "A", flags: []).isImportable)
+        XCTAssertFalse(CronaCaptureProposal(line: 1, title: "A", flags: ["no title"]).isImportable)
+    }
 }
