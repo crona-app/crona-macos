@@ -132,7 +132,7 @@ struct IssueDetailView: View {
                     ("Estimate", issue.estimateMinutes.map(MenuBarTextFormatter.formatMinutes) ?? "—"),
                     ("Due", issue.todoForDate.map { formattedPopoverDate($0, appState: appState) } ?? "—"),
                     ("Pinned", issue.pinnedDaily == true ? "Daily" : "No")
-                ])
+                ] + (issue.carry?.fromDate.map { [("Carried from", formattedPopoverDate($0, appState: appState))] } ?? []))
             }
 
             Button {

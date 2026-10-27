@@ -623,15 +623,23 @@ struct FocusIssueRow: View {
                 }
 
                 HStack(spacing: 12) {
-                    metaLabel(
-                        icon: CronaIssueStatusPresentation.icon(for: issue.status),
-                        text: CronaIssueStatusPresentation.status(for: issue.status)?.title
-                            ?? issue.status.replacingOccurrences(of: "_", with: " ").capitalized,
-                        color: CronaIssueStatusPresentation.color(for: issue.status))
+                    if issue.carriedAway {
+                        metaLabel(
+                            icon: CronaCarryPresentation.carriedIcon,
+                            text: CronaCarryPresentation.carriedChipText,
+                            color: CronaCarryPresentation.carriedColor)
+                    } else {
+                        metaLabel(
+                            icon: CronaIssueStatusPresentation.icon(for: issue.status),
+                            text: CronaIssueStatusPresentation.status(for: issue.status)?.title
+                                ?? issue.status.replacingOccurrences(of: "_", with: " ").capitalized,
+                            color: CronaIssueStatusPresentation.color(for: issue.status))
+                    }
                     metaLabel(icon: "clock.fill", text: metaLine)
                     if issue.pinnedDaily == true {
                         metaLabel(icon: "pin.fill", text: "Pinned")
                     }
+                    CarryBadge(carry: issue.carry)
                     PenaltyRiskMarker(penalty: issue.penalty)
                 }
                 .padding(.leading, 24)
