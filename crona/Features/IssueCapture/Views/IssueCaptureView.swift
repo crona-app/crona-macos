@@ -4,11 +4,23 @@ import SwiftUI
 struct IssueCaptureView: View {
     @ObservedObject var appState: CompanionAppState
     @ObservedObject var issueCapture: IssueCaptureModel
-    @FocusState private var isEditorFocused: Bool
+    @ObservedObject private var issueCreationService: IssueCreationService
+    @ObservedObject private var tagsModel: TagsModel
+    @State private var editor = CaptureEditorController()
+    @State private var token: CaptureToken?
+    @State private var highlighted = 0
 
     init(appState: CompanionAppState, issueCapture: IssueCaptureModel) {
         self.appState = appState
         self.issueCapture = issueCapture
+        self.issueCreationService = appState.issueCreationService
+        self.tagsModel = appState.tags
+    }
+
+    private var suggestions: [CaptureSuggestion] {
+        guard let token else { return [] }
+        return CaptureAutocomplete.suggestions(
+            for: token, destinations: issueCreationService.destinations, tags: tagsModel.tags.map(\.name))
     }
 
     var body: some View {
@@ -41,17 +53,28 @@ struct IssueCaptureView: View {
                 if issueCapture.text.isEmpty {
                     Text("- One issue per line")
                         .foregroundStyle(PopupVisualTheme.tertiaryText)
-                        .padding(.horizontal, 5)
                         .allowsHitTesting(false)
                 }
-                TextEditor(text: $issueCapture.text)
-                    .scrollContentBackground(.hidden)
-                    .focused($isEditorFocused)
+                CaptureTextEditor(
+                    text: $issueCapture.text, controller: editor,
+                    onToken: { next in
+                        if next != token { highlighted = 0 }
+                        token = next
+                    },
+                    onKey: handleKey)
             }
             .font(.body)
             .frame(height: 120)
             .padding(10)
-            .popupInputSurface(isFocused: isEditorFocused)
+            .popupInputSurface(isFocused: true)
+
+            if !suggestions.isEmpty {
+                suggestionList
+            } else {
+                Text("#repo/stream  ~estimate  @date  +tag")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(PopupVisualTheme.tertiaryText)
+            }
 
             if !issueCapture.proposals.isEmpty {
                 ScrollView(.vertical) {
@@ -90,8 +113,66 @@ struct IssueCaptureView: View {
         .padding(20)
         .frame(width: 420)
         .fixedSize(horizontal: false, vertical: true)
-        .onAppear { isEditorFocused = true }
         .onExitCommand(perform: issueCapture.dismiss)
+        .task {
+            if issueCreationService.destinations.isEmpty { await issueCreationService.loadDestinations() }
+        }
+    }
+
+    private var suggestionList: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(Array(suggestions.enumerated()), id: \.element) { index, suggestion in
+                Button {
+                    accept(suggestion)
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(suggestion.label)
+                            .foregroundStyle(PopupVisualTheme.primaryText)
+                        Spacer(minLength: 0)
+                        if index == highlighted {
+                            Image(systemName: "return")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(PopupVisualTheme.tertiaryText)
+                        }
+                    }
+                    .font(.callout)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(index == highlighted ? PopupVisualTheme.primaryText.opacity(0.08) : .clear))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { if $0 { highlighted = index } }
+            }
+        }
+        .padding(4)
+        .background(RoundedRectangle(cornerRadius: 12).fill(PopupVisualTheme.primaryText.opacity(0.05)))
+    }
+
+    private func handleKey(_ key: CaptureEditorKey) -> Bool {
+        let options = suggestions
+        guard !options.isEmpty else {
+            // NSTextView would otherwise show its own word completions on Escape.
+            if key == .dismiss { issueCapture.dismiss(); return true }
+            return false
+        }
+        switch key {
+        case .up: highlighted = (highlighted - 1 + options.count) % options.count
+        case .down: highlighted = (highlighted + 1) % options.count
+        case .accept: accept(options[min(highlighted, options.count - 1)])
+        case .dismiss: token = nil
+        }
+        return true
+    }
+
+    private func accept(_ suggestion: CaptureSuggestion) {
+        guard let token else { return }
+        let result = CaptureAutocomplete.apply(suggestion, to: issueCapture.text, replacing: token)
+        self.token = nil
+        editor.replace(with: result.text, caret: result.caret)
+        editor.focus()
     }
 
     private func proposalRow(_ proposal: CronaCaptureProposal) -> some View {
