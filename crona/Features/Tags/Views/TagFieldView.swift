@@ -29,7 +29,9 @@ struct TagFieldView: View {
                     TextField(tags.isEmpty ? "Add tags" : "Add another", text: $draft)
                         .textFieldStyle(.plain)
                         .focused($isFocused)
-                        .onSubmit(submit)
+                        // Handle Return here so a sheet's default button (Create, Save) cannot take it first.
+                        .onKeyPress(.return) { submit() }
+                        .onSubmit { _ = submit() }
                         .onKeyPress(.downArrow) { move(1) }
                         .onKeyPress(.upArrow) { move(-1) }
                         .onChange(of: draft) { _, value in
@@ -110,14 +112,17 @@ struct TagFieldView: View {
         return .handled
     }
 
-    private func submit() {
+    /// Adds the highlighted suggestion or the typed text. With nothing typed, Return falls through to the sheet.
+    private func submit() -> KeyPress.Result {
+        guard !draft.trimmingCharacters(in: .whitespaces).isEmpty else { return .ignored }
         let options = suggestions
-        if !draft.trimmingCharacters(in: .whitespaces).isEmpty, options.indices.contains(highlighted) {
+        if options.indices.contains(highlighted) {
             add(options[highlighted].name)
         } else {
             commitDraft()
         }
         isFocused = true
+        return .handled
     }
 
     private func add(_ name: String) {

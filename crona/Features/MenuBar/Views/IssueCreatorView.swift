@@ -152,7 +152,7 @@ struct IssueCreatorView: View {
                     }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
-                        .keyboardShortcut(.defaultAction)
+                        .keyboardShortcut(issueCreator.tagDraft.isEmpty ? .defaultAction : nil)
                         .disabled(createActionDisabled)
                 } else {
                     Button(action: { issueCreator.submit(followUp: .close) }) {
@@ -463,7 +463,7 @@ struct HabitCreatorView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .keyboardShortcut(.defaultAction)
+            .keyboardShortcut(habitEditor.tagDraft.isEmpty ? .defaultAction : nil)
             .disabled(habitsService.isManagingHabit || habitEditor.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding(20)
