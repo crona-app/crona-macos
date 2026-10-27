@@ -166,6 +166,8 @@ final class CompanionAppState: ObservableObject {
         }
     )
 
+    private(set) lazy var tags = TagsModel(daemonConnection: daemonConnection)
+
     /// Points every day-based tab at the shared day and reloads them.
     func refreshSelectedDay() async {
         let date = day.selectedDate
@@ -376,6 +378,7 @@ final class CompanionAppState: ObservableObject {
                 await self.contextService.refresh()
                 await self.dailyFocusService.refresh(date: self.daemonConnection.currentDate)
                 await self.habitsService.refresh()
+                await self.tags.refresh()
                 await self.dailyIssues.refresh()
                 await self.popoverStatsService.refresh()
             }
