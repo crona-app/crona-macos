@@ -652,19 +652,14 @@ struct FocusIssueRow: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Label {
-                    HStack(spacing: 6) {
-                        Text(issue.title)
-                            .font(.headline)
-                            .foregroundStyle(PopupVisualTheme.primaryText)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .help(issue.title)
-                        TagChipsView(tags: issue.tags, tagsModel: appState.tags)
-                    }
-                } icon: {
-                    Image(systemName: CronaIssueStatusPresentation.icon(for: issue.status))
-                        .foregroundStyle(CronaIssueStatusPresentation.color(for: issue.status))
+                HStack(spacing: 6) {
+                    Text(issue.title)
+                        .font(.headline)
+                        .foregroundStyle(PopupVisualTheme.primaryText)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .help(issue.title)
+                    TagChipsView(tags: issue.tags, tagsModel: appState.tags)
                 }
                 .onTapGesture {
                     appState.openIssueDetails(issue)
@@ -690,7 +685,6 @@ struct FocusIssueRow: View {
                     CarryBadge(carry: issue.carry) { formattedPopoverDate($0, appState: appState) }
                     PenaltyRiskMarker(penalty: issue.penalty)
                 }
-                .padding(.leading, 24)
             }
             .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
 
