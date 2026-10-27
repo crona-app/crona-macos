@@ -149,4 +149,13 @@ final class TagsTests: DaemonTestCase {
         await waitForIssueCreator { model.tags.count == 3 }
         XCTAssertEqual(model.tags.count, 3)
     }
+
+    func testSettingsChangedEventReloadsFilters() async throws {
+        let (model, transport) = try await makeTags()
+        await model.refresh()
+        transport.tagFiltersFixture = ["issues": "+work"]
+        try postDaemonEvent(#"{"type":"settings.changed","payload":{}}"#)
+        await waitForIssueCreator { !model.filter(for: .issues).isEmpty }
+        XCTAssertEqual(model.filter(for: .issues).query, "+work")
+    }
 }

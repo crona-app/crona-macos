@@ -11,7 +11,7 @@ enum TagPane: String, CaseIterable {
 /// The tag vocabulary and the saved Issues and Habits tag filters.
 @MainActor
 final class TagsModel: ObservableObject {
-    private static let refreshEvents: Set<String> = ["tags.changed"]
+    private static let refreshEvents: Set<String> = ["tags.changed", "settings.changed"]
 
     private let daemonConnection: DaemonConnectionService
     private var eventObserver: NSObjectProtocol?
