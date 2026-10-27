@@ -52,7 +52,7 @@ enum CaptureAutocomplete {
                 destinations.filter { matchesTarget($0, query: query) }.prefix(limit).map {
                     CaptureSuggestion(
                         label: $0.label, detail: nil,
-                        insertion: prefix + firstWord($0.repoName) + "/" + firstWord($0.streamName))
+                        insertion: prefix + slug($0.repoName) + "/" + slug($0.streamName))
                 })
         case .estimate:
             return plain(estimates, query: query, prefix: prefix)
@@ -85,8 +85,8 @@ enum CaptureAutocomplete {
 
     private static func matchesTarget(_ destination: IssueDestination, query: String) -> Bool {
         guard !query.isEmpty else { return true }
-        let repo = destination.repoName.lowercased()
-        let stream = destination.streamName.lowercased()
+        let repo = slug(destination.repoName)
+        let stream = slug(destination.streamName)
         if let slash = query.firstIndex(of: "/") {
             let repoQuery = String(query[..<slash])
             let streamQuery = String(query[query.index(after: slash)...])
@@ -95,8 +95,9 @@ enum CaptureAutocomplete {
         return repo.hasPrefix(query) || stream.hasPrefix(query)
     }
 
-    private static func firstWord(_ name: String) -> String {
-        String(name.split(whereSeparator: \.isWhitespace).first ?? Substring(name)).lowercased()
+    /// The core matches `#` targets with spaces written as `-`.
+    static func slug(_ name: String) -> String {
+        name.lowercased().split(whereSeparator: \.isWhitespace).joined(separator: "-")
     }
 
     private static func isSpace(_ character: unichar) -> Bool {

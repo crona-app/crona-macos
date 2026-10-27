@@ -36,10 +36,10 @@ final class CaptureAutocompleteTests: XCTestCase {
         XCTAssertEqual(found.first?.label, "crona / macos")
     }
 
-    func testTargetInsertionUsesFirstWordOfNamesWithSpaces() {
+    func testTargetInsertionSlugsNamesWithSpaces() {
         let found = CaptureAutocomplete.suggestions(
             for: CaptureToken(trigger: .target, query: "blog", range: NSRange()), destinations: destinations, tags: [])
-        XCTAssertEqual(found.map(\.insertion), ["#side/blog"])
+        XCTAssertEqual(found.map(\.insertion), ["#side-projects/blog-posts"])
     }
 
     func testEstimateDateAndTagSuggestionsFilterByPrefix() {
@@ -59,6 +59,12 @@ final class CaptureAutocompleteTests: XCTestCase {
                 tags: ["docs", "release", "done"]
             ).map(\.insertion),
             ["+docs", "+done"])
+        XCTAssertEqual(
+            CaptureAutocomplete.suggestions(
+                for: CaptureToken(trigger: .target, query: "side-pro", range: NSRange()), destinations: destinations,
+                tags: []
+            ).map(\.insertion),
+            ["#side-projects/blog-posts"])
     }
 
     func testApplyReplacesTokenAndAddsSpace() {
