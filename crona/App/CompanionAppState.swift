@@ -147,6 +147,8 @@ final class CompanionAppState: ObservableObject {
         return day
     }()
 
+    private(set) lazy var dailyIssues = DailyIssuesModel(daemonConnection: daemonConnection, day: day)
+
     /// Points every day-based tab at the shared day and reloads them.
     func refreshSelectedDay() async {
         let date = day.selectedDate
@@ -155,6 +157,7 @@ final class CompanionAppState: ObservableObject {
         popoverStatsService.selectDate(date)
         await habitsService.refresh()
         await wellbeingService.refresh()
+        await dailyIssues.refresh()
     }
     private(set) lazy var issueActions = IssueActionEditorModel(
         daemonConnection: daemonConnection,
@@ -355,7 +358,8 @@ final class CompanionAppState: ObservableObject {
                 await self.timerService.refresh()
                 await self.contextService.refresh()
                 await self.dailyFocusService.refresh(date: self.daemonConnection.currentDate)
-                await self.habitsService.refresh(date: self.daemonConnection.currentDate)
+                await self.habitsService.refresh()
+                await self.dailyIssues.refresh()
                 await self.popoverStatsService.refresh()
             }
         }
@@ -807,8 +811,14 @@ final class CompanionAppState: ObservableObject {
             }
             .store(in: &cancellables)
 
+        // Row menus need status transitions for today's focus issues and every section's issues.
         dailyFocusService.$snapshot
             .map(\.issues)
+            .combineLatest(dailyIssues.$sections.map { $0.planned + $0.overdue + $0.upcoming })
+            .map { focus, sections in
+                var seen = Set<Int64>()
+                return (focus + sections).filter { seen.insert($0.id).inserted }
+            }
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] issues in

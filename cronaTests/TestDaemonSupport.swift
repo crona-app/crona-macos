@@ -118,7 +118,7 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
                 "totalEstimatedMinutes": 0, "completedIssues": 0,
                 "abandonedIssues": 0, "workedSeconds": 0] as [String: Any]
         case "daily_plan.get":
-            result = ["id": "plan", "date": logicalDate, "createdAt": "", "updatedAt": "",
+            result = ["id": "plan", "date": probe.params["date"]?.stringValue ?? logicalDate, "createdAt": "", "updatedAt": "",
                 "entries": planEntriesFixture] as [String: Any]
         case "timer.get_state":
             if let timerStateFixture {
@@ -145,7 +145,7 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
             timerStateFixture = nil
             result = ["state": "idle"]
         case "issue.list_all":
-            result = createdFixture.map { [$0] } ?? []
+            result = (createdFixture.map { [$0] } ?? []) + todaySummaryIssuesFixture
         case "issue.change_status":
             if failStatusChange { throw NSError(domain: "AdhocTests", code: 2) }
             var issue = createdFixture ?? [:]

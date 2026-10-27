@@ -283,21 +283,22 @@ struct IdleFocusView: View {
     @ObservedObject var appState: CompanionAppState
     @ObservedObject private var issueActionsService: IssueActionsService
 
+    @ObservedObject private var dailyIssues: DailyIssuesModel
+
     init(appState: CompanionAppState) {
         self.appState = appState
         self.issueActionsService = appState.issueActionsService
+        self.dailyIssues = appState.dailyIssues
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            PopoverDayHeader(appState: appState)
             HStack(spacing: 10) {
                 Image(systemName: "scope")
                     .foregroundStyle(PopupVisualTheme.semantic(.focus))
                     .frame(width: 22)
-                Text(
-                    formattedPopoverDate(
-                        appState.dailyFocusService.snapshot.date, appState: appState)
-                )
+                Text("Focus")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(PopupVisualTheme.primaryText)
                 Spacer()
@@ -330,15 +331,18 @@ struct IdleFocusView: View {
             }
             .buttonStyle(GlassPressButtonStyle())
 
-            if appState.dailyFocusService.snapshot.issues.isEmpty {
+            DailySectionPicker(dailyIssues: dailyIssues)
+
+            let sectionIssues = dailyIssues.sections.issues(in: dailyIssues.section)
+            if sectionIssues.isEmpty {
                 PlaceholderPanel(
                     icon: "checkmark.circle",
-                    title: "Today is clear",
-                    subtitle: "No planned focus issues for today."
+                    title: DailySectionPicker.emptyText(for: dailyIssues.section),
+                    subtitle: ""
                 )
             } else {
                 VStack(spacing: 12) {
-                    ForEach(appState.dailyFocusService.snapshot.issues) { issue in
+                    ForEach(sectionIssues) { issue in
                         FocusIssueRow(appState: appState, issue: issue) {
                             appState.selectFocusIssue(issue)
                         }
@@ -621,6 +625,9 @@ struct FocusIssueRow: View {
                             ?? issue.status.replacingOccurrences(of: "_", with: " ").capitalized,
                         color: CronaIssueStatusPresentation.color(for: issue.status))
                     metaLabel(icon: "clock.fill", text: metaLine)
+                    if issue.pinnedDaily == true {
+                        metaLabel(icon: "pin.fill", text: "Pinned")
+                    }
                     PenaltyRiskMarker(penalty: issue.penalty)
                 }
                 .padding(.leading, 24)
