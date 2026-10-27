@@ -250,4 +250,22 @@ final class IssueCreatorModelTests: DaemonTestCase {
         let create = try XCTUnwrap(transport.requests.first { $0.method == "issue.create" })
         XCTAssertNil(create.params["tags"])
     }
+
+    func testIssueCreatorSendsPendingTagDraft() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+        appState.issueCreator.presentCreator()
+        await settleAsyncTasks()
+        appState.issueCreator.title = "Tagged"
+        appState.issueCreator.destinationID = 7
+        appState.issueCreator.tagDraft = "urgent"
+
+        appState.issueCreator.submit(followUp: .more)
+        await waitForIssueCreator { !appState.issueCreator.isSubmitting }
+
+        let create = try XCTUnwrap(transport.requests.first { $0.method == "issue.create" })
+        XCTAssertEqual(create.params["tags"]?.stringArrayValue, ["urgent"])
+        XCTAssertEqual(appState.issueCreator.tagDraft, "")
+    }
 }

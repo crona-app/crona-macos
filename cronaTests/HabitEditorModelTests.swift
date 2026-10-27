@@ -91,4 +91,20 @@ final class HabitEditorModelTests: DaemonTestCase {
         let create = try XCTUnwrap(transport.requests.first { $0.method == "habit.create" })
         XCTAssertEqual(create.params["tags"]?.stringArrayValue, ["health"])
     }
+
+    func testHabitCreatorSendsPendingTagDraft() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+        appState.habitEditor.presentCreator()
+        appState.habitEditor.name = "Walk"
+        appState.habitEditor.destinationID = 7
+        appState.habitEditor.tagDraft = "health"
+
+        appState.habitEditor.submit()
+        await waitForIssueCreator { !appState.habitEditor.isPresented }
+
+        let create = try XCTUnwrap(transport.requests.first { $0.method == "habit.create" })
+        XCTAssertEqual(create.params["tags"]?.stringArrayValue, ["health"])
+    }
 }

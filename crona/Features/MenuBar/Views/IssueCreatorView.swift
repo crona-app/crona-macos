@@ -62,7 +62,7 @@ struct IssueCreatorView: View {
 
             if issueCreator.issueBeingEdited == nil {
                 Text("Tags (optional)").font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                TagFieldView(tags: $issueCreator.tags, tagsModel: appState.tags)
+                TagFieldView(tags: $issueCreator.tags, draft: $issueCreator.tagDraft, tagsModel: appState.tags)
             }
 
             Text("Estimate (optional) and scheduled date").font(.caption.weight(.medium)).foregroundStyle(.secondary)
@@ -442,7 +442,7 @@ struct HabitCreatorView: View {
                 .creatorField()
 
             if habitEditor.habitBeingEdited == nil {
-                TagFieldView(tags: $habitEditor.tags, tagsModel: appState.tags)
+                TagFieldView(tags: $habitEditor.tags, draft: $habitEditor.tagDraft, tagsModel: appState.tags)
             }
 
             if habitEditor.habitBeingEdited != nil {

@@ -37,7 +37,7 @@ struct TagEditorView: View {
                 Spacer()
             }
 
-            TagFieldView(tags: $tagEditor.tags, tagsModel: appState.tags)
+            TagFieldView(tags: $tagEditor.tags, draft: $tagEditor.draft, tagsModel: appState.tags)
 
             if let error = tagEditor.errorMessage {
                 Label(error, systemImage: "exclamationmark.triangle.fill")

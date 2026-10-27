@@ -8,6 +8,7 @@ final class IssueCreatorModel: ObservableObject {
     @Published var description = ""
     @Published var estimate = ""
     @Published var tags: [String] = []
+    @Published var tagDraft = ""
     @Published var dueDate: Date?
     @Published var destinationID: Int64?
     @Published private(set) var isPresented = false
@@ -74,6 +75,7 @@ final class IssueCreatorModel: ObservableObject {
         description = ""
         estimate = ""
         tags = []
+        tagDraft = ""
         dueDate = defaultDueDate
         destinationID = contextService.snapshot.streamID
         isContentVisible = false
@@ -171,6 +173,8 @@ final class IssueCreatorModel: ObservableObject {
             return
         }
 
+        tags = TagInput.committing(tagDraft, into: tags)
+        tagDraft = ""
         let request = CronaCreateIssueRequest(
             streamID: streamID,
             title: title,
@@ -207,6 +211,7 @@ final class IssueCreatorModel: ObservableObject {
                 self.description = ""
                 self.estimate = ""
                 self.tags = []
+                self.tagDraft = ""
                 destinationID = created.streamID
             case .focus:
                 successDismissTask?.cancel()

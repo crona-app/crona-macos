@@ -20,6 +20,11 @@ enum TagInput {
         return tags + [name]
     }
 
+    /// Folds comma-separated typed text into the tag list, so text not yet added is never lost on save.
+    static func committing(_ draft: String, into tags: [String]) -> [String] {
+        draft.split(separator: ",").reduce(tags) { adding(String($1), to: $0) }
+    }
+
     private static func isLetterOrDigit(_ scalar: Unicode.Scalar) -> Bool {
         ("a"..."z").contains(scalar) || ("0"..."9").contains(scalar)
     }

@@ -3,8 +3,9 @@ import SwiftUI
 /// Edits a list of tags: chips with remove buttons, a field that adds on Return or comma, and existing tags as suggestions.
 struct TagFieldView: View {
     @Binding var tags: [String]
+    /// Text typed but not yet added; the owning model folds it in on save.
+    @Binding var draft: String
     @ObservedObject var tagsModel: TagsModel
-    @State private var draft = ""
     @FocusState private var isFocused: Bool
 
     var body: some View {

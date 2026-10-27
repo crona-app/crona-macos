@@ -6,6 +6,7 @@ final class HabitEditorModel: ObservableObject {
     @Published var name = ""
     @Published var description = ""
     @Published var tags: [String] = []
+    @Published var tagDraft = ""
     @Published var destinationID: Int64?
     @Published var scheduleType = "daily"
     @Published var weekdays: Set<Int> = []
@@ -45,6 +46,7 @@ final class HabitEditorModel: ObservableObject {
         name = ""
         description = ""
         tags = []
+        tagDraft = ""
         destinationID = contextService.snapshot.streamID
         scheduleType = "daily"
         weekdays = []
@@ -140,6 +142,8 @@ final class HabitEditorModel: ObservableObject {
                 if succeeded { self.habitBeingEdited = nil; self.isPresented = false }
             }
         } else {
+            tags = TagInput.committing(tagDraft, into: tags)
+            tagDraft = ""
             Task {
                 let succeeded = await habitsService.create(
                     CronaCreateHabitRequest(

@@ -23,6 +23,7 @@ final class TagEditorModel: ObservableObject {
 
     @Published private(set) var target: TagEditorTarget?
     @Published var tags: [String] = []
+    @Published var draft = ""
     @Published private(set) var isSaving = false
     @Published private(set) var errorMessage: String?
 
@@ -37,6 +38,7 @@ final class TagEditorModel: ObservableObject {
         guard !isSaving else { return }
         self.target = target
         self.tags = tags
+        draft = ""
         errorMessage = nil
     }
 
@@ -44,6 +46,7 @@ final class TagEditorModel: ObservableObject {
         guard !isSaving else { return }
         target = nil
         tags = []
+        draft = ""
         errorMessage = nil
     }
 
@@ -51,6 +54,8 @@ final class TagEditorModel: ObservableObject {
         guard let target, !isSaving else { return false }
         isSaving = true
         errorMessage = nil
+        self.tags = TagInput.committing(draft, into: self.tags)
+        draft = ""
         let tags = self.tags
         do {
             switch target {

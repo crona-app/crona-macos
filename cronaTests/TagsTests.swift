@@ -388,4 +388,21 @@ final class TagsTests: DaemonTestCase {
 
         XCTAssertEqual(model.today.map(\.key), ["b"])
     }
+
+    func testTagEditorSaveIncludesPendingDraft() async throws {
+        let (editor, transport) = try await makeEditor()
+        editor.present(.issue(id: 5, title: "Fix"), tags: ["work"])
+        editor.draft = "Deep Work"
+
+        _ = await editor.save()
+
+        let request = try XCTUnwrap(transport.requests.last { $0.method == "issue.tags.set" })
+        XCTAssertEqual(request.params["tags"]?.stringArrayValue, ["work", "deep-work"])
+        XCTAssertEqual(editor.draft, "")
+    }
+
+    func testTagInputCommitsCommaSeparatedDraft() {
+        XCTAssertEqual(TagInput.committing("a, b,a", into: ["x"]), ["x", "a", "b"])
+        XCTAssertEqual(TagInput.committing("  ", into: ["x"]), ["x"])
+    }
 }
