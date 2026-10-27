@@ -145,4 +145,24 @@ final class CarryOverTests: DaemonTestCase {
         let unknown = row(due: "2026-10-28", carriedAway: true, carriedTo: nil)
         XCTAssertNil(CronaCarryPresentation.menuAction(for: unknown, isToday: false, section: .planned))
     }
+
+    func testDetailLinesForCarriedAndStalledIssues() {
+        let fmt: (String) -> String = { "<\($0)>" }
+        XCTAssertEqual(
+            CronaCarryPresentation.detailLines(
+                carry: DailyFocusCarry(count: 1, stalled: false, fromDate: "2026-10-26"),
+                carriedToDate: nil, formatDate: fmt),
+            [CarryDetailLine(text: "Carried from <2026-10-26>", stalled: false),
+             CarryDetailLine(text: "Carried 1 time", stalled: false)])
+        XCTAssertEqual(
+            CronaCarryPresentation.detailLines(
+                carry: DailyFocusCarry(count: 5, stalled: true, fromDate: nil),
+                carriedToDate: nil, formatDate: fmt),
+            [CarryDetailLine(text: "Carried 5 times", stalled: false),
+             CarryDetailLine(text: "Stalled: carried 5 times without finishing", stalled: true)])
+        XCTAssertEqual(
+            CronaCarryPresentation.detailLines(carry: nil, carriedToDate: "2026-10-28", formatDate: fmt),
+            [CarryDetailLine(text: "Carried to <2026-10-28>", stalled: false)])
+        XCTAssertEqual(CronaCarryPresentation.detailLines(carry: nil, carriedToDate: nil, formatDate: fmt), [])
+    }
 }

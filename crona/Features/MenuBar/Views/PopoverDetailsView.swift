@@ -113,6 +113,15 @@ struct IssueDetailView: View {
                 }
             }
 
+            let carryLines = CronaCarryPresentation.detailLines(for: issue) { formattedPopoverDate($0, appState: appState) }
+            if !carryLines.isEmpty {
+                DetailSection(title: "Carry", icon: CronaCarryPresentation.carriedIcon) {
+                    ForEach(carryLines, id: \.text) { line in
+                        DetailStatusRow(title: line.text, tint: line.stalled ? CronaPenaltyPresentation.colorKey.color : CronaCarryPresentation.carriedColor)
+                    }
+                }
+            }
+
             if let description = nonEmpty(issue.description) {
                 DetailSection(title: "Description", icon: "text.alignleft") {
                     DetailBodyText(description)
@@ -132,7 +141,7 @@ struct IssueDetailView: View {
                     ("Estimate", issue.estimateMinutes.map(MenuBarTextFormatter.formatMinutes) ?? "—"),
                     ("Due", issue.todoForDate.map { formattedPopoverDate($0, appState: appState) } ?? "—"),
                     ("Pinned", issue.pinnedDaily == true ? "Daily" : "No")
-                ] + (issue.carry?.fromDate.map { [("Carried from", formattedPopoverDate($0, appState: appState))] } ?? []))
+                ])
             }
 
             Button {
