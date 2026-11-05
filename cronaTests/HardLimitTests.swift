@@ -114,3 +114,32 @@ final class HardLimitTests: DaemonTestCase {
         XCTAssertEqual(summary.limitSeconds, 0)
     }
 }
+
+@MainActor
+final class HardLimitTodayLineTests: XCTestCase {
+    func testTodayLineCountsTheSessionThatJustFinished() {
+        XCTAssertEqual(HardLimitTodayLine.text(completedSessionsToday: 0), "First focus session today")
+        XCTAssertEqual(HardLimitTodayLine.text(completedSessionsToday: 2), "3rd focus session today")
+        XCTAssertEqual(HardLimitTodayLine.text(completedSessionsToday: 10), "11th focus session today")
+        XCTAssertEqual(HardLimitTodayLine.text(completedSessionsToday: 21), "22nd focus session today")
+    }
+
+    func testTodayLineIsHiddenWithoutMetrics() {
+        XCTAssertNil(HardLimitTodayLine.text(completedSessionsToday: nil))
+    }
+}
+
+@MainActor
+final class FocusIssueContextCardTests: XCTestCase {
+    func testProgressShowsWorkedAgainstEstimate() {
+        XCTAssertEqual(
+            FocusIssueContextCard.progressText(workedSeconds: 1500, estimateMinutes: 60),
+            "\(MenuBarTextFormatter.formatCompactDuration(seconds: 1500)) of \(MenuBarTextFormatter.formatMinutes(60)) estimate")
+    }
+
+    func testProgressWithoutEstimateShowsWorkedOnly() {
+        XCTAssertEqual(
+            FocusIssueContextCard.progressText(workedSeconds: 1500, estimateMinutes: nil),
+            "\(MenuBarTextFormatter.formatCompactDuration(seconds: 1500)) worked")
+    }
+}

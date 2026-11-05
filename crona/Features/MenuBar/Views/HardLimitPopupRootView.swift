@@ -14,9 +14,9 @@ enum HardLimitPopupSizing {
     static func panelHeight(for phase: HardLimitPopupPhase?, adhoc: Bool = false, adhocHeight: CGFloat = 600) -> CGFloat {
         if phase == .endSession && adhoc { return adhocHeight + 32 }
         return switch phase {
-        case .decision: 434
-        case .endSession: 460
-        case .extend: 560
+        case .decision: 420
+        case .endSession: 490
+        case .extend: 430
         case .success: 268
         case nil: 434
         }
@@ -37,66 +37,6 @@ struct HardLimitSessionTimeSummary: Equatable {
         let limit = max(0, snapshot.hardLimitTotalSeconds)
         let remaining = min(limit, max(0, snapshot.hardLimitRemainingSeconds))
         return Self(spentSeconds: min(limit, max(0, limit - remaining)), limitSeconds: limit)
-    }
-}
-
-private enum HardLimitTimeContextIntent {
-    case decision
-    case extend
-    case commit
-
-    var title: String {
-        switch self {
-        case .decision: return "Time spent in this session"
-        case .extend: return "You’ve already put in"
-        case .commit: return "Session summary"
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .decision: return "Your focus limit has been reached. Choose whether to save or continue."
-        case .extend: return "Add focused time if the task still needs your attention."
-        case .commit: return "Capture what changed while the session is still fresh."
-        }
-    }
-}
-
-private struct HardLimitTimeContextView: View {
-    let summary: HardLimitSessionTimeSummary
-    let intent: HardLimitTimeContextIntent
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "timer")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(PopupVisualTheme.semantic(.info))
-                Text(intent.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(PopupVisualTheme.primaryText)
-                Spacer(minLength: 0)
-                Text(summary.spentText)
-                    .font(.headline.monospacedDigit())
-                    .foregroundStyle(PopupVisualTheme.primaryText)
-            }
-            HStack(spacing: 8) {
-                Text("Spent")
-                Text(summary.spentText).monospacedDigit()
-                Text("of")
-                Text(summary.limitText).monospacedDigit()
-                Text("limit")
-            }
-            .font(.caption.weight(.medium))
-            .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.68))
-            Text(intent.detail)
-                .font(.footnote)
-                .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.66))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 14))
     }
 }
 
@@ -429,9 +369,7 @@ private struct InactivityEndSessionView: View {
         PopupEndSessionForm(
             appState: appState,
             endSession: appState.endSession,
-            subtitle: "Add a short note for this focus session.",
             timeSummary: nil,
-            timeContextIntent: nil,
             onBack: { appState.popups.returnToInactivityDecision() }
         )
     }
@@ -440,32 +378,46 @@ private struct InactivityEndSessionView: View {
 private struct HardLimitDecisionView: View {
     @ObservedObject var appState: CompanionAppState
     @ObservedObject private var countdown: HardLimitCountdownService
+    @ObservedObject private var popoverStats: PopoverStatsService
     @FocusState private var focusedAction: DecisionAction?
 
     init(appState: CompanionAppState) {
         self.appState = appState
         self.countdown = appState.hardLimitCountdownService
+        self.popoverStats = appState.popoverStatsService
     }
 
     var body: some View {
-        let title = "Focus time is up"
-        let subtitle = "Your planned focus limit has been reached. What would you like to do next?"
         let summary = HardLimitSessionTimeSummary.from(appState.timerService.snapshot)
 
         VStack(spacing: 12) {
-            header(symbol: "hourglass.circle.fill", title: title, subtitle: subtitle)
+            VStack(spacing: 8) {
+                FocusCompleteRing()
+                Text("Focus block complete")
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(PopupVisualTheme.primaryText)
+                Text("\(summary.spentText) focused")
+                    .font(.title3.weight(.medium).monospacedDigit())
+                    .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.78))
+                if let today = HardLimitTodayLine.text(
+                    completedSessionsToday: popoverStats.todayMetrics?.sessionCount)
+                {
+                    Text(today)
+                        .font(.caption)
+                        .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.55))
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 4)
 
-            HardLimitTimeContextView(summary: summary, intent: .decision)
-
-            contextCard
+            FocusIssueContextCard(appState: appState)
 
             VStack(spacing: 8) {
                 Button {
                     appState.popups.chooseHardLimitEnd()
                 } label: {
                     popupButtonLabel(
-                        title: "Finish Session",
-                        detail: "Save what you completed and close the session · in \(countdown.state.displayedSeconds)s",
+                        title: "Finish",
                         shortcut: "E"
                     )
                 }
@@ -482,8 +434,7 @@ private struct HardLimitDecisionView: View {
                     appState.popups.chooseHardLimitExtend()
                 } label: {
                     popupButtonLabel(
-                        title: "Keep Working",
-                        detail: "Add time and continue this session",
+                        title: "Keep going",
                         shortcut: "X"
                     )
                 }
@@ -504,41 +455,6 @@ private struct HardLimitDecisionView: View {
         }
     }
 
-    private var contextCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let issue = appState.activeFocusTitle {
-                Label(issue, systemImage: "record.circle.fill")
-                    .font(.headline)
-                    .foregroundStyle(PopupVisualTheme.primaryText)
-            }
-
-            HStack(spacing: 14) {
-                if !appState.timerService.snapshot.adhoc, let repo = appState.contextService.snapshot.repoName {
-                    meta(icon: "folder.fill", text: repo)
-                }
-                if !appState.timerService.snapshot.adhoc, let stream = appState.contextService.snapshot.streamName {
-                    meta(icon: "arrow.triangle.branch", text: stream)
-                }
-            }
-
-            Text("Choose how to continue: add time to keep working, or finish and save the session.")
-                .font(.footnote)
-                .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.66))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 14))
-    }
-
-    private func meta(icon: String, text: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-            Text(text).lineLimit(1)
-        }
-        .font(.caption.weight(.medium))
-        .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.72))
-    }
-
     private enum DecisionAction: Hashable {
         case extend
         case end
@@ -552,9 +468,7 @@ private struct HardLimitEndSessionView: View {
         PopupEndSessionForm(
             appState: appState,
             endSession: appState.endSession,
-            subtitle: "What did you complete? Add a short note before closing the session.",
             timeSummary: HardLimitSessionTimeSummary.from(appState.timerService.snapshot),
-            timeContextIntent: .commit,
             onBack: { appState.popups.returnToHardLimitDecision() }
         )
     }
@@ -563,9 +477,7 @@ private struct HardLimitEndSessionView: View {
 private struct PopupEndSessionForm: View {
     @ObservedObject var appState: CompanionAppState
     @ObservedObject var endSession: EndSessionModel
-    let subtitle: String
     let timeSummary: HardLimitSessionTimeSummary?
-    let timeContextIntent: HardLimitTimeContextIntent?
     let onBack: () -> Void
 
     @ViewBuilder var body: some View {
@@ -573,17 +485,25 @@ private struct PopupEndSessionForm: View {
             AdhocAttributionView(appState: appState, endSession: endSession, onCancel: onBack)
         } else {
             VStack(alignment: .leading, spacing: 12) {
-                header(symbol: "checkmark.circle", title: "End Session", subtitle: subtitle)
-
-                if let timeSummary, let timeContextIntent {
-                    HardLimitTimeContextView(summary: timeSummary, intent: timeContextIntent)
+                VStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(PopupVisualTheme.semantic(.success))
+                    Text("What did you get done?")
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(PopupVisualTheme.primaryText)
+                    if let timeSummary {
+                        Text("\(timeSummary.spentText) focused")
+                            .font(.subheadline.monospacedDigit())
+                            .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.6))
+                    }
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 4)
+
+                FocusIssueContextCard(appState: appState)
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("What did you complete?")
-                        .font(.headline)
-                        .foregroundStyle(PopupVisualTheme.primaryText)
-
                     StableMultilineTextField(
                         text: $endSession.commitMessage,
                         placeholder: "e.g. Updated the install docs and verified the Linux steps",
@@ -636,50 +556,24 @@ private struct HardLimitExtendView: View {
 
     var body: some View {
         let mode = TimerPresentation.from(appState.timerService.snapshot).mode
-        let title = "How much longer do you need?"
-        let subtitle =
-            mode == .timer
-            ? "Choose a focused extension and keep working on the current task."
-            : "Choose how many additional focus sessions you need."
-        let summary = HardLimitSessionTimeSummary.from(appState.timerService.snapshot)
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Add more time")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(PopupVisualTheme.primaryText)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 6)
 
-        VStack(alignment: .leading, spacing: 12) {
-            header(symbol: "plus.circle", title: title, subtitle: subtitle)
+            FocusIssueContextCard(appState: appState)
 
-            HardLimitTimeContextView(summary: summary, intent: .extend)
-
-            VStack(spacing: 10) {
+            HStack(spacing: 8) {
                 ForEach(Array(choices(for: mode).enumerated()), id: \.element.id) { index, choice in
-                    Button {
+                    HardLimitExtendChip(
+                        choice: choice,
+                        shortcut: "\(index + 1)",
+                        isSelected: popups.hardLimitPopupExtendChoice == choice
+                    ) {
                         popups.hardLimitPopupExtendChoice = choice
-                    } label: {
-                        HStack {
-                            Text(choice.title)
-                                .font(.headline)
-                                .foregroundStyle(PopupVisualTheme.primaryText)
-                            Spacer()
-                            if popups.hardLimitPopupExtendChoice == choice {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(PopupVisualTheme.semantic(.info))
-                            }
-                            shortcutHint("\(index + 1)")
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(
-                                    PopupVisualTheme.primaryText.opacity(
-                                        popups.hardLimitPopupExtendChoice == choice ? 0.1 : 0.05)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .strokeBorder(PopupVisualTheme.border, lineWidth: 1)
-                                )
-                        )
                     }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: [])
                 }
             }
 
