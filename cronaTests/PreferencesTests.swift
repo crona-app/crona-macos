@@ -223,3 +223,25 @@ final class PreferencesTests: DaemonTestCase {
         XCTAssertEqual(format, .adaptive)
     }
 }
+
+@MainActor
+final class CompletionCelebrationPreferenceTests: XCTestCase {
+    func testCompletionCelebrationDefaultsToNoneForOlderPreferences() throws {
+        let decoded = try JSONDecoder().decode(CompanionPreferences.self, from: Data("{}".utf8))
+        XCTAssertEqual(decoded.completionCelebration, .off)
+    }
+
+    func testCompletionCelebrationRoundTrips() throws {
+        var preferences = try JSONDecoder().decode(CompanionPreferences.self, from: Data("{}".utf8))
+        preferences.completionCelebration = .confetti
+        let decoded = try JSONDecoder().decode(
+            CompanionPreferences.self, from: JSONEncoder().encode(preferences))
+        XCTAssertEqual(decoded.completionCelebration, .confetti)
+    }
+
+    func testReduceMotionTurnsCelebrationOff() {
+        XCTAssertEqual(CompletionCelebrationStyle.confetti.resolved(reduceMotion: true), .off)
+        XCTAssertEqual(CompletionCelebrationStyle.glow.resolved(reduceMotion: true), .off)
+        XCTAssertEqual(CompletionCelebrationStyle.glow.resolved(reduceMotion: false), .glow)
+    }
+}

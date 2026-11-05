@@ -267,6 +267,7 @@ struct CompanionPreferences: Codable, Equatable {
     var showHardLimitActionPopups = true
     var showHardLimitWarningIndicator = true
     var hardLimitWarningLeadSeconds = 10
+    var completionCelebration: CompletionCelebrationStyle = .off
     var showInactivityActionPopups = true
     var inactivityPopupPosition: CompanionPopupPosition = .topCenter
     var breakScreenEnabled = false
@@ -323,6 +324,7 @@ extension CompanionPreferences {
         case showHardLimitActionPopups
         case showHardLimitWarningIndicator
         case hardLimitWarningLeadSeconds
+        case completionCelebration
         case showInactivityActionPopups
         case inactivityPopupPosition
         case breakScreenEnabled
@@ -385,6 +387,8 @@ extension CompanionPreferences {
         hardLimitWarningLeadSeconds =
             try values.decodeIfPresent(Int.self, forKey: .hardLimitWarningLeadSeconds)
             ?? 10
+        completionCelebration =
+            try values.decodeIfPresent(CompletionCelebrationStyle.self, forKey: .completionCelebration) ?? .off
         showInactivityActionPopups =
             try values.decodeIfPresent(Bool.self, forKey: .showInactivityActionPopups)
             ?? true
@@ -443,6 +447,7 @@ extension CompanionPreferences {
         try values.encode(showHardLimitActionPopups, forKey: .showHardLimitActionPopups)
         try values.encode(showHardLimitWarningIndicator, forKey: .showHardLimitWarningIndicator)
         try values.encode(hardLimitWarningLeadSeconds, forKey: .hardLimitWarningLeadSeconds)
+        try values.encode(completionCelebration, forKey: .completionCelebration)
         try values.encode(showInactivityActionPopups, forKey: .showInactivityActionPopups)
         try values.encode(inactivityPopupPosition, forKey: .inactivityPopupPosition)
         try values.encode(breakScreenEnabled, forKey: .breakScreenEnabled)

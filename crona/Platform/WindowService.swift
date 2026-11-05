@@ -46,6 +46,7 @@ final class WindowService {
     private weak var lastClosedSettingsWindow: NSWindow?
     private var settingsWindowCloseObserver: NSObjectProtocol?
     private var hardLimitPanel: HardLimitPanel?
+    private let completionCelebration = CompletionCelebrationWindow()
     private var inactivityPanel: InactivityPanel?
     private var smartPauseResumePanel: SmartPauseResumePanel?
     private var timerHUDPanel: TimerHUDPanel?
@@ -779,6 +780,15 @@ final class WindowService {
         panel.makeFirstResponder(nil)
         panel.makeKeyAndOrderFront(nil)
         animatePopupEntrance(panel, style: .centeredFadeBlur, token: .hardLimit)
+        playCompletionCelebration(appState.preferences.preferences.completionCelebration, around: panel)
+    }
+
+    /// Plays the celebration on the screen holding `popup`, or on the popup target screen as a preview.
+    func playCompletionCelebration(_ style: CompletionCelebrationStyle, around popup: NSWindow? = nil) {
+        let screen = popup?.screen ?? popupTargetScreen()
+        let popupFrame = popup?.frame
+            ?? NSRect(x: screen.visibleFrame.midX - 1, y: screen.visibleFrame.midY - 1, width: 2, height: 2)
+        completionCelebration.play(style, on: screen, popupFrame: popupFrame, below: .statusBar)
     }
 
     func updateHardLimitPopup() {

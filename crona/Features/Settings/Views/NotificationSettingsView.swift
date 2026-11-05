@@ -210,6 +210,14 @@ struct NotificationSettingsView: View {
             }
 
             SettingsCard("Focus Boundaries") {
+                CompletionCelebrationSettingsRow(
+                    selection: Binding(
+                        get: { appState.preferences.preferences.completionCelebration },
+                        set: { appState.preferences.preferences.completionCelebration = $0 }
+                    ),
+                    onPreview: { appState.windowService.playCompletionCelebration($0) }
+                )
+
                 SettingsToggleRow(
                     title: "Show Action Popup",
                     subtitle: "Show End and Extend at a session boundary.",
