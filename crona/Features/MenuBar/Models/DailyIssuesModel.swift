@@ -24,6 +24,8 @@ final class DailyIssuesModel: ObservableObject {
     @Published private(set) var sections = DailyIssueSections()
     @Published var section: DailySection = .planned
     @Published private(set) var isLoading = false
+    /// The day the sections were last built for, so a failed refresh is not mistaken for current.
+    private(set) var loadedDate: String?
 
     init(
         daemonConnection: DaemonConnectionService, day: PopoverDayModel,
@@ -85,6 +87,7 @@ final class DailyIssuesModel: ObservableObject {
             // A newer day may have been picked while this one loaded.
             guard date == day.selectedDate else { return }
             unfilteredSections = built
+            loadedDate = date
             applyFilter(tags.filter(for: .issues), known: tags.knownNames)
         } catch {
             logger.error("Daily issues refresh failed: \(error.localizedDescription, privacy: .private)")

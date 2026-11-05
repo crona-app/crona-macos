@@ -81,6 +81,7 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
     var failCaptureParse = false
     var tagsFixture: [[String: Any]] = []
     var failTagList = false
+    var failListAllIssues = false
     var failTagSet = false
     var tagFiltersFixture: [String: String]?
     var distributionRowsFixture: [[String: Any]] = []
@@ -197,6 +198,7 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
             timerStateFixture = nil
             result = ["state": "idle"]
         case "issue.list_all":
+            if failListAllIssues { throw NSError(domain: "DailyIssuesTests", code: 1) }
             result = (createdFixture.map { [$0] } ?? []) + todaySummaryIssuesFixture
         case "issue.change_status":
             if failStatusChange { throw NSError(domain: "AdhocTests", code: 2) }

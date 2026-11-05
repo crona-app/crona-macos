@@ -84,6 +84,37 @@ final class PopoverNavigationTests: DaemonTestCase {
         XCTAssertEqual(appState.popoverStatsService.functionalDate, "2001-02-04")
     }
 
+    func testPopoverOpenRetriesIssuesLeftOnPreviousDay() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection)
+        await settleAsyncTasks()
+        transport.healthDate = "2001-02-04"
+        transport.failListAllIssues = true
+        await appState.reconcileFunctionalDateOnPopoverOpen()
+        XCTAssertNotEqual(appState.dailyIssues.loadedDate, "2001-02-04")
+
+        transport.failListAllIssues = false
+        await appState.reconcileFunctionalDateOnPopoverOpen()
+
+        XCTAssertEqual(appState.dailyIssues.loadedDate, "2001-02-04")
+    }
+
+    func testReconnectMovesTabsToDaemonDate() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection)
+        await settleAsyncTasks()
+        transport.healthDate = "2001-02-04"
+        _ = try await connection.refreshHealth()
+
+        NotificationCenter.default.post(name: .cronaDaemonDidConnect, object: nil)
+        await waitForIssueCreator { appState.dailyIssues.loadedDate == "2001-02-04" }
+
+        XCTAssertEqual(appState.day.selectedDate, "2001-02-04")
+        XCTAssertEqual(appState.habitsService.snapshot.date, "2001-02-04")
+    }
+
     func testPopoverOpenSkipsReconcileWhenDatesMatch() async throws {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }

@@ -388,9 +388,10 @@ final class CompanionAppState: ObservableObject {
                 await self.timerService.refresh()
                 await self.contextService.refresh()
                 await self.dailyFocusService.refresh(date: self.daemonConnection.currentDate)
-                await self.habitsService.refresh()
+                // A day.start missed while disconnected (for example during sleep) leaves the tabs on the old day.
+                self.day.select(self.daemonConnection.currentDate)
                 await self.tags.refresh()
-                await self.dailyIssues.refresh()
+                await self.refreshSelectedDay()
                 await self.popoverStatsService.refresh()
             }
         }
@@ -625,6 +626,7 @@ final class CompanionAppState: ObservableObject {
                 habitsService.snapshot.date,
                 wellbeingService.snapshot.date,
                 popoverStatsService.functionalDate,
+                dailyIssues.loadedDate ?? "",
             ]
             guard storedDates.contains(where: { $0 != daemonDate }) else {
                 logger.debug("Popup date reconciliation not needed for \(daemonDate, privacy: .public)")
