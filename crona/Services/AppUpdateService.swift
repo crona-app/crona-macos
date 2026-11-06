@@ -67,6 +67,19 @@ final class AppUpdateService: NSObject, ObservableObject {
         snapshot.updateAvailable
     }
 
+    #if DEBUG
+        /// Developer settings: show the menu bar badge and popup pill without a real update.
+        @Published var forcesUpdatePrompt = false
+    #endif
+
+    /// Whether the menu bar icon badge and the popup's update pill show.
+    var showsUpdatePrompt: Bool {
+        #if DEBUG
+            if forcesUpdatePrompt { return true }
+        #endif
+        return hasAvailableUpdate
+    }
+
     init(
         preferences: PreferencesService,
         bundle: Bundle = .main,

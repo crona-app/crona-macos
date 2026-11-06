@@ -64,6 +64,7 @@ final class StatusBarService: NSObject {
     private var lastRenderedTitle = ""
     private var lastRenderedDisplayMode: MenuBarDisplayMode?
     private var lastRenderedIconState: MenuBarIconState?
+    private var lastRenderedUpdateDot = false
     private var iconAnimationTimer: Timer?
     private var iconAnimationPhase = 0.0
     private var completionTask: Task<Void, Never>?
@@ -198,6 +199,8 @@ final class StatusBarService: NSObject {
         )
         let displayMode = appState.preferences.preferences.menuBarDisplayMode
         let iconState = resolvedIconState(for: model, now: now)
+        // While a timer runs, the update shows as a dot beside its progress ring.
+        let showsUpdateDot = iconState.isProgressState && appState.appUpdateService.showsUpdatePrompt
 
         if lastRenderedDisplayMode != displayMode {
             switch displayMode {
@@ -212,12 +215,16 @@ final class StatusBarService: NSObject {
         }
 
         if displayMode.showsIcon {
-            if lastRenderedIconState != iconState || button.image == nil || iconState == .connecting {
+            if lastRenderedIconState != iconState || lastRenderedUpdateDot != showsUpdateDot
+                || button.image == nil || iconState == .connecting
+            {
                 button.image = MenuBarIconProvider.image(
                     for: iconState,
-                    connectingPhase: iconAnimationPhase
+                    connectingPhase: iconAnimationPhase,
+                    showsUpdateDot: showsUpdateDot
                 )
                 lastRenderedIconState = iconState
+                lastRenderedUpdateDot = showsUpdateDot
             }
         } else {
             button.image = nil
@@ -226,7 +233,7 @@ final class StatusBarService: NSObject {
         let accessibilityDescription = iconState.accessibilityDescription(
             for: model.timerSnapshot,
             at: now
-        )
+        ) + (showsUpdateDot ? " - Update available" : "")
         button.setAccessibilityLabel(accessibilityDescription)
         button.toolTip = accessibilityDescription
 
@@ -280,7 +287,7 @@ final class StatusBarService: NSObject {
             now: now,
             includeCompletion: true
         )
-        if resolvedState == .idle, appState?.appUpdateService.hasAvailableUpdate == true {
+        if resolvedState == .idle, appState?.appUpdateService.showsUpdatePrompt == true {
             return .updateAvailable
         }
         return resolvedState

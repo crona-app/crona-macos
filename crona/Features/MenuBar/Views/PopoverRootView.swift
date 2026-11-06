@@ -142,31 +142,6 @@ struct PopoverRootView: View {
                     IssueCreationSuccessView(appState: appState, success: success)
                 }
 
-                if appUpdateService.hasAvailableUpdate,
-                    !appState.isUpdatePresentationBlocked
-                {
-                    Button(action: appState.checkForAppUpdates) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "arrow.down.circle.fill")
-                                .foregroundStyle(PopupVisualTheme.semantic(.info))
-                            Text(
-                                "Crona \(appUpdateService.snapshot.latestVersion ?? "") is ready"
-                            )
-                            .font(.subheadline.weight(.semibold))
-                            Spacer()
-                            Text("Update")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 11)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(PopupVisualTheme.primaryText.opacity(0.07))
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
             }
 
             if appState.isStatsCalendarPresented {
@@ -212,6 +187,15 @@ struct PopoverRootView: View {
                 .font(.caption2)
                 .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.72))
                 .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if !appState.isStatsCalendarPresented,
+                appUpdateService.showsUpdatePrompt,
+                !appState.isUpdatePresentationBlocked
+            {
+                UpdateAvailablePill(
+                    latestVersion: appUpdateService.snapshot.latestVersion,
+                    action: appState.checkForAppUpdates)
             }
         }
         .padding(14)

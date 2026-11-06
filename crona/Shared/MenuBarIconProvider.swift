@@ -118,18 +118,20 @@ struct CronaMenuBarIconRenderer {
 
     private let cache = NSCache<NSString, NSImage>()
 
-    func image(for state: MenuBarIconState, connectingPhase: Double = 0) -> NSImage {
-        let key = cacheKey(for: state, connectingPhase: connectingPhase) as NSString
+    /// `showsUpdateDot` adds the update dot to a state that has its own glyph, such as a running timer.
+    func image(for state: MenuBarIconState, connectingPhase: Double = 0, showsUpdateDot: Bool = false) -> NSImage {
+        let dot = showsUpdateDot && state != .updateAvailable
+        let key = (cacheKey(for: state, connectingPhase: connectingPhase) + (dot ? "-update" : "")) as NSString
         if let cached = cache.object(forKey: key) {
             return cached
         }
 
-        let image = render(state: state, connectingPhase: connectingPhase)
+        let image = render(state: state, connectingPhase: connectingPhase, showsUpdateDot: dot)
         cache.setObject(image, forKey: key)
         return image
     }
 
-    private func render(state: MenuBarIconState, connectingPhase: Double) -> NSImage {
+    private func render(state: MenuBarIconState, connectingPhase: Double, showsUpdateDot: Bool) -> NSImage {
         let image = NSImage(size: Self.canvasSize)
         image.lockFocus()
         defer { image.unlockFocus() }
@@ -171,6 +173,10 @@ struct CronaMenuBarIconRenderer {
             drawCompletionGlyph(context)
         case .updateAvailable:
             stroke(context, path: path, width: Self.strokeWidth, alpha: 1)
+            drawUpdateArrow(context)
+            drawUpdateBadge(context)
+        }
+        if showsUpdateDot {
             drawUpdateBadge(context)
         }
 
@@ -255,10 +261,30 @@ struct CronaMenuBarIconRenderer {
         context.restoreGState()
     }
 
-    private func drawUpdateBadge(_ context: CGContext) {
+    private func drawUpdateArrow(_ context: CGContext) {
         context.saveGState()
+        context.setStrokeColor(NSColor.black.cgColor)
+        context.setLineWidth(1.35)
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+        context.move(to: CGPoint(x: 9, y: 6.2))
+        context.addLine(to: CGPoint(x: 9, y: 11.6))
+        context.move(to: CGPoint(x: 7.1, y: 9.7))
+        context.addLine(to: CGPoint(x: 9, y: 11.6))
+        context.addLine(to: CGPoint(x: 10.9, y: 9.7))
+        context.strokePath()
+        context.restoreGState()
+    }
+
+    /// A solid dot in the top-right corner, cut out from the arc so it reads on its own.
+    private func drawUpdateBadge(_ context: CGContext) {
+        let dot = CGRect(x: 12.4, y: 12.4, width: 5.2, height: 5.2)
+        context.saveGState()
+        context.setBlendMode(.clear)
+        context.fillEllipse(in: dot.insetBy(dx: -1.2, dy: -1.2))
+        context.setBlendMode(.normal)
         context.setFillColor(NSColor.black.cgColor)
-        context.fillEllipse(in: CGRect(x: 12.25, y: 12.25, width: 3.5, height: 3.5))
+        context.fillEllipse(in: dot)
         context.restoreGState()
     }
 
@@ -315,7 +341,7 @@ struct CronaMenuBarIconRenderer {
 enum MenuBarIconProvider {
     private static let renderer = CronaMenuBarIconRenderer()
 
-    static func image(for state: MenuBarIconState, connectingPhase: Double = 0) -> NSImage {
-        renderer.image(for: state, connectingPhase: connectingPhase)
+    static func image(for state: MenuBarIconState, connectingPhase: Double = 0, showsUpdateDot: Bool = false) -> NSImage {
+        renderer.image(for: state, connectingPhase: connectingPhase, showsUpdateDot: showsUpdateDot)
     }
 }

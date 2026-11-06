@@ -103,6 +103,21 @@ final class MenuBarTests: DaemonTestCase {
         }
     }
 
+    func testMenuBarUpdateDotChangesRunningTimerIcon() throws {
+        let renderer = CronaMenuBarIconRenderer()
+        let plain = renderer.image(for: .focus(progress: 0.5))
+        let dotted = renderer.image(for: .focus(progress: 0.5), showsUpdateDot: true)
+        XCTAssertTrue(dotted.isTemplate)
+        XCTAssertNotEqual(plain.tiffRepresentation, dotted.tiffRepresentation)
+    }
+
+    func testMenuBarUpdateDotIsIgnoredForTheUpdateIcon() {
+        let renderer = CronaMenuBarIconRenderer()
+        XCTAssertEqual(
+            renderer.image(for: .updateAvailable).tiffRepresentation,
+            renderer.image(for: .updateAvailable, showsUpdateDot: true).tiffRepresentation)
+    }
+
     func testMenuBarFormatterAdaptiveUsesContextualUnits() {
         XCTAssertEqual(MenuBarTextFormatter.formatAdaptive(seconds: 0), "0s")
         XCTAssertEqual(MenuBarTextFormatter.formatAdaptive(seconds: 59), "59s")
@@ -272,5 +287,17 @@ final class MenuBarTests: DaemonTestCase {
         )
 
         XCTAssertEqual(title, "Offline")
+    }
+}
+
+@MainActor
+final class UpdateAvailablePillTests: XCTestCase {
+    func testPillNamesTheLatestVersion() {
+        XCTAssertEqual(UpdateAvailablePill.title(latestVersion: "1.1.0-beta.3"), "Crona 1.1.0-beta.3 available")
+    }
+
+    func testPillFallsBackWithoutAVersion() {
+        XCTAssertEqual(UpdateAvailablePill.title(latestVersion: nil), "New version available")
+        XCTAssertEqual(UpdateAvailablePill.title(latestVersion: ""), "New version available")
     }
 }

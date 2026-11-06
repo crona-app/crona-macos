@@ -284,6 +284,18 @@ func dayBoundaryTimeString(from date: Date) -> String {
 
 
 #if DEBUG
+    private struct ForceUpdateBadgeToggle: View {
+        @ObservedObject var service: AppUpdateService
+
+        var body: some View {
+            SettingsToggleRow(
+                title: "Force Update Prompt",
+                subtitle: "Show the menu bar update badge and the popup's update pill without a real update.",
+                isOn: $service.forcesUpdatePrompt
+            )
+        }
+    }
+
     private struct DeveloperSettingsView: View {
         @ObservedObject var appState: CompanionAppState
 
@@ -339,6 +351,7 @@ func dayBoundaryTimeString(from date: Date) -> String {
                 }
 
                 SettingsCard("Menu Bar Icon Preview") {
+                    ForceUpdateBadgeToggle(service: appState.appUpdateService)
                     MenuBarIconPreviewGrid()
                 }
             }
