@@ -344,6 +344,7 @@ jobs:
             --maximum-versions 0
             --download-url-prefix "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/"
             --release-notes-url-prefix "https://crona.work/updates/mac/"
+            --full-release-notes-url "https://crona.work/releases"
           )
           if [[ "${GITHUB_REF_NAME}" == *-beta.* ]]; then
             APPCAST_ARGS+=(--channel beta)
