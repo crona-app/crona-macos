@@ -52,6 +52,6 @@ For shared daemon installation and provisioning guidance, use the core Crona ins
 
 The app uses Sparkle for in-app updates. The signed appcast feed is published at:
 
-- <https://webxsid.github.io/crona-macos/appcast.xml>
+- <https://crona.work/updates/mac/appcast.xml>
 
 Use the DMG for manual upgrades. Sparkle consumes the ZIP artifact and appcast feed automatically.

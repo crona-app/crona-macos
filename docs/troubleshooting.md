@@ -30,7 +30,7 @@ Check both macOS notification permissions and the diagnostics snapshot's reporte
 Confirm:
 
 - the app is on the intended channel, stable or beta
-- the appcast feed is reachable: <https://webxsid.github.io/crona-macos/appcast.xml>
+- the appcast feed is reachable: <https://crona.work/updates/mac/appcast.xml>
 - the embedded release version is older than the published version
 
 Remember that beta installs can see both beta and stable releases, while stable installs only see stable releases.

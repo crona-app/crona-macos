@@ -49,7 +49,7 @@
 	<key>CRONA_UPDATES_ENABLED</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://webxsid.github.io/crona-macos/appcast.xml</string>
+	<string>https://crona.work/updates/mac/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>$(CRONA_SPARKLE_PUBLIC_KEY)</string>
 	<key>SUEnableAutomaticChecks</key>

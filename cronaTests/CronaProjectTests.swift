@@ -10,13 +10,14 @@ final class CronaProjectTests: XCTestCase {
         XCTAssertEqual(CronaProject.discussionsURL, "\(base)/discussions")
     }
 
-    /// The release feed is baked into installed apps, so it must move with the owner deliberately.
-    func testReleaseFeedURLSharesRepoOwner() throws {
+    /// The release feed is baked into installed apps, so it stays on crona.work whatever the owner.
+    func testReleaseFeedURLIsOnCronaDomain() throws {
         let plist = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Config/Info-Release.plist")
         let values = try XCTUnwrap(NSDictionary(contentsOf: plist))
         let feed = try XCTUnwrap(values["SUFeedURL"] as? String)
-        XCTAssertEqual(feed, "https://\(CronaProject.repoOwner).github.io/crona-macos/appcast.xml")
+        XCTAssertEqual(feed, CronaProject.updateFeedURL)
+        XCTAssertEqual(URL(string: feed)?.host, "crona.work")
     }
 }

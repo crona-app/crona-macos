@@ -22,7 +22,11 @@ If the matching file exists, the release workflow publishes that body instead of
 
 The signed Sparkle appcast is published at:
 
-- <https://webxsid.github.io/crona-macos/appcast.xml>
+- <https://crona.work/updates/mac/appcast.xml>
+
+Installed apps read that crona.work address, which redirects (302) to the GitHub Pages feed this
+workflow deploys (`<owner>.github.io/crona-macos`). If the repository moves, change only the
+redirect target in the site repository's `public/_redirects`; never change `SUFeedURL`.
 
 ## Release Artifacts
 
