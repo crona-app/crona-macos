@@ -16,6 +16,7 @@ The third 1.1.0 beta moves updates to crona.work after the project's move to the
 
 - Read updates from `https://crona.work/updates/mac/appcast.xml`, which follows the feed wherever it is hosted.
 - Point docs, GitHub, Support, and Feedback & Roadmap links at the `crona-app` organization, and send feedback to GitHub Discussions instead of UserJot.
+- Make an available update easier to notice: the menu bar icon shows an up-arrow and a larger dot, the dot also appears during sessions, and the popup shows a pinned **Crona X available** pill at the bottom.
 - Rework the focus-complete, Add more time, and End Session popups: a completion ring, one focused-time line, a session count for today, extension chips, and one issue card with repo, stream, and time against the estimate.
 
 ### Fixed
