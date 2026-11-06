@@ -690,19 +690,19 @@ final class CompanionAppState: ObservableObject {
     }
 
     func openDocumentation() {
-        openExternalURL("https://github.com/webxsid/crona/tree/main/docs")
+        openExternalURL(CronaProject.docsURL)
     }
 
     func openGitHub() {
-        openExternalURL("https://github.com/webxsid/crona")
+        openExternalURL(CronaProject.coreRepoURL)
     }
 
     func openSupport() {
-        openExternalURL("https://github.com/webxsid/crona/discussions")
+        openExternalURL(CronaProject.discussionsURL)
     }
 
     func openFeedbackAndRoadmap() {
-        openExternalURL("https://crona.userjot.com/?cursor=1&order=top&limit=10")
+        openExternalURL(CronaProject.discussionsURL)
     }
 
     private func openExternalURL(_ value: String) {

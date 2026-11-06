@@ -55,7 +55,7 @@ jobs:
 
           mkdir -p feed
           if curl --fail --silent --show-error \
-            "https://webxsid.github.io/crona-macos/appcast.xml" \
+            "https://${GITHUB_REPOSITORY_OWNER}.github.io/crona-macos/appcast.xml" \
             -o feed/appcast.xml; then
             LATEST_BUILD="$(ruby -r rexml/document -e '
               doc = REXML::Document.new(File.read(ARGV[0]))
@@ -342,8 +342,8 @@ jobs:
           APPCAST_ARGS=(
             --ed-key-file -
             --maximum-versions 0
-            --download-url-prefix "https://github.com/webxsid/crona-macos/releases/download/${GITHUB_REF_NAME}/"
-            --release-notes-url-prefix "https://webxsid.github.io/crona-macos/"
+            --download-url-prefix "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/"
+            --release-notes-url-prefix "https://${GITHUB_REPOSITORY_OWNER}.github.io/crona-macos/"
           )
           if [[ "${GITHUB_REF_NAME}" == *-beta.* ]]; then
             APPCAST_ARGS+=(--channel beta)
