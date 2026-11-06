@@ -4,7 +4,7 @@
 
 This repository contains the native macOS client. The core daemon, CLI, and terminal UI are maintained in the main Crona repo:
 
-- <https://github.com/webxsid/crona>
+- <https://github.com/crona-app/crona>
 
 When a change touches daemon behavior, protocol, or shared product language, confirm the corresponding source of truth in the core repo instead of drifting the macOS client docs or assumptions.
 

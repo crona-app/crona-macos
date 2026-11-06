@@ -4,8 +4,8 @@ Crona for macOS is the native macOS client for Crona. It connects to the local C
 
 This repository contains the SwiftUI/AppKit client. The core Crona daemon, CLI, and terminal UI live in the main Crona repository:
 
-- Core repo: <https://github.com/webxsid/crona>
-- Core docs: <https://github.com/webxsid/crona/tree/main/docs>
+- Core repo: <https://github.com/crona-app/crona>
+- Core docs: <https://github.com/crona-app/crona/tree/main/docs>
 
 ## What Lives Here
 
@@ -31,8 +31,8 @@ The macOS app expects a local Crona runtime directory with daemon discovery meta
 
 ## Support
 
-- macOS app releases: <https://github.com/webxsid/crona-macos/releases>
-- core project issues and discussions: <https://github.com/webxsid/crona>
+- macOS app releases: <https://github.com/crona-app/crona-macos/releases>
+- core project issues and discussions: <https://github.com/crona-app/crona>
 
 ## License
 

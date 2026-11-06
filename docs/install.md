@@ -15,7 +15,7 @@ The DMG is the user-facing installer. The ZIP exists for Sparkle and is not the 
 
 Releases are published here:
 
-- <https://github.com/webxsid/crona-macos/releases>
+- <https://github.com/crona-app/crona-macos/releases>
 
 ## Release Channels
 
@@ -46,7 +46,7 @@ If the runtime is missing or not running, the app can still launch, but daemon-b
 
 For shared daemon installation and provisioning guidance, use the core Crona install docs:
 
-- <https://github.com/webxsid/crona/blob/main/docs/install.md>
+- <https://github.com/crona-app/crona/blob/main/docs/install.md>
 
 ## Updates
 

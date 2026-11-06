@@ -18,7 +18,7 @@ This docs set covers the native macOS client only. It does not try to duplicate 
 
 Use the main Crona repo for shared product documentation:
 
-- Core docs index: <https://github.com/webxsid/crona/blob/main/docs/README.md>
-- Concepts: <https://github.com/webxsid/crona/blob/main/docs/concepts.md>
-- Core install guide: <https://github.com/webxsid/crona/blob/main/docs/install.md>
-- Development: <https://github.com/webxsid/crona/blob/main/docs/development.md>
+- Core docs index: <https://github.com/crona-app/crona/blob/main/docs/README.md>
+- Concepts: <https://github.com/crona-app/crona/blob/main/docs/concepts.md>
+- Core install guide: <https://github.com/crona-app/crona/blob/main/docs/install.md>
+- Development: <https://github.com/crona-app/crona/blob/main/docs/development.md>

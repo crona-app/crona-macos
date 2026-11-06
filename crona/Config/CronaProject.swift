@@ -4,7 +4,7 @@ import Foundation
 /// the release workflow takes it from the repository it runs in.
 enum CronaProject {
     /// Owns the core `crona` repository, the source of truth for docs, support and feedback.
-    static let repoOwner = "webxsid"
+    static let repoOwner = "crona-app"
     static let coreRepoName = "crona"
 
     static var coreRepoSlug: String { "\(repoOwner)/\(coreRepoName)" }
