@@ -4,6 +4,24 @@ All notable changes to **Crona for macOS** are documented here.
 
 ## Unreleased
 
+## [1.1.0-beta.3] - 2026-11-06
+
+The third 1.1.0 beta moves updates to crona.work after the project's move to the `crona-app` GitHub organization, calms the focus-complete popups, and keeps the Issues tab on the daemon's day.
+
+### Added
+
+- Add a Completion Celebration setting (None, Glow, Confetti) that plays a green screen-edge glow or two confetti cannons on the active screen when a focus block completes. Reduce Motion turns it off.
+
+### Changed
+
+- Read updates from `https://crona.work/updates/mac/appcast.xml`, which follows the feed wherever it is hosted.
+- Point docs, GitHub, Support, and Feedback & Roadmap links at the `crona-app` organization, and send feedback to GitHub Discussions instead of UserJot.
+- Rework the focus-complete, Add more time, and End Session popups: a completion ring, one focused-time line, a session count for today, extension chips, and one issue card with repo, stream, and time against the estimate.
+
+### Fixed
+
+- Keep the Issues tab on the daemon's logical day after a day change or a reconnect, instead of showing yesterday until the app restarts.
+
 ## [1.1.0-beta.2] - 2026-10-27
 
 The second 1.1.0 beta adds the delay penalty, carry-over, tags, and bulk issue capture with an Inbox, and organizes the Issues tab around a shared day.

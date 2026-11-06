@@ -67,6 +67,6 @@ The app currently ships with these base config values:
 - `CRONA_KERNEL_EXECUTABLE = crona-daemon`
 - `CRONA_KERNEL_DEV_EXECUTABLE = crona-daemon-dev`
 - `CRONA_RELEASE_CHANNEL = beta`
-- `CRONA_RELEASE_VERSION = 1.1.0-beta.2`
+- `CRONA_RELEASE_VERSION = 1.1.0-beta.3`
 
 Those values come from the Xcode config files in [`Config`](../Config).

@@ -61,9 +61,9 @@ Generate the Sparkle key pair once with Sparkle's `generate_keys` tool. Store th
 
 ## 1.1.0 beta preparation
 
-The metadata for `v1.1.0-beta.2` is marketing version `1.1.0`, build `20`, and semantic release version `1.1.0-beta.2`. It requires daemon protocol `1.7`.
+The metadata for `v1.1.0-beta.3` is marketing version `1.1.0`, build `21`, and semantic release version `1.1.0-beta.3`. It requires daemon protocol `1.7`.
 
-Build numbers continue across marketing versions. Build `19` (`v1.1.0-beta.1`) followed the 1.0.0 build `18`, and build `20` follows it, to preserve Sparkle appcast ordering.
+Build numbers continue across marketing versions. Build `19` (`v1.1.0-beta.1`) followed the 1.0.0 build `18`, build `20` (`v1.1.0-beta.2`) followed it, and build `21` follows that, to preserve Sparkle appcast ordering.
 
 ## Cutting a Release
 

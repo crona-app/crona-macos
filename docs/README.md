@@ -11,6 +11,7 @@ This docs set covers the native macOS client only. It does not try to duplicate 
 - [Troubleshooting](troubleshooting.md): common runtime, notification, and update issues
 - [Future plan: macOS widget](plans/macos-widget.md): parked widget design, decisions so far, and the signing spike to do first
 - [Changelog](changelog.md): notable macOS app changes and release history
+- [1.1.0-beta.3 release notes](release-notes/v1.1.0-beta.3.md): updates move to crona.work, a calmer focus-complete popup with optional glow or confetti, and the Issues tab keeping up with the day
 - [1.1.0-beta.2 release notes](release-notes/v1.1.0-beta.2.md): delay penalty, carry-over, tags, issue capture and the Inbox, and a shared day across tabs
 - [1.1.0-beta.1 release notes](release-notes/v1.1.0-beta.1.md): ad hoc focus sessions, popup refinements, and floating timer progress
 
