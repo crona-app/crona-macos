@@ -55,6 +55,64 @@ final class DailyIssuesModelTests: DaemonTestCase {
         XCTAssertEqual(appState.day.selectedDate, previous)
     }
 
+    func testChangingDayClearsPreviousIssuesAndFailedRefreshDoesNotRestoreThem() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        transport.todaySummaryIssuesFixture = [issueJSON(1, due: transport.logicalDate)]
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+        await appState.dailyIssues.refresh()
+        XCTAssertEqual(appState.dailyIssues.sections.planned.map(\.id), [1])
+
+        transport.failListAllIssues = true
+        appState.day.showPreviousDay()
+        XCTAssertTrue(appState.dailyIssues.sections.planned.isEmpty)
+        XCTAssertNil(appState.dailyIssues.loadedDate)
+        await appState.dailyIssues.refresh()
+        await waitForIssueCreator { appState.dailyIssues.errorMessage != nil }
+        XCTAssertNotNil(appState.dailyIssues.errorMessage)
+        XCTAssertTrue(appState.dailyIssues.sections.planned.isEmpty)
+
+        transport.failListAllIssues = false
+        await appState.dailyIssues.refresh()
+        XCTAssertNil(appState.dailyIssues.errorMessage)
+        XCTAssertEqual(appState.dailyIssues.loadedDate, appState.day.selectedDate)
+        XCTAssertEqual(appState.dailyIssues.sections.upcoming.map(\.id), [1])
+    }
+
+    func testFakeDaemonDayRolloverUpdatesTodayAndDateNavigation() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let oldDate = transport.logicalDate
+        let newDate = CronaCalendarDate.adding(days: 1, to: oldDate)!
+        transport.todaySummaryIssuesFixture = [issueJSON(1, due: oldDate), issueJSON(2, due: newDate)]
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+        await appState.refreshSelectedDay()
+        XCTAssertEqual(appState.dailyIssues.sections.planned.map(\.id), [1])
+
+        transport.healthDate = newDate
+        let event = try JSONDecoder().decode(CronaProtocolEvent.self, from: Data("""
+            {"type":"day.start","payload":{"kind":"start","dateBefore":"\(oldDate)",
+            "dateAfter":"\(newDate)","effectiveLocalTime":"04:00",
+            "timezone":"Asia/Kolkata","occurrenceId":"test-rollover","logicalDate":"\(newDate)"}}
+            """.utf8))
+        await waitForIssueCreator { !transport.eventContinuations.isEmpty }
+        transport.eventContinuations[0].yield(event)
+        await waitForIssueCreator {
+            appState.dailyIssues.loadedDate == newDate && !appState.dailyIssues.isLoading
+        }
+        XCTAssertEqual(appState.day.selectedDate, newDate)
+        XCTAssertTrue(appState.day.isToday)
+        XCTAssertEqual(appState.dailyIssues.sections.planned.map(\.id), [2])
+        XCTAssertEqual(appState.dailyIssues.sections.overdue.map(\.id), [1])
+
+        appState.day.showPreviousDay()
+        await waitForIssueCreator { appState.dailyIssues.loadedDate == oldDate }
+        XCTAssertEqual(appState.dailyIssues.sections.planned.map(\.id), [1])
+        appState.day.showToday()
+        await waitForIssueCreator { appState.dailyIssues.loadedDate == newDate }
+        XCTAssertEqual(appState.dailyIssues.sections.planned.map(\.id), [2])
+    }
+
     func testSectionTitlesAndEmptyText() {
         XCTAssertEqual(DailySectionPicker.title(for: .overdue, overdueCount: 0), "Overdue")
         XCTAssertEqual(DailySectionPicker.title(for: .overdue, overdueCount: 3), "Overdue (3)")

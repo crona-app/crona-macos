@@ -380,7 +380,14 @@ struct IdleFocusView: View {
     @ViewBuilder
     private var issueList: some View {
         let sectionIssues = dailyIssues.sections.issues(in: dailyIssues.section)
-        if sectionIssues.isEmpty {
+        if let error = dailyIssues.errorMessage {
+            VStack(spacing: 8) {
+                Text(error).font(.caption).foregroundStyle(.secondary)
+                Button("Retry") { Task { await dailyIssues.refresh() } }
+            }
+        } else if dailyIssues.isLoading && dailyIssues.loadedDate == nil {
+            ProgressView("Loading issues")
+        } else if sectionIssues.isEmpty {
             PlaceholderPanel(
                 icon: "checkmark.circle",
                 title: DailySectionPicker.emptyText(for: dailyIssues.section),

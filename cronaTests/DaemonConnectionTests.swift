@@ -4,6 +4,15 @@ import XCTest
 
 @MainActor
 final class DaemonConnectionTests: DaemonTestCase {
+    func testCleanEventStreamClosureReconnects() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        await waitForIssueCreator { !transport.eventContinuations.isEmpty }
+        transport.eventContinuations[0].finish()
+        await waitForIssueCreator { transport.eventContinuations.count >= 2 }
+        XCTAssertEqual(connection.connectionState, .connected)
+    }
+
     func testDiscoveryResolvesEndpointAndDefaultsTransport() {
         let config = CronaConfig(
             environment: .development,

@@ -53,6 +53,7 @@ class DaemonTestCase: XCTestCase {
 }
 
 final class IssueCreatorTestTransport: CronaDaemonTransport {
+    var eventContinuations: [AsyncThrowingStream<CronaProtocolEvent, Error>.Continuation] = []
     let logicalDate = "2001-02-03"
     private(set) var requests: [RequestWithParamsProbe] = []
     var methods: [String] { requests.map(\.method) }
@@ -144,7 +145,7 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
             if suspendRefresh {
                 await withCheckedContinuation { refreshContinuation = $0 }
             }
-            result = ["date": logicalDate, "totalIssues": todaySummaryIssuesFixture.count,
+            result = ["date": healthDate ?? logicalDate, "totalIssues": todaySummaryIssuesFixture.count,
                 "issues": todaySummaryIssuesFixture,
                 "totalEstimatedMinutes": 0, "completedIssues": 0,
                 "abandonedIssues": 0, "workedSeconds": 0] as [String: Any]
@@ -259,7 +260,9 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
     }
 
     func openEventStream(with request: Data) async throws -> AsyncThrowingStream<CronaProtocolEvent, Error> {
-        AsyncThrowingStream { $0.finish() }
+        AsyncThrowingStream { continuation in
+            eventContinuations.append(continuation)
+        }
     }
 }
 

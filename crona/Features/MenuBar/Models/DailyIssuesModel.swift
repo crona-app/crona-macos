@@ -18,12 +18,15 @@ final class DailyIssuesModel: ObservableObject {
     private var tagFilterSubscription: AnyCancellable?
     /// Every section before the Issues tag filter applies.
     private var unfilteredSections = DailyIssueSections()
+    private var refreshID = UUID()
+    private var daySubscription: AnyCancellable?
     private let logger = Logger(subsystem: "com.crona.macos", category: "dailyIssues")
 
     /// The sections after the Issues tag filter.
     @Published private(set) var sections = DailyIssueSections()
     @Published var section: DailySection = .planned
     @Published private(set) var isLoading = false
+    @Published private(set) var errorMessage: String?
     /// The day the sections were last built for, so a failed refresh is not mistaken for current.
     private(set) var loadedDate: String?
 
@@ -35,6 +38,15 @@ final class DailyIssuesModel: ObservableObject {
         self.day = day
         self.issueCreationService = issueCreationService
         self.tags = tags
+        daySubscription = day.$selectedDate.removeDuplicates().sink { [weak self] _ in
+            guard let self else { return }
+            refreshID = UUID()
+            unfilteredSections = DailyIssueSections()
+            sections = DailyIssueSections()
+            loadedDate = nil
+            errorMessage = nil
+            isLoading = false
+        }
         // @Published emits before the change lands, so filter with the emitted values.
         tagFilterSubscription = tags.$filters.combineLatest(tags.$tags)
             .dropFirst()
@@ -65,8 +77,11 @@ final class DailyIssuesModel: ObservableObject {
 
     func refresh() async {
         let date = day.selectedDate
+        let requestID = UUID()
+        refreshID = requestID
         isLoading = true
-        defer { isLoading = false }
+        errorMessage = nil
+        defer { if refreshID == requestID { isLoading = false } }
         // The Inbox is recognised by its system stream, which comes with the destinations list.
         if issueCreationService.destinations.isEmpty && issueCreationService.systemStreamIDs.isEmpty {
             await issueCreationService.loadDestinations()
@@ -85,11 +100,13 @@ final class DailyIssuesModel: ObservableObject {
                 issues: fetchedIssues, plan: try await plan, date: date,
                 systemStreamIDs: issueCreationService.systemStreamIDs)
             // A newer day may have been picked while this one loaded.
-            guard date == day.selectedDate else { return }
+            guard date == day.selectedDate, refreshID == requestID else { return }
             unfilteredSections = built
             loadedDate = date
             applyFilter(tags.filter(for: .issues), known: tags.knownNames)
         } catch {
+            guard refreshID == requestID, date == day.selectedDate else { return }
+            errorMessage = error.localizedDescription
             logger.error("Daily issues refresh failed: \(error.localizedDescription, privacy: .private)")
         }
     }

@@ -20,6 +20,7 @@ final class DaemonConnectionService: ObservableObject {
     private let postLaunchRetryDelay: Duration
     private var connectionTask: Task<Void, Never>?
     private var eventTask: Task<Void, Never>?
+    private var generation = UUID()
     private var isAttemptingConnection = false
     private var launchFailureLatched = false
     private var attemptedDaemonLaunchEndpoints: Set<String> = []
@@ -53,10 +54,12 @@ final class DaemonConnectionService: ObservableObject {
 
     func start() {
         guard connectionTask == nil else { return }
-        connectionTask = Task { await runConnectionLoop() }
+        let generation = generation
+        connectionTask = Task { await runConnectionLoop(generation: generation) }
     }
 
     func stop() {
+        generation = UUID()
         connectionTask?.cancel()
         eventTask?.cancel()
         connectionTask = nil
@@ -172,9 +175,9 @@ final class DaemonConnectionService: ObservableObject {
         lastErrorDescription = nil
     }
 
-    private func runConnectionLoop() async {
-        defer { connectionTask = nil }
-        while !Task.isCancelled {
+    private func runConnectionLoop(generation: UUID) async {
+        defer { if self.generation == generation { connectionTask = nil } }
+        while !Task.isCancelled && self.generation == generation {
             if launchFailureLatched {
                 logger.debug("Connection loop stopped after daemon launch failure")
                 return
@@ -186,7 +189,7 @@ final class DaemonConnectionService: ObservableObject {
             }
 
             await connectOnce()
-            if Task.isCancelled { break }
+            if Task.isCancelled || self.generation != generation { break }
             if launchFailureLatched { return }
             try? await Task.sleep(for: reconnectInterval)
         }
@@ -198,8 +201,10 @@ final class DaemonConnectionService: ObservableObject {
             return
         }
 
+        let generation = generation
+        guard !Task.isCancelled else { return }
         isAttemptingConnection = true
-        defer { isAttemptingConnection = false }
+        defer { if self.generation == generation { isAttemptingConnection = false } }
         connectionState = .connecting
         let runtime = kernelDiscovery.reload()
         resolvedDiscovery = runtime.resolvedDiscovery
@@ -229,7 +234,9 @@ final class DaemonConnectionService: ObservableObject {
         let client = clientFactory(discovery.endpoint)
         do {
             let health = try await client.healthGet()
+            guard self.generation == generation, !Task.isCancelled else { return }
             let info = try await client.kernelInfoGet()
+            guard self.generation == generation, !Task.isCancelled else { return }
             logger.debug("Daemon handshake succeeded. endpoint=\(discovery.endpoint, privacy: .private(mask: .hash)) protocol=\(info.protocolVersion, privacy: .public)")
 
             guard info.protocolVersion == CronaProtocolVersion.current.rawValue else {
@@ -250,7 +257,9 @@ final class DaemonConnectionService: ObservableObject {
             self.timezone = health.timezone ?? ""
             self.lastDayBoundaryOccurrenceID = nil
             self.kernelInfo = info
-            self.alertStatus = try? await client.alertsStatusGet()
+            let alertStatus = try? await client.alertsStatusGet()
+            guard self.generation == generation, !Task.isCancelled else { return }
+            self.alertStatus = alertStatus
             self.connectionState = .connected
             self.lastReconnectAt = Date()
             self.lastErrorDescription = nil
@@ -259,6 +268,7 @@ final class DaemonConnectionService: ObservableObject {
             NotificationCenter.default.post(name: .cronaDaemonDidConnect, object: nil)
             await subscribeToEvents(using: client)
         } catch {
+            guard self.generation == generation, !Task.isCancelled else { return }
             if await attemptDaemonLaunchIfNeeded(
                 runtime: runtime,
                 discovery: discovery,
@@ -275,21 +285,27 @@ final class DaemonConnectionService: ObservableObject {
 
     private func subscribeToEvents(using client: CronaDaemonClient) async {
         eventTask?.cancel()
+        let generation = generation
         eventTask = Task {
             do {
                 logger.debug("Starting daemon event stream consumer")
                 let stream = try await client.subscribeToEvents()
                 for try await event in stream {
-                    if Task.isCancelled { break }
+                    if Task.isCancelled || self.generation != generation { break }
                     logger.debug("Posting daemon event notification: \(event.type, privacy: .public)")
                     NotificationCenter.default.post(name: .cronaDaemonEventReceived, object: event)
                 }
                 await MainActor.run {
+                    guard self.generation == generation, !Task.isCancelled else { return }
+                    self.markDaemonStopped()
+                    self.lastErrorDescription = "The daemon event stream closed."
                     self.logger.debug("Daemon event stream ended without error")
                     self.eventTask = nil
                 }
             } catch {
                 await MainActor.run {
+                    guard self.generation == generation, !Task.isCancelled else { return }
+                    self.markDaemonStopped()
                     self.client = nil
                     self.currentDate = ""
                     self.timezone = ""
@@ -308,7 +324,8 @@ final class DaemonConnectionService: ObservableObject {
         discovery: CronaResolvedKernelDiscovery?,
         after error: Error?
     ) async -> Bool {
-        guard connectionState == .connecting else { return false }
+        let generation = generation
+        guard !Task.isCancelled, connectionState == .connecting else { return false }
         let launchAttemptKey = discovery?.endpoint ?? "runtime:\(runtime.config.runtimeDirectoryPath)"
         guard attemptedDaemonLaunchEndpoints.insert(launchAttemptKey).inserted else { return false }
 
@@ -317,6 +334,7 @@ final class DaemonConnectionService: ObservableObject {
             clearLatchedLaunchFailure()
             logger.log("Daemon recovery launched local daemon and will retry.")
             try? await Task.sleep(for: postLaunchRetryDelay)
+            guard self.generation == generation, !Task.isCancelled else { return true }
             await connectOnce(force: true)
             return true
         } catch {

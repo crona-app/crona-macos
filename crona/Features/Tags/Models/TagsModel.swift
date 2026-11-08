@@ -13,6 +13,11 @@ enum TagPane: String, CaseIterable {
 final class TagsModel: ObservableObject {
     private static let refreshEvents: Set<String> = ["tags.changed", "settings.changed"]
 
+    private var saveTask: Task<Void, Never>?
+    private var pendingSaves = 0
+    private var revision = 0
+    private var paneRevisions: [TagPane: Int] = [:]
+    private var confirmed: [TagPane: CronaTagFilter] = [:]
     private let daemonConnection: DaemonConnectionService
     private var eventObserver: NSObjectProtocol?
     private let logger = Logger(subsystem: "com.crona.macos", category: "tags")
@@ -52,8 +57,11 @@ final class TagsModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
         do {
+            let revision = revision
             let saved = try await daemonConnection.withClient { try await $0.tagFiltersGet() }
+            guard pendingSaves == 0, self.revision == revision else { return }
             filters = Self.filters(from: saved)
+            confirmed = filters
         } catch {
             logger.error("Tag filters failed: \(error.localizedDescription, privacy: .private)")
         }
@@ -72,19 +80,33 @@ final class TagsModel: ObservableObject {
     }
 
     func setFilter(_ filter: CronaTagFilter, for pane: TagPane) async {
-        let previous = filters[pane]
+        revision += 1
+        let operation = revision
+        paneRevisions[pane] = operation
+        pendingSaves += 1
         filters[pane] = filter.isEmpty ? nil : filter
-        do {
-            // Patch over the latest map so the TUI's other panes are kept.
-            var saved = try await daemonConnection.withClient { try await $0.tagFiltersGet() }
-            saved[pane.rawValue] = filter.isEmpty ? nil : filter.query
-            try await daemonConnection.withClient { try await $0.tagFiltersPatch(saved) }
-            errorMessage = nil
-        } catch {
-            logger.error("Saving tag filter failed: \(error.localizedDescription, privacy: .private)")
-            filters[pane] = previous
-            errorMessage = error.localizedDescription
+        let previousTask = saveTask
+        let task = Task { @MainActor in
+            await previousTask?.value
+            do {
+                var saved = try await daemonConnection.withClient { try await $0.tagFiltersGet() }
+                saved[pane.rawValue] = filter.isEmpty ? nil : filter.query
+                try await daemonConnection.withClient { try await $0.tagFiltersPatch(saved) }
+                confirmed[pane] = filter.isEmpty ? nil : filter
+                if revision == operation { errorMessage = nil }
+            } catch {
+                if paneRevisions[pane] == operation { filters[pane] = confirmed[pane] }
+                if revision == operation { errorMessage = error.localizedDescription }
+            }
+            pendingSaves -= 1
+            revision += 1
+            if pendingSaves == 0 {
+                saveTask = nil
+                await refresh()
+            }
         }
+        saveTask = task
+        await task.value
     }
 
     private static func filters(from saved: [String: String]) -> [TagPane: CronaTagFilter] {
