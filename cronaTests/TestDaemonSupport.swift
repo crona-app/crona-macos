@@ -70,6 +70,7 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
     var failStart = false
     var suspendStart = false
     var awayModeEnabled = false
+    var awayDatesFixture: [String] = []
     var healthDate: String?
     var todaySummaryIssuesFixture: [[String: Any]] = []
     var planEntriesFixture: [[String: Any]] = []
@@ -196,9 +197,11 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
             if failStart { throw NSError(domain: "FocusStartTests", code: 1) }
             result = ["state": "idle"]
         case "settings.get_all" where awayModeEnabled:
-            result = ["local": ["awayModeEnabled": true]]
+            result = ["local": ["awayModeEnabled": true, "awayDates": awayDatesFixture]]
         case "settings.get_all":
-            result = ["local": tagFiltersFixture.map { ["tagFilters": $0] } ?? [String: Any]()]
+            var local: [String: Any] = ["awayDates": awayDatesFixture]
+            if let tagFiltersFixture { local["tagFilters"] = tagFiltersFixture }
+            result = ["local": local]
         case "settings.patch" where probe.params["key"]?.stringValue == "tagFilters":
             if case let .object(values)? = probe.params["value"] {
                 tagFiltersFixture = values.compactMapValues(\.stringValue)

@@ -17,6 +17,11 @@ final class PopoverDayModel: ObservableObject {
     var isToday: Bool { selectedDate >= today() }
     var canShowNextDay: Bool { selectedDate < today() }
 
+    /// Matches the TUI: historical treatment comes from recorded away dates, not rest rules.
+    func isRecordedAway(in settings: CronaCoreSettings) -> Bool {
+        settings.isHistoricalAwayDate(selectedDate)
+    }
+
     func showPreviousDay() {
         select(CronaCalendarDate.adding(days: -1, to: selectedDate) ?? selectedDate)
     }

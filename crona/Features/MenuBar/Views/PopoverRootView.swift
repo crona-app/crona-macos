@@ -60,6 +60,8 @@ struct PopoverRootView: View {
     @ObservedObject private var endSession: EndSessionModel
     @ObservedObject private var habitEditor: HabitEditorModel
     @ObservedObject private var issueActions: IssueActionEditorModel
+    @ObservedObject private var day: PopoverDayModel
+    @ObservedObject private var coreSettings: CoreSettingsService
     let displayClock: PopupDisplayClock
     let onVisibleSurfaceHeightChange: ((CGFloat) -> Void)?
     @Environment(\.openSettings) private var openSettings
@@ -78,6 +80,8 @@ struct PopoverRootView: View {
         self.endSession = appState.endSession
         self.habitEditor = appState.habitEditor
         self.issueActions = appState.issueActions
+        self.day = appState.day
+        self.coreSettings = appState.coreSettingsService
         self.displayClock = displayClock
         self.onVisibleSurfaceHeightChange = onVisibleSurfaceHeightChange
     }
@@ -265,8 +269,8 @@ struct PopoverRootView: View {
                     !appState.todayIsAway
                     && (appState.isStatsCalendarPresented
                         || appState.selectedPopoverTab == .stats
-                        || appState.selectedPopoverTab == .habits
-                        || appState.selectedPopoverTab == .now)
+                        || (!day.isRecordedAway(in: coreSettings.settings)
+                            && (appState.selectedPopoverTab == .habits || appState.selectedPopoverTab == .now)))
                 {
                     Button {
                         if appState.isStatsCalendarPresented {

@@ -50,10 +50,7 @@ struct WellbeingTabView: View {
             if let historyDate {
                 Text(formattedPopoverDate(historyDate, appState: appState)).font(.headline)
             } else {
-                PopoverDayHeader(appState: appState)
-                Button { appState.openLibrary(.checkIns) } label: {
-                    Label("History", systemImage: "clock.arrow.circlepath")
-                }.buttonStyle(.borderless)
+                PopoverDayHeader(appState: appState, libraryDestination: .checkIns)
             }
             if let entry = wellbeingService.snapshot.checkIn {
                 CheckInTimestampsView(entry: entry, timezone: appState.daemonConnection.timezone, settings: appState.coreSettingsService.settings)

@@ -27,10 +27,7 @@ struct StatsTabView: View {
                         ))
             } else {
                 VStack(spacing: StatsLayout.sectionSpacing) {
-                    PopoverDayHeader(appState: appState)
-                    Button { appState.openLibrary(.review) } label: {
-                        Label("Open Review", systemImage: "chart.xyaxis.line")
-                    }.buttonStyle(.borderless)
+                    PopoverDayHeader(appState: appState, libraryDestination: .review)
                     statsSummaryContent(snapshot: snapshot)
                 }
             }
@@ -61,9 +58,7 @@ struct StatsTabView: View {
     private func statsSummaryBody(snapshot: PopoverStatsSnapshot) -> some View {
         ZStack {
             VStack(spacing: StatsLayout.sectionSpacing) {
-                if appState.coreSettingsService.isHistoricalAwayDate(snapshot.date) {
-                    HistoricalAwayStatsView(date: snapshot.date)
-                } else if let score = snapshot.focusScore, let metrics = snapshot.todayMetrics {
+                if let score = snapshot.focusScore, let metrics = snapshot.todayMetrics {
                     DailyStatsSummaryView(
                         score: score,
                         metrics: metrics,
@@ -428,32 +423,6 @@ struct StatsTabView: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-
-    private struct HistoricalAwayStatsView: View {
-        let date: String
-
-        var body: some View {
-            VStack(spacing: StatsLayout.sectionSpacing) {
-                Image(systemName: "figure.walk.circle.fill")
-                    .font(.system(size: 38, weight: .semibold))
-                    .foregroundStyle(PopupVisualTheme.semantic(.away).opacity(0.82))
-                Text("Away Mode")
-                    .font(.title3.weight(.bold))
-                Text("You chose to rest and recover on \(displayDate).")
-                    .font(.subheadline)
-                    .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.68))
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 32)
-            .padding(.horizontal, 16)
-            .background(subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 24))
-        }
-
-        private var displayDate: String {
-            CronaCalendarDate.localizedString(from: date) ?? date
-        }
-    }
 
     private var statsAnimation: Animation? {
         systemGlass.reduceMotion ? nil : .easeInOut(duration: 0.18)

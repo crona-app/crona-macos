@@ -12,6 +12,7 @@ All notable changes to **Crona for macOS** are documented here.
 - Show habit progress, 7- and 30-day hit-rate rings, a 14-day outcome strip, and recent entries in habit details.
 - Show a time-used ring, worked time, and remaining or overrun estimates in issue details.
 - Keep issue and habit actions in a fixed footer, including the habit duration editor, so long details never push primary actions offscreen.
+- Show a shared recovery panel for recorded historical away dates across Issues, Habits, Wellbeing, and Stats, retaining day/calendar and Library navigation while hiding daily content and creation actions.
 - Consolidate daily Stats into Score, Worked, Issues, and Habits gauges, with focus percentage beside the score and a shared sessions, average, and breaks row.
 - Browse filtered issue and habit details with previous/next controls and arrow keys, retaining the source list on return.
 - Show the selected day's seven latest issue updates as an always-visible activity timeline in Stats, with event icons, readable status changes, and links to available issues.

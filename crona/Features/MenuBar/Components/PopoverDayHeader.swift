@@ -3,10 +3,12 @@ import SwiftUI
 /// Previous/next day pill shared by the day-based popover tabs. Moving it moves every tab.
 struct PopoverDayHeader: View {
     let appState: CompanionAppState
+    let libraryDestination: LibraryDestination?
     @ObservedObject private var day: PopoverDayModel
 
-    init(appState: CompanionAppState) {
+    init(appState: CompanionAppState, libraryDestination: LibraryDestination? = nil) {
         self.appState = appState
+        self.libraryDestination = libraryDestination
         self._day = ObservedObject(wrappedValue: appState.day)
     }
 
@@ -45,23 +47,31 @@ struct PopoverDayHeader: View {
             .modifier(PopoverDatePillSurfaceModifier())
             .frame(height: 32)
         }
+        .padding(.horizontal, libraryDestination == nil ? 0 : 66)
         .frame(maxWidth: .infinity)
         .overlay(alignment: .trailing) {
-            if !day.isToday {
-                Button {
-                    day.showToday()
-                } label: {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 11, weight: .semibold))
-                        .frame(width: 24, height: 24)
+            HStack(spacing: 6) {
+                if !day.isToday {
+                    Button {
+                        day.showToday()
+                    } label: {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 11, weight: .semibold))
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.78))
+                    .background(Circle().fill(PopupVisualTheme.primaryText.opacity(0.08)))
+                    .help("Return to today")
+                    .accessibilityLabel("Return to today")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.78))
-                .background(Circle().fill(PopupVisualTheme.primaryText.opacity(0.08)))
-                .help("Return to today")
-                .accessibilityLabel("Return to today")
-                .padding(.trailing, 6)
+                if let libraryDestination {
+                    PopoverLibraryShortcut(destination: libraryDestination) {
+                        appState.openLibrary(libraryDestination)
+                    }
+                }
             }
+            .padding(.trailing, 6)
         }
     }
 
