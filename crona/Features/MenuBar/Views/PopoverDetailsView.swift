@@ -4,6 +4,8 @@ struct PopoverDetailView: View {
     @ObservedObject var appState: CompanionAppState
     @ObservedObject private var habitsService: HabitsService
     @ObservedObject private var dailyIssues: DailyIssuesModel
+    @ObservedObject private var tags: TagsModel
+    @ObservedObject private var browser: DetailBrowserModel
     let route: PopoverDetailRoute
 
     init(appState: CompanionAppState, route: PopoverDetailRoute) {
@@ -11,10 +13,14 @@ struct PopoverDetailView: View {
         self.route = route
         self.habitsService = appState.habitsService
         self.dailyIssues = appState.dailyIssues
+        self.tags = appState.tags
+        self.browser = appState.detailBrowser
     }
 
     var body: some View {
-        Group {
+        VStack(spacing: 8) {
+            DetailBrowsingControls(appState: appState)
+            Group {
             switch route {
             case .issueDetails(let issueID):
                 if let issue = appState.detailsIssue(id: issueID) {
@@ -23,12 +29,13 @@ struct PopoverDetailView: View {
                     missingDetail(title: "Issue unavailable")
                 }
             case .habitDetails(let habitID):
-                if let habit = habitsService.snapshot.items.first(where: { $0.id == habitID }) {
+                if let habit = habitsService.snapshot.filtered(by: tags.filter(for: .habits), known: tags.knownNames).items.first(where: { $0.id == habitID }) {
                     HabitDetailView(appState: appState, habit: habit)
                 } else {
                     missingDetail(title: "Habit unavailable")
                 }
             }
+            }.id(String(describing: route))
         }
     }
 
@@ -98,13 +105,7 @@ struct IssueDetailView: View {
                 .buttonStyle(.plain)
             }
 
-            DetailSection(title: "Status", icon: CronaIssueStatusPresentation.icon(for: issue.status)) {
-                DetailStatusRow(
-                    title: CronaIssueStatusPresentation.status(for: issue.status)?.title
-                        ?? issue.status.replacingOccurrences(of: "_", with: " ").capitalized,
-                    tint: CronaIssueStatusPresentation.color(for: issue.status)
-                )
-            }
+            IssueProgressSummaryView(issue: issue)
 
             IssueRiskAndCarrySections(appState: appState, issue: issue)
 
@@ -125,22 +126,15 @@ struct IssueDetailView: View {
             DetailSection(title: "Planning", icon: "slider.horizontal.3") {
                 DetailMetadataGrid(rows: [
                     ("Repository", issue.repoName ?? "—"),
-                    ("Worked", MenuBarTextFormatter.formatCompactDuration(seconds: issue.workedSeconds)),
-                    ("Estimate", issue.estimateMinutes.map(MenuBarTextFormatter.formatMinutes) ?? "—"),
                     ("Due", issue.todoForDate.map { formattedPopoverDate($0, appState: appState) } ?? "—"),
                     ("Pinned", issue.pinnedDaily == true ? "Daily" : "No")
                 ])
             }
-
-            Button {
-                appState.dismissDetails()
-                appState.selectFocusIssue(issue)
-            } label: {
-                Label("Start Focus", systemImage: "play.fill")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            IssueDetailActionBar(appState: appState, issue: issue)
+        }
+        .frame(maxHeight: 480)
     }
 }
 
@@ -150,7 +144,6 @@ struct HabitDetailView: View {
     @State private var isLoggingDuration = false
     @State private var durationDraft = ""
     @State private var durationError: String?
-    @FocusState private var durationFieldFocused: Bool
 
     var body: some View {
         detailScroll {
@@ -197,15 +190,7 @@ struct HabitDetailView: View {
                             Label("Mark Failed", systemImage: "xmark")
                         }
                     }
-                    Button {
-                        let targetSeconds = max(60, (habit.targetMinutes ?? 1) * 60)
-                        durationDraft = HabitDurationFormatter.string(from: targetSeconds)
-                        durationError = nil
-                        isLoggingDuration = true
-                        DispatchQueue.main.async {
-                            durationFieldFocused = true
-                        }
-                    } label: {
+                    Button(action: beginDuration) {
                         Label("Log Duration…", systemImage: "clock.fill")
                     }
                 } label: {
@@ -217,7 +202,7 @@ struct HabitDetailView: View {
                 .buttonStyle(.plain)
             }
 
-            DetailSection(title: "Today", icon: habitStatusIcon) {
+            DetailSection(title: appState.day.isToday ? "Today" : appState.day.selectedDate, icon: habitStatusIcon) {
                 DetailStatusRow(title: habitStatusTitle, tint: habitTint)
             }
 
@@ -228,6 +213,8 @@ struct HabitDetailView: View {
                     DetailBodyText(description)
                 }
             }
+
+            HabitHistorySection(habit: habit, model: appState.habitHistory, day: appState.day)
 
             DetailSection(title: "Schedule", icon: "calendar") {
                 DetailMetadataGrid(rows: [
@@ -240,71 +227,27 @@ struct HabitDetailView: View {
                 ])
             }
 
-            if isLoggingDuration {
-                DetailSection(title: "Log Duration", icon: "clock.fill") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            TextField("0h0m0s", text: $durationDraft)
-                                .textFieldStyle(.plain)
-                                .popupInputSurface()
-                                .padding(.horizontal, 9)
-                                .frame(height: 30)
-                                .focused($durationFieldFocused)
-                                .onSubmit(submitDuration)
-                                .onChange(of: durationDraft) {
-                                    durationError = nil
-                                }
-
-                            Button("Cancel") {
-                                isLoggingDuration = false
-                                durationFieldFocused = false
-                            }
-                            .buttonStyle(.bordered)
-
-                            Button("Save", action: submitDuration)
-                                .buttonStyle(.borderedProminent)
-                                .disabled(parsedDuration == nil || parsedDuration == 0)
-                        }
-
-                        Text("Use HhMmSs, for example 1h20m30s or 01:20:30")
-                            .font(.caption)
-                            .foregroundStyle(PopupVisualTheme.secondaryText)
-
-                        if let durationError {
-                            Text(durationError)
-                                .font(.caption)
-                                .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.9))
-                        }
-                    }
-                }
-            }
-
             if let notes = nonEmpty(habit.notes) {
                 DetailSection(title: "Notes", icon: "note.text") {
                     DetailBodyText(notes)
                 }
             }
-
-            if !habit.completed && habit.status != "failed" {
-                HStack(spacing: 10) {
-                    Button {
-                        appState.habitEditor.fail(habit)
-                    } label: {
-                        Label("Fail", systemImage: "xmark")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button {
-                        appState.habitEditor.complete(habit)
-                    } label: {
-                        Label("Done", systemImage: "checkmark")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-            }
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            HabitDetailActionBar(
+                appState: appState, habit: habit,
+                isLoggingDuration: $isLoggingDuration, durationDraft: $durationDraft, durationError: $durationError,
+                parsedDuration: parsedDuration, beginLogging: beginDuration, submitDuration: submitDuration
+            )
+        }
+        .frame(maxHeight: 480)
+    }
+
+    private func beginDuration() {
+        let targetSeconds = max(60, (habit.targetMinutes ?? 1) * 60)
+        durationDraft = HabitDurationFormatter.string(from: targetSeconds)
+        durationError = nil
+        isLoggingDuration = true
     }
 
     private var habitStatusTitle: String {
@@ -333,7 +276,6 @@ struct HabitDetailView: View {
     private func submitDuration() {
         guard let seconds = parsedDuration else {
             durationError = "Enter a duration greater than zero."
-            durationFieldFocused = true
             return
         }
 
@@ -341,7 +283,6 @@ struct HabitDetailView: View {
             habit,
             durationMinutes: max(1, Int((Double(seconds) / 60).rounded()))
         )
-        durationFieldFocused = false
         isLoggingDuration = false
     }
 
@@ -479,7 +420,6 @@ private func detailScroll<Content: View>(@ViewBuilder content: () -> Content) ->
         .padding(.vertical, 2)
     }
     .scrollIndicators(.hidden)
-    .frame(maxHeight: 480)
 }
 
 private func nonEmpty(_ value: String?) -> String? {

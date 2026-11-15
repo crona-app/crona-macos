@@ -168,6 +168,28 @@ final class CompanionAppState: ObservableObject {
 
     private(set) lazy var tags = TagsModel(daemonConnection: daemonConnection)
 
+    private(set) lazy var libraryNavigation = LibraryNavigationModel()
+    private(set) lazy var checkInHistory = CheckInHistoryModel(
+        connection: daemonConnection,
+        settings: { [weak self] in self?.coreSettingsService.settings ?? CronaCoreSettings() },
+        canMutate: { [weak self] in self?.todayIsAway == false },
+        onChanged: { [weak self] date in
+            guard let self else { return }
+            if self.day.selectedDate == date { await self.wellbeingService.refresh(date: date) }
+            await self.popoverStatsService.checkInDidChange(date: date)
+            self.review.invalidate()
+        })
+    private(set) lazy var review = ReviewModel(connection: daemonConnection,
+        settings: { [weak self] in self?.coreSettingsService.settings ?? CronaCoreSettings() })
+    private(set) lazy var habitHistory = HabitHistoryModel(connection: daemonConnection)
+    private(set) lazy var detailBrowser = DetailBrowserModel()
+    private(set) lazy var dailyActivity = DailyActivityModel(connection: daemonConnection, day: day)
+    private(set) lazy var libraryWindow = LibraryWindowController(windowService: windowService,
+        onClosed: { [weak self] in
+            self?.checkInHistory.setVisible(false)
+            self?.review.setVisible(false)
+        })
+
     private(set) lazy var tagFocus = TagFocusModel(daemonConnection: daemonConnection)
 
     private(set) lazy var tagEditor = TagEditorModel(
@@ -533,15 +555,23 @@ final class CompanionAppState: ObservableObject {
 
     /// Section issues carry plan data (penalty, carry); today's focus list is the fallback.
     func detailsIssue(id: Int64) -> DailyFocusIssue? {
-        dailyIssues.allIssues.first { $0.id == id }
+        if case .issues(let section) = detailBrowser.source {
+            return dailyIssues.sections.issues(in: section).first { $0.id == id }
+        }
+        return detailBrowser.activityIssue.flatMap { $0.id == id ? $0 : nil }
+            ?? dailyIssues.allIssues.first { $0.id == id }
             ?? dailyFocusService.snapshot.issues.first { $0.id == id }
     }
 
     func openIssueDetails(_ issue: DailyFocusIssue) {
+        let section = dailyIssues.sections.issues(in: dailyIssues.section).contains { $0.id == issue.id }
+            ? dailyIssues.section : nil
+        detailBrowser.open(issue: issue, section: section)
         popoverDetailsRoute = .issueDetails(issueID: issue.id)
     }
 
     func openHabitDetails(_ habit: HabitRowModel) {
+        detailBrowser.open(habit: habit)
         popoverDetailsRoute = .habitDetails(habitID: habit.id)
     }
 

@@ -75,6 +75,17 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
     var planEntriesFixture: [[String: Any]] = []
     var checkInByDate: [String: [String: Any]] = [:]
     var failCheckIn = false
+    var libraryFixtures: [String: Any] = [:]
+    var failedLibraryMethods: Set<String> = []
+    var suspendCheckInRange = false
+    private var checkInRangeContinuation: CheckedContinuation<Void, Never>?
+
+    func resumeCheckInRange() {
+        suspendCheckInRange = false
+        checkInRangeContinuation?.resume()
+        checkInRangeContinuation = nil
+    }
+
     var failCarry = false
     var provideInbox = false
     var captureProposalsFixture: [[String: Any]] = []
@@ -126,7 +137,25 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
             from: JSONSerialization.data(withJSONObject: object))
         requests.append(probe)
         let result: Any
+        if failedLibraryMethods.contains(probe.method) { throw NSError(domain: "LibraryTests", code: 1) }
         switch probe.method {
+        case "checkin.range":
+            let start = probe.params["start"]?.stringValue ?? ""
+            let end = probe.params["end"]?.stringValue ?? ""
+            let snapshot = checkInByDate.filter { $0.key >= start && $0.key <= end }.map(\.value)
+            if suspendCheckInRange { await withCheckedContinuation { checkInRangeContinuation = $0 } }
+            result = snapshot
+        case "checkin.upsert":
+            if failCheckIn { throw NSError(domain: "WellbeingTests", code: 1) }
+            let params = object["params"] as! [String: Any]
+            checkInByDate[params["date"] as! String] = params
+            result = params
+        case "checkin.delete":
+            checkInByDate[probe.params["date"]?.stringValue ?? ""] = nil
+            result = ["ok": true]
+        case let method where libraryFixtures[method] != nil:
+            result = libraryFixtures[method]!
+
         case "health.get":
             result = ["status": "ok", "db": true, "ok": 1, "uptime": 1,
                 "currentDate": healthDate ?? logicalDate, "timezone": "Asia/Kolkata"] as [String: Any]

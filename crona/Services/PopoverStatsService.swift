@@ -344,8 +344,19 @@ final class PopoverStatsService: ObservableObject {
         }
     }
 
+    func checkInDidChange(date: String) async {
+        cache[date] = nil
+        calendarCacheRevision += 1
+        if date == selectedDate { await refresh() }
+        if date == todayDate && date != selectedDate { await refreshTodayMetrics() }
+    }
+
     private func handle(event: CronaProtocolEvent) {
         switch event.type {
+        case "checkin.updated", "checkin.deleted":
+            if let payload = try? event.decodePayload(CronaDailyCheckInQuery.self) {
+                Task { await checkInDidChange(date: payload.date) }
+            }
         case "session.history_changed", "timer.state", "timer.break_deferral_warning", "timer.break_deferred",
              "session.started", "session.stopped", "session.ended", "timer.extended", "timer.boundary",
              "context.issue.changed", "issue.created", "issue.updated", "issue.deleted",

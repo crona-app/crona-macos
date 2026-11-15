@@ -374,6 +374,8 @@ final class StatusBarService: NSObject {
         menu.addItem(menuItem("About Crona", action: #selector(openAbout)))
         menu.addItem(.separator())
 
+        menu.addItem(menuItem("Open Library…", action: #selector(openLibrary)))
+
         let settings = menuItem("Settings…", action: #selector(openSettings))
         settings.keyEquivalent = ","
         settings.keyEquivalentModifierMask = [.command]
@@ -436,6 +438,10 @@ final class StatusBarService: NSObject {
     @objc private func toggleAwayMode() {
         guard let appState else { return }
         appState.setAwayMode(!appState.coreSettingsService.settings.awayModeEnabled)
+    }
+
+    @objc private func openLibrary() {
+        appState?.openLibrary()
     }
 
     @objc private func openSettings() {

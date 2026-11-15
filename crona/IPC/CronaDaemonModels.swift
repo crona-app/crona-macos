@@ -53,6 +53,7 @@ struct CronaHealth: Codable, Equatable {
 struct CronaCoreSettings: Codable, Equatable {
     let awayModeEnabled: Bool
     let awayDates: [String]
+    let weekStart: String
     let restWeekdays: [Int]
     let restSpecificDates: [String]
     let dateDisplayPreset: String
@@ -61,6 +62,7 @@ struct CronaCoreSettings: Codable, Equatable {
     init(
         awayModeEnabled: Bool = false,
         awayDates: [String] = [],
+        weekStart: String = "monday",
         restWeekdays: [Int] = [],
         restSpecificDates: [String] = [],
         dateDisplayPreset: String = "iso",
@@ -68,6 +70,7 @@ struct CronaCoreSettings: Codable, Equatable {
     ) {
         self.awayModeEnabled = awayModeEnabled
         self.awayDates = awayDates
+        self.weekStart = weekStart
         self.restWeekdays = restWeekdays
         self.restSpecificDates = restSpecificDates
         self.dateDisplayPreset = dateDisplayPreset
@@ -77,6 +80,7 @@ struct CronaCoreSettings: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         awayModeEnabled = try values.decodeIfPresent(Bool.self, forKey: .awayModeEnabled) ?? false
+        weekStart = try values.decodeIfPresent(String.self, forKey: .weekStart) ?? "monday"
         awayDates = try values.decodeIfPresent([String].self, forKey: .awayDates) ?? []
         restWeekdays = try values.decodeIfPresent([Int].self, forKey: .restWeekdays) ?? []
         restSpecificDates =
@@ -89,7 +93,7 @@ struct CronaCoreSettings: Codable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case awayModeEnabled
-        case awayDates
+        case awayDates, weekStart
         case restWeekdays
         case restSpecificDates
         case dateDisplayPreset

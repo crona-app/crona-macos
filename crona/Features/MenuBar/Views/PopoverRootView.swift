@@ -148,29 +148,8 @@ struct PopoverRootView: View {
                 if case .stats = appState.selectedPopoverTab {
                     StatsTabView(appState: appState)
                 }
-            } else if let route = appState.popoverDetailsRoute {
-                PopoverDetailView(appState: appState, route: route)
-            } else if appState.hasActiveFocusSession {
-                IssuesTabView(
-                    appState: appState,
-                    displayClock: displayClock
-                )
-            } else if appState.todayIsAway {
-                AwayModeView(appState: appState)
             } else {
-                switch appState.selectedPopoverTab {
-                case .now:
-                    IssuesTabView(
-                        appState: appState,
-                        displayClock: displayClock
-                    )
-                case .habits:
-                    HabitsTabView(appState: appState)
-                case .wellbeing:
-                    WellbeingTabView(appState: appState)
-                case .stats:
-                    StatsTabView(appState: appState)
-                }
+                PopoverDailyContentView(appState: appState, displayClock: displayClock)
             }
 
             if !appState.isStatsCalendarPresented,

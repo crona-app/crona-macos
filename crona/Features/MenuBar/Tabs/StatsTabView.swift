@@ -28,6 +28,9 @@ struct StatsTabView: View {
             } else {
                 VStack(spacing: StatsLayout.sectionSpacing) {
                     PopoverDayHeader(appState: appState)
+                    Button { appState.openLibrary(.review) } label: {
+                        Label("Open Review", systemImage: "chart.xyaxis.line")
+                    }.buttonStyle(.borderless)
                     statsSummaryContent(snapshot: snapshot)
                 }
             }
@@ -61,68 +64,13 @@ struct StatsTabView: View {
                 if appState.coreSettingsService.isHistoricalAwayDate(snapshot.date) {
                     HistoricalAwayStatsView(date: snapshot.date)
                 } else if let score = snapshot.focusScore, let metrics = snapshot.todayMetrics {
-                    scoreHero(score: score, message: snapshot.scoreMessage)
-                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
-
-                    LazyVGrid(
-                        columns: [
-                            GridItem(.flexible(), spacing: StatsLayout.gridSpacing),
-                            GridItem(.flexible(), spacing: StatsLayout.gridSpacing),
-                        ],
-                        spacing: StatsLayout.gridSpacing
-                    ) {
-                        StatsMetricTile(
-                            icon: "bolt.fill",
-                            tint: PopupVisualTheme.semantic(.focus),
-                            title: "Focus",
-                            value: compactDuration(metrics.workedSeconds)
-                        )
-                        StatsMetricTile(
-                            icon: "cup.and.saucer.fill",
-                            tint: PopupVisualTheme.semantic(.breakTime),
-                            title: "Breaks",
-                            value: compactDuration(metrics.restSeconds)
-                        )
-                        StatsMetricTile(
-                            icon: "rectangle.stack.fill",
-                            tint: PopupVisualTheme.semantic(.warning),
-                            title: "Sessions",
-                            value: "\(metrics.sessionCount)"
-                        )
-                        StatsMetricTile(
-                            icon: "scope",
-                            tint: .mint,
-                            title: "Target",
-                            value: compactDuration(score.targetWorkedSeconds)
-                        )
-                    }
-
-                    FocusRestBalanceView(
-                        workedSeconds: metrics.workedSeconds,
-                        restSeconds: metrics.restSeconds
+                    DailyStatsSummaryView(
+                        score: score,
+                        metrics: metrics,
+                        message: snapshot.scoreMessage,
+                        highRiskCount: highRiskOutcome(statsDate: snapshot.date).first?.1
                     )
-
-                    StatsOutcomeCard(
-                        icon: "checkmark.circle.fill",
-                        tint: PopupVisualTheme.semantic(.success),
-                        title: "Issues",
-                        values: [
-                            ("Completed", metrics.completedIssues),
-                            ("Planned", metrics.totalIssues),
-                            ("Abandoned", metrics.abandonedIssues),
-                        ] + highRiskOutcome(statsDate: snapshot.date)
-                    )
-
-                    StatsOutcomeCard(
-                        icon: "checklist.checked",
-                        tint: PopupVisualTheme.semantic(.info),
-                        title: "Habits",
-                        values: [
-                            ("Done", metrics.habitCompletedCount),
-                            ("Due", metrics.habitDueCount),
-                            ("Failed", metrics.habitFailedCount),
-                        ]
-                    )
+                    .transition(.opacity)
 
                     FocusByTagSection(date: snapshot.date, tagFocus: appState.tagFocus, tagsModel: appState.tags)
                 } else if !snapshot.isLoading {
@@ -132,6 +80,8 @@ struct StatsTabView: View {
                         subtitle: "Start a focus session to populate this day’s summary."
                     )
                 }
+
+                DailyActivityView(appState: appState)
 
                 if let error = snapshot.lastErrorDescription, !error.isEmpty {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -579,39 +529,6 @@ struct StatsTabView: View {
         calendarScoreColors(score).map { $0.opacity(0.12) }
     }
 
-    private func scoreHero(
-        score: CronaFocusScoreSummary,
-        message: String
-    ) -> some View {
-        HStack(spacing: 12) {
-            CompactScoreRing(score: score.score)
-                .frame(width: StatsLayout.heroRingSize, height: StatsLayout.heroRingSize)
-                .matchedGeometryEffect(id: "stats-score-ring", in: calendarTransition)
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(PopoverStatsService.title(for: score.reason))
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(PopupVisualTheme.primaryText)
-                    .contentTransition(.numericText())
-
-                Text(message)
-                    .font(.subheadline)
-                    .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.66))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(StatsLayout.cardPadding)
-        .background(subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 26))
-    }
-
-    private func compactDuration(_ seconds: Int) -> String {
-        MenuBarTextFormatter.formatCompactDuration(seconds: seconds)
-    }
-
-
-
     private func displayDate(_ date: String) -> String {
         formattedPopoverDate(date, appState: appState)
     }
@@ -682,127 +599,5 @@ private struct CompactScoreRing: View {
             .foregroundStyle(PopupVisualTheme.primaryText)
         }
         .animation(SystemGlassSettings.shared.reduceMotion ? nil : .easeOut(duration: 0.35), value: score)
-    }
-}
-
-private struct StatsMetricTile: View {
-    let icon: String
-    let tint: Color
-    let title: String
-    let value: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Image(systemName: icon)
-                    .foregroundStyle(tint)
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.58))
-                Spacer()
-            }
-
-            Text(value)
-                .font(.title3.weight(.bold))
-                .monospacedDigit()
-                .foregroundStyle(PopupVisualTheme.primaryText)
-                .contentTransition(.numericText())
-        }
-        .padding(StatsLayout.tilePadding)
-        .frame(maxWidth: .infinity, minHeight: StatsLayout.tileHeight, alignment: .leading)
-        .background(StatsSectionBackground())
-    }
-}
-
-private struct FocusRestBalanceView: View {
-    let workedSeconds: Int
-    let restSeconds: Int
-
-    var body: some View {
-        let total = max(1, workedSeconds + restSeconds)
-        let focusFraction = Double(workedSeconds) / Double(total)
-
-        VStack(spacing: 7) {
-            HStack {
-                Label("Focus balance", systemImage: "circle.lefthalf.filled")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.72))
-                Spacer()
-                Text("\(Int(focusFraction * 100))% focus")
-                    .font(.subheadline.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(PopupVisualTheme.primaryText)
-            }
-
-            GeometryReader { geometry in
-                Capsule()
-                    .fill(PopupVisualTheme.semantic(.breakTime).opacity(0.18))
-                    .overlay(alignment: .leading) {
-                        Capsule()
-                            .fill(PopupVisualTheme.primaryText.opacity(0.56))
-                            .frame(width: geometry.size.width * focusFraction)
-                    }
-            }
-            .frame(height: 6)
-        }
-        .padding(StatsLayout.cardPadding)
-        .background(StatsSectionBackground())
-    }
-}
-
-private struct StatsOutcomeCard: View {
-    let icon: String
-    let tint: Color
-    let title: String
-    let values: [(String, Int)]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Label(title, systemImage: icon)
-                .font(.headline)
-                .foregroundStyle(PopupVisualTheme.primaryText)
-
-            HStack(spacing: 0) {
-                ForEach(Array(values.enumerated()), id: \.offset) { index, value in
-                    VStack(spacing: 4) {
-                        Text("\(value.1)")
-                            .font(.title3.weight(.bold))
-                            .monospacedDigit()
-                            .foregroundStyle(PopupVisualTheme.primaryText)
-                            .contentTransition(.numericText())
-                        Text(value.0)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(PopupVisualTheme.secondaryText)
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    if index < values.count - 1 {
-                        Divider()
-                            .overlay(PopupVisualTheme.primaryText.opacity(0.08))
-                            .frame(height: 30)
-                    }
-                }
-            }
-        }
-        .padding(StatsLayout.cardPadding)
-        .background(StatsSectionBackground())
-    }
-}
-
-private struct StatsSectionBackground: View {
-    @ObservedObject private var systemGlass = SystemGlassSettings.shared
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .fill(PopupVisualTheme.surfaceFill)
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(
-                        systemGlass.increaseContrast
-                            ? PopupVisualTheme.primaryText.opacity(0.5)
-                            : PopupVisualTheme.border,
-                        lineWidth: systemGlass.increaseContrast ? 1.5 : 0.8
-                    )
-            }
     }
 }

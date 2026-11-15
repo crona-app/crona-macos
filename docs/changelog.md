@@ -4,6 +4,21 @@ All notable changes to **Crona for macOS** are documented here.
 
 ## Unreleased
 
+### Added
+
+- Add a resizable Crona Library window with searchable check-in history, fixed-date editing, confirmed deletion, and week/month Review.
+- Review work and wellbeing trends, plan outcomes, estimate accuracy, previous-period completion, and recorded away days using existing daemon data.
+- Inspect Review charts with nearby hover tooltips, a date guide, and highlighted points; readouts disappear when the pointer leaves the graph.
+- Show habit progress, 7- and 30-day hit-rate rings, a 14-day outcome strip, and recent entries in habit details.
+- Show a time-used ring, worked time, and remaining or overrun estimates in issue details.
+- Keep issue and habit actions in a fixed footer, including the habit duration editor, so long details never push primary actions offscreen.
+- Consolidate daily Stats into Score, Worked, Issues, and Habits gauges, with focus percentage beside the score and a shared sessions, average, and breaks row.
+- Browse filtered issue and habit details with previous/next controls and arrow keys, retaining the source list on return.
+- Show the selected day's seven latest issue updates as an always-visible activity timeline in Stats, with event icons, readable status changes, and links to available issues.
+- Display check-in creation and update times in Wellbeing and Library, using daemon timezone and date preferences.
+- Add a local build-and-run script and Codex Run action.
+
+
 ## [1.1.0-beta.3] - 2026-11-06
 
 The third 1.1.0 beta moves updates to crona.work after the project's move to the `crona-app` GitHub organization, calms the focus-complete popups, and keeps the Issues tab on the daemon's day.

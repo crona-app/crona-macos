@@ -21,7 +21,9 @@ struct IssuesTabView: View {
             } else if appState.todayIsAway {
                 AwayModeView(appState: appState)
             } else if appState.selectedFocusIssue != nil || appState.isAdhocStartSelected {
-                fitOrScroll { FocusStartConfigView(appState: appState, issue: appState.selectedFocusIssue) }
+                fitOrScroll {
+                    FocusStartConfigView(appState: appState, issue: appState.selectedFocusIssue)
+                }
             } else {
                 // Scrolls only its issue list, so the day pill and section switch stay put.
                 IdleFocusView(appState: appState)
@@ -244,7 +246,8 @@ struct ActiveTimerView: View {
             if let upcoming = presentation.upcomingSegment {
                 MetricStripCard(
                     icon: upcoming.kind == .work ? "bolt.fill" : "cup.and.saucer.fill",
-                    tint: upcoming.kind == .work ? PopupVisualTheme.semantic(.focus) : PopupVisualTheme.semantic(.breakTime),
+                    tint: upcoming.kind == .work
+                        ? PopupVisualTheme.semantic(.focus) : PopupVisualTheme.semantic(.breakTime),
                     title: upcoming.title,
                     value: shortDuration(upcoming.durationSeconds)
                 )
@@ -326,8 +329,9 @@ struct IdleFocusView: View {
             HStack(spacing: 8) {
                 Button(action: appState.beginAdhocStart) {
                     HStack(spacing: 10) {
-                        Image(systemName: "timer").foregroundStyle(PopupVisualTheme.semantic(.focus))
-                        Text("Start Ad Hoc").font(.subheadline.weight(.semibold))
+                        Image(systemName: "timer").foregroundStyle(
+                            PopupVisualTheme.semantic(.focus))
+                        Text("Quick Timer").font(.subheadline.weight(.semibold))
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .semibold))
@@ -335,7 +339,9 @@ struct IdleFocusView: View {
                     }
                     .foregroundStyle(PopupVisualTheme.primaryText)
                     .padding(14)
-                    .background(subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 16))
+                    .background(
+                        subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 16)
+                    )
                     .contentShape(RoundedRectangle(cornerRadius: 16))
                 }
                 .buttonStyle(GlassPressButtonStyle())
@@ -346,7 +352,9 @@ struct IdleFocusView: View {
                         .foregroundStyle(PopupVisualTheme.primaryText)
                         .frame(width: 48)
                         .frame(maxHeight: .infinity)
-                        .background(subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 16))
+                        .background(
+                            subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 16)
+                        )
                         .contentShape(RoundedRectangle(cornerRadius: 16))
                 }
                 .buttonStyle(GlassPressButtonStyle())
@@ -471,7 +479,8 @@ struct FocusStartConfigView: View {
                 switch editor.state.mode {
                 case .stopwatch:
                     MetricStripCard(
-                        icon: "play.fill", tint: PopupVisualTheme.semantic(.success), title: "Open-ended focus",
+                        icon: "play.fill", tint: PopupVisualTheme.semantic(.success),
+                        title: "Open-ended focus",
                         value: "No hard limit")
                 case .pomodoro:
                     ExpandablePresetRow(
@@ -583,8 +592,13 @@ struct FocusStartConfigView: View {
                     )
                 }
             }
-            .animation(SystemGlassSettings.shared.reduceMotion ? nil : .easeInOut(duration: 0.2), value: editor.state.breaksEnabled)
-            .animation(SystemGlassSettings.shared.reduceMotion ? nil : .easeInOut(duration: 0.2), value: editor.state.longBreakEnabled)
+            .animation(
+                SystemGlassSettings.shared.reduceMotion ? nil : .easeInOut(duration: 0.2),
+                value: editor.state.breaksEnabled
+            )
+            .animation(
+                SystemGlassSettings.shared.reduceMotion ? nil : .easeInOut(duration: 0.2),
+                value: editor.state.longBreakEnabled)
 
             if let endDate = TimerEndProjection.startEndDate(config: editor.state) {
                 EndsAtRow(date: endDate)
@@ -743,7 +757,10 @@ struct FocusIssueRow: View {
                     )
                     .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                     .onHover { isActionsHovered = $0 }
-                    .animation(SystemGlassSettings.shared.reduceMotion ? nil : .easeOut(duration: 0.12), value: isActionsHovered)
+                    .animation(
+                        SystemGlassSettings.shared.reduceMotion ? nil : .easeOut(duration: 0.12),
+                        value: isActionsHovered
+                    )
                     .menuBarIconHitTarget()
             }
             .menuStyle(.borderlessButton)

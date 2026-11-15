@@ -554,7 +554,7 @@ private struct AlertDeliverySubscriptionProbe: Decodable {
     let params: Params
 }
 
-private final class CapturingDaemonTransport: CronaDaemonTransport {
+final class CapturingDaemonTransport: CronaDaemonTransport {
     let responseData: Data
     private(set) var requestData: Data?
 

@@ -23,6 +23,8 @@ Open `crona.xcodeproj` in Xcode and run the `crona` scheme, or build from the co
 xcodebuild -project crona.xcodeproj -scheme crona -configuration Debug -sdk macosx build
 ```
 
+For a build-and-launch loop, use `./script/build_and_run.sh`. It stops the running `crona` app, builds Debug without signing, and launches the result from `/private/tmp/crona-macos-run`. The Codex Run action uses this script. Optional flags are `--debug`, `--logs`, `--telemetry`, and `--verify`; set `CRONA_DERIVED_DATA` to use another build directory.
+
 Debug builds target:
 
 - `~/Library/Application Support/Crona Dev`

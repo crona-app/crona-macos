@@ -9,6 +9,9 @@ struct WellbeingTabView: View {
     @ObservedObject var appState: CompanionAppState
     @ObservedObject private var popoverStatsService: PopoverStatsService
     @ObservedObject private var wellbeingService: WellbeingService
+    private let historyDate: String?
+    @ObservedObject private var historyModel: CheckInHistoryModel
+    private let onSaved: () -> Void
     @State private var mood = 0
     @State private var energy = 0
     @State private var hasSleepDuration = false
@@ -32,25 +35,39 @@ struct WellbeingTabView: View {
     private let leadingRailSpacing: CGFloat = 11
     private let textColumnWidth: CGFloat = 106
 
-    init(appState: CompanionAppState) {
+    init(appState: CompanionAppState, service: WellbeingService? = nil, historyDate: String? = nil,
+         historyModel: CheckInHistoryModel? = nil, onSaved: @escaping () -> Void = {}) {
         self.appState = appState
         self.popoverStatsService = appState.popoverStatsService
-        self.wellbeingService = appState.wellbeingService
+        self.wellbeingService = service ?? appState.wellbeingService
+        self.historyDate = historyDate
+        self.historyModel = historyModel ?? appState.checkInHistory
+        self.onSaved = onSaved
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
-            PopoverDayHeader(appState: appState)
+            if let historyDate {
+                Text(formattedPopoverDate(historyDate, appState: appState)).font(.headline)
+            } else {
+                PopoverDayHeader(appState: appState)
+                Button { appState.openLibrary(.checkIns) } label: {
+                    Label("History", systemImage: "clock.arrow.circlepath")
+                }.buttonStyle(.borderless)
+            }
+            if let entry = wellbeingService.snapshot.checkIn {
+                CheckInTimestampsView(entry: entry, timezone: appState.daemonConnection.timezone, settings: appState.coreSettingsService.settings)
+            }
             ratingRow(
                 title: "Mood",
-                subtitle: "Your mood today",
+                subtitle: isHistorical ? "How you felt that day" : "Your mood today",
                 symbol: "face.smiling",
                 value: $mood,
                 tint: PopupVisualTheme.semantic(.mood)
             )
             ratingRow(
                 title: "Energy",
-                subtitle: "Your energy level",
+                subtitle: isHistorical ? "Your energy that day" : "Your energy level",
                 symbol: "bolt.fill",
                 value: $energy,
                 tint: PopupVisualTheme.semantic(.energy)
@@ -59,7 +76,7 @@ struct WellbeingTabView: View {
             VStack(spacing: 0) {
                 durationInput(
                     title: "Sleep duration",
-                    subtitle: "Time asleep last night",
+                    subtitle: isHistorical ? "Time asleep the night before" : "Time asleep last night",
                     symbol: "moon.zzz.fill",
                     isIncluded: $hasSleepDuration,
                     hours: $sleepHours,
@@ -70,7 +87,7 @@ struct WellbeingTabView: View {
                 Divider().padding(.leading, 42)
                 durationInput(
                     title: "Screen time",
-                    subtitle: "Total device time today",
+                    subtitle: isHistorical ? "Total device time that day" : "Total device time today",
                     symbol: "display",
                     isIncluded: $hasScreenTime,
                     hours: $screenHours,
@@ -117,8 +134,11 @@ struct WellbeingTabView: View {
         .onDisappear { feedbackDismissTask?.cancel() }
     }
 
+    private var isHistorical: Bool { historyDate != nil || !appState.day.isToday }
+
     private var canSave: Bool {
-        mood > 0
+        (historyDate == nil || historyModel.mutationsAllowed)
+            && mood > 0
             && energy > 0
             && !wellbeingService.snapshot.isSaving
             && currentRequest != baselineRequest
@@ -306,14 +326,19 @@ struct WellbeingTabView: View {
         saveFeedback = nil
         let request = currentRequest
         Task {
-            if await wellbeingService.save(request) {
+            let saved: Bool
+            if let historyDate {
+                saved = await historyModel.save(request, originalDate: historyDate)
+            } else { saved = await wellbeingService.save(request) }
+            if saved {
                 baselineRequest = request
                 showFeedback(.success)
+                onSaved()
                 await popoverStatsService.refresh()
                 await popoverStatsService.refreshTodayMetrics()
             } else {
                 showFeedback(.error(
-                    wellbeingService.snapshot.lastErrorDescription
+                    (historyDate == nil ? wellbeingService.snapshot.lastErrorDescription : historyModel.error)
                         ?? "Couldn’t update the check-in. Try again."
                 ))
             }
@@ -340,7 +365,7 @@ struct WellbeingTabView: View {
         notes: String
     ) -> CronaDailyCheckInUpsertRequest {
         CronaDailyCheckInUpsertRequest(
-            date: wellbeingService.snapshot.date.nilIfEmpty ?? DailyFocusService.todayString(),
+            date: historyDate ?? wellbeingService.snapshot.date.nilIfEmpty ?? DailyFocusService.todayString(),
             mood: mood,
             energy: energy,
             sleepHours: sleepHours,
