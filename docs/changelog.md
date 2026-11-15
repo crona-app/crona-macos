@@ -4,6 +4,10 @@ All notable changes to **Crona for macOS** are documented here.
 
 ## Unreleased
 
+## [1.1.0-beta.4] - 2026-11-15
+
+The fourth 1.1.0 beta adds a Library window for check-in history and Review, compacts the daily summary, and keeps item actions available while browsing longer details.
+
 ### Added
 
 - Add a resizable Crona Library window with searchable check-in history, fixed-date editing, confirmed deletion, and week/month Review.
@@ -19,6 +23,12 @@ All notable changes to **Crona for macOS** are documented here.
 - Display check-in creation and update times in Wellbeing and Library, using daemon timezone and date preferences.
 - Add a local build-and-run script and Codex Run action.
 
+
+### Fixed
+
+- Recover cleanly after daemon disconnects and ignore connection work from an earlier connection attempt.
+- Clear stale issue lists on date changes and ignore late responses for previously selected days.
+- Preserve newer tag-filter changes when saves overlap or a settings refresh arrives during a save.
 
 ## [1.1.0-beta.3] - 2026-11-06
 
