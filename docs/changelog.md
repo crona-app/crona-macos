@@ -6,6 +6,7 @@ All notable changes to **Crona for macOS** are documented here.
 
 ### Changed
 
+- Replace expanding focus timer setup cards with directly editable duration and cycle fields, compact presets, stable break rows, and a fixed-position start action.
 - Replace check-in and manual-session duration dropdowns with hour/minute text inputs, preserve individual minutes when editing check-ins, and allow direct entry of sleep scores from 0 to 100.
 - Use hour/minute duration notation consistently for popup targets, estimates, timer presets, and pre-filled edit fields; custom timer durations accept the same notation and habit logs retain second-level precision when needed.
 
