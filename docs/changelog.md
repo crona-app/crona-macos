@@ -13,6 +13,7 @@ All notable changes to **Crona for macOS** are documented here.
 
 ### Fixed
 
+- Replace the pointer countdown with a brief Break deferred confirmation after a confirmed deferral, then dismiss the stale boundary warning.
 - Treat omitted daily-plan entries as an empty plan and show the normal planned-issues empty state instead of a decoding error.
 
 ## [1.1.0-beta.4] - 2026-11-15

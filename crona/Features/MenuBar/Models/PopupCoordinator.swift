@@ -31,6 +31,7 @@ final class PopupCoordinator: ObservableObject {
     private let contextService: ContextService
     private let preferences: PreferencesService
     private let windowService: WindowService
+    private let breakDeferralNotice: BreakDeferralNoticeModel
     private let endSession: EndSessionModel
     private let hardLimitCountdownService: HardLimitCountdownService
     private let inactivityPopupCountdownService: HardLimitCountdownService
@@ -45,6 +46,7 @@ final class PopupCoordinator: ObservableObject {
         preferences: PreferencesService,
         windowService: WindowService,
         endSession: EndSessionModel,
+        breakDeferralNotice: BreakDeferralNoticeModel,
         hardLimitCountdownService: HardLimitCountdownService,
         inactivityPopupCountdownService: HardLimitCountdownService
     ) {
@@ -54,6 +56,7 @@ final class PopupCoordinator: ObservableObject {
         self.preferences = preferences
         self.windowService = windowService
         self.endSession = endSession
+        self.breakDeferralNotice = breakDeferralNotice
         self.hardLimitCountdownService = hardLimitCountdownService
         self.inactivityPopupCountdownService = inactivityPopupCountdownService
     }
@@ -443,7 +446,10 @@ final class PopupCoordinator: ObservableObject {
             return
         }
 
-        guard let model = buildHardLimitWarningIndicatorModel(snapshot: snapshot) else {
+        let deferred = breakDeferralNotice.suppressesWarning(for: snapshot)
+        let candidate = deferred ? breakDeferralNotice.indicator(for: snapshot)
+            : buildHardLimitWarningIndicatorModel(snapshot: snapshot)
+        guard let model = candidate else {
             finalizeHardLimitWarningIndicator()
             return
         }
@@ -746,13 +752,14 @@ struct HardLimitPopupSuccessModel: Equatable {
 enum HardLimitWarningKind: String, Equatable {
     case expiry
     case breakStart
+    case breakDeferred
     case resume
 
     var symbolName: String {
         switch self {
         case .expiry:
             return "hourglass.circle.fill"
-        case .breakStart:
+        case .breakStart, .breakDeferred:
             return "cup.and.saucer.fill"
         case .resume:
             return "bolt.fill"
@@ -765,6 +772,8 @@ enum HardLimitWarningKind: String, Equatable {
             return .systemOrange
         case .breakStart:
             return .systemPink
+        case .breakDeferred:
+            return .systemTeal
         case .resume:
             return .systemYellow
         }

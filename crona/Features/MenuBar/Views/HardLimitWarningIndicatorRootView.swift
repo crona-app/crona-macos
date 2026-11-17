@@ -36,12 +36,14 @@ struct HardLimitWarningIndicatorRootView: View {
 
                         Spacer(minLength: 4)
 
-                        Text(String(format: "%02d", remaining))
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                            .contentTransition(.numericText(countsDown: true))
-                            .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: remaining)
-                            .foregroundStyle(PopupVisualTheme.primaryText)
+                        if model.kind != .breakDeferred {
+                            Text(String(format: "%02d", remaining))
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                                .contentTransition(.numericText(countsDown: true))
+                                .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: remaining)
+                                .foregroundStyle(PopupVisualTheme.primaryText)
+                        }
                     }
                     .padding(.horizontal, 9)
                     .padding(.vertical, 6)
