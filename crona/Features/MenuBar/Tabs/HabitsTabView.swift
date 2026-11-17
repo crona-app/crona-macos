@@ -409,7 +409,7 @@ private struct InlineHabitLogEditor: View {
             }
         }
         .onChange(of: value) {
-            if HabitDurationFormatter.seconds(from: draft) != value {
+            if !isFocused && HabitDurationFormatter.seconds(from: draft) != value {
                 draft = HabitDurationFormatter.string(from: value)
             }
         }
@@ -558,24 +558,14 @@ private struct InlineMinutesEditor: View {
                     .multilineTextAlignment(.trailing)
                     .font(.headline.monospacedDigit())
                     .focused($isFocused)
-                    .frame(width: 42)
-                    .accessibilityLabel("Custom duration in minutes")
+                    .frame(width: 96)
+                    .accessibilityLabel("Custom duration, for example 1h30m")
                     .onChange(of: draft) {
-                        let digits = draft.filter(\.isNumber)
-                        if digits != draft {
-                            draft = digits
-                            return
-                        }
-                        if let parsed = Int(digits) {
-                            value = max(minimum, parsed)
+                        if case .success(let minutes?) = FlexibleDurationParser.optionalMinutes(draft) {
+                            value = max(minimum, minutes)
                         }
                     }
-                    .onSubmit {
-                        setValue(max(minimum, Int(draft) ?? minimum))
-                    }
-                Text("min")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.5))
+                    .onSubmit { setValue(value) }
             }
             .padding(.horizontal, 10)
             .frame(height: 34)
@@ -598,14 +588,17 @@ private struct InlineMinutesEditor: View {
                 .fill(PopupVisualTheme.primaryText.opacity(0.045))
         )
         .onAppear {
-            draft = "\(value)"
+            draft = MenuBarTextFormatter.formatMinutes(value)
             DispatchQueue.main.async {
                 isFocused = true
             }
         }
+        .onChange(of: isFocused) { _, focused in
+            if !focused { setValue(value) }
+        }
         .onChange(of: value) {
-            if Int(draft) != value {
-                draft = "\(value)"
+            if !isFocused {
+                draft = MenuBarTextFormatter.formatMinutes(value)
             }
         }
     }
@@ -614,7 +607,7 @@ private struct InlineMinutesEditor: View {
 
     private func setValue(_ newValue: Int) {
         value = max(minimum, newValue)
-        draft = "\(value)"
+        draft = MenuBarTextFormatter.formatMinutes(value)
     }
 
     private func minuteStepButton(

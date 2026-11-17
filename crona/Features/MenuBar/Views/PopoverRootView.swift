@@ -501,7 +501,7 @@ final class FocusStartConfigEditor: ObservableObject {
     private func displayText(for choice: FocusPresetChoice, customMinutes: Int) -> String {
         switch choice {
         case .custom:
-            return "\(max(0, customMinutes))m"
+            return MenuBarTextFormatter.formatMinutes(customMinutes)
         default:
             return choice.title
         }

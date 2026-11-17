@@ -70,7 +70,7 @@ struct HabitHistorySection: View {
                 if let target = habit.targetMinutes, target > 0 {
                     ProgressView(value: min(Double(habit.durationMinutes ?? 0) / Double(target), 1))
                         .frame(width: 70)
-                    Text("\(habit.durationMinutes ?? 0)/\(target)m").font(.caption.monospacedDigit())
+                    Text("\(MenuBarTextFormatter.formatMinutes(habit.durationMinutes ?? 0)) / \(MenuBarTextFormatter.formatMinutes(target))").font(.caption.monospacedDigit())
                 } else {
                     Image(systemName: habit.completed ? "checkmark.circle.fill" : "circle")
                         .foregroundStyle(habit.completed ? .green : .secondary).font(.title3)

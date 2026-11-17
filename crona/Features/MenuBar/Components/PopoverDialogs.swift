@@ -332,21 +332,19 @@ struct IssueActionEditorView: View {
                 .popupInputSurface()
 
             manualSessionSection("Duration", systemImage: "hourglass") {
-                durationPickerRow(
+                durationInputRow(
                     title: "Work",
-                    hours: $issueActions.manualSession.workHours,
-                    minutes: $issueActions.manualSession.workMinutes
+                    text: $issueActions.manualSession.workDuration
                 )
-                durationPickerRow(
+                durationInputRow(
                     title: "Break",
-                    hours: $issueActions.manualSession.breakHours,
-                    minutes: $issueActions.manualSession.breakMinutes
+                    text: $issueActions.manualSession.breakDuration
                 )
             }
 
             manualSessionSection("Timing", systemImage: "clock") {
                 HStack(spacing: 10) {
-                    Text("Set start and end times")
+                    Text("Set clock times")
                         .font(.subheadline.weight(.medium))
                     Spacer(minLength: 12)
                     Toggle("", isOn: $issueActions.manualSession.timesEnabled)
@@ -357,18 +355,8 @@ struct IssueActionEditorView: View {
                 .contentShape(Rectangle())
 
                 if issueActions.manualSession.timesEnabled {
-                    timePickerRow(
-                        title: "Start",
-                        hour: $issueActions.manualSession.startHour,
-                        minute: $issueActions.manualSession.startMinute,
-                        period: $issueActions.manualSession.startPeriod
-                    )
-                    timePickerRow(
-                        title: "End",
-                        hour: $issueActions.manualSession.endHour,
-                        minute: $issueActions.manualSession.endMinute,
-                        period: $issueActions.manualSession.endPeriod
-                    )
+                    clockInputRow(title: "Start (optional)", text: $issueActions.manualSession.startTime)
+                    clockInputRow(title: "End (optional)", text: $issueActions.manualSession.endTime)
                 }
             }
 
@@ -450,62 +438,28 @@ struct IssueActionEditorView: View {
         }
     }
 
-    private func durationPickerRow(
-        title: String,
-        hours: Binding<Int>,
-        minutes: Binding<Int>
-    ) -> some View {
+    private func durationInputRow(title: String, text: Binding<String>) -> some View {
         HStack {
-            Text(title)
-                .font(.subheadline.weight(.medium))
+            Text(title).font(.subheadline.weight(.medium))
             Spacer()
-            Picker("Hours", selection: hours) {
-                ForEach(0...12, id: \.self) { value in
-                    Text("\(value) hr").tag(value)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            Picker("Minutes", selection: minutes) {
-                ForEach([0, 15, 30, 45], id: \.self) { value in
-                    Text("\(value) min").tag(value)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
+            DurationTextField(title: "\(title) duration", text: text)
         }
     }
 
-    private func timePickerRow(
-        title: String,
-        hour: Binding<Int>,
-        minute: Binding<Int>,
-        period: Binding<String>
-    ) -> some View {
+    private func clockInputRow(title: String, text: Binding<String>) -> some View {
         HStack {
-            Text(title)
-                .font(.subheadline.weight(.medium))
+            Text(title).font(.subheadline.weight(.medium))
             Spacer()
-            Picker("Hour", selection: hour) {
-                ForEach(1...12, id: \.self) { value in
-                    Text(String(format: "%02d", value)).tag(value)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            Picker("Minute", selection: minute) {
-                ForEach([0, 15, 30, 45], id: \.self) { value in
-                    Text(String(format: ":%02d", value)).tag(value)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            Picker("AM or PM", selection: period) {
-                Text("AM").tag("AM")
-                Text("PM").tag("PM")
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
+            TextField("HH:mm", text: text)
+                .textFieldStyle(.plain)
+                .monospacedDigit()
+                .multilineTextAlignment(.trailing)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .popupInputSurface(cornerRadius: 8)
+                .frame(width: 96)
+                .accessibilityLabel(title)
+                .help("24-hour time, such as 09:07; leave blank to omit")
         }
     }
 

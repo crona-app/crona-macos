@@ -25,6 +25,21 @@ final class DailyIssuesModelTests: DaemonTestCase {
         XCTAssertEqual(appState.dailyIssues.sections.overdue.map(\.id), [2])
     }
 
+    func testEmptyPlanLoadsWithoutAnError() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        transport.todaySummaryIssuesFixture = []
+        transport.planEntriesFixture = []
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+
+        await appState.dailyIssues.refresh()
+
+        XCTAssertNil(appState.dailyIssues.errorMessage)
+        XCTAssertEqual(appState.dailyIssues.loadedDate, appState.day.selectedDate)
+        XCTAssertTrue(appState.dailyIssues.sections.planned.isEmpty)
+        XCTAssertEqual(DailySectionPicker.emptyText(for: .planned), "No issues planned")
+    }
+
     func testRefreshRequestsPlanForSelectedDay() async throws {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }

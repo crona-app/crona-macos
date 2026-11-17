@@ -112,7 +112,7 @@ final class IssueCreatorModel: ObservableObject {
         issueBeingEdited = issue
         title = issue.title
         description = issue.description ?? ""
-        estimate = issue.estimateMinutes.map(String.init) ?? ""
+        estimate = issue.estimateMinutes.map(MenuBarTextFormatter.formatMinutes) ?? ""
         dueDate = issue.todoForDate.flatMap(CronaCalendarDate.date(from:))
         destinationID = issue.streamID
         isContentVisible = false

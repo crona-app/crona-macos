@@ -192,4 +192,14 @@ final class AdhocSessionTests: DaemonTestCase {
         let status = try XCTUnwrap(transport.requests.last(where: { $0.method == "issue.change_status" }))
         XCTAssertEqual(status.params["status"]?.stringValue, "ready")
     }
+
+    func testAdhocEstimatePrefillUsesHoursAndMinutesAndKeepsTypedDraft() {
+        var state = AdhocAttributionState.initial(elapsedSeconds: 5400, date: "2026-11-17", streamID: nil)
+        XCTAssertEqual(state.estimateText, "1h30m")
+        state.estimateInput = "1h3"
+        XCTAssertEqual(state.estimateText, "1h3")
+        state.estimateInput = ""
+        XCTAssertEqual(state.estimateText, "")
+    }
+
 }

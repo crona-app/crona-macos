@@ -118,4 +118,16 @@ final class FocusStartConfigTests: DaemonTestCase {
         XCTAssertEqual(state.resolvedLongBreakMinutes, 0)
         XCTAssertEqual(timerState.resolvedCountdownMinutes, 1)
     }
+
+    func testPresetAndCustomDurationLabelsUseHoursAndMinutes() {
+        XCTAssertEqual(FocusPresetChoice.preset90.title, "1h30m")
+        let editor = FocusStartConfigEditor(initialState: FocusStartConfigState(
+            focusChoice: .custom, breakChoice: .custom, longBreakChoice: .custom, countdownChoice: .custom,
+            customFocusMinutes: 90, customBreakMinutes: 60, customLongBreakMinutes: 75, customCountdownMinutes: 120))
+        XCTAssertEqual(editor.focusDisplay, "1h30m")
+        XCTAssertEqual(editor.breakDisplay, "1h0m")
+        XCTAssertEqual(editor.longBreakDisplay, "1h15m")
+        XCTAssertEqual(editor.countdownDisplay, "2h0m")
+    }
+
 }

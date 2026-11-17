@@ -4,6 +4,15 @@ All notable changes to **Crona for macOS** are documented here.
 
 ## Unreleased
 
+### Changed
+
+- Replace check-in and manual-session duration dropdowns with hour/minute text inputs, preserve individual minutes when editing check-ins, and allow direct entry of sleep scores from 0 to 100.
+- Use hour/minute duration notation consistently for popup targets, estimates, timer presets, and pre-filled edit fields; custom timer durations accept the same notation and habit logs retain second-level precision when needed.
+
+### Fixed
+
+- Treat omitted daily-plan entries as an empty plan and show the normal planned-issues empty state instead of a decoding error.
+
 ## [1.1.0-beta.4] - 2026-11-15
 
 The fourth 1.1.0 beta adds a Library window for check-in history and Review, compacts the daily summary, and keeps item actions available while browsing longer details.

@@ -304,7 +304,7 @@ struct AdhocAttributionView: View {
     }
     private var estimateBinding: Binding<String> {
         Binding(
-            get: { endSession.adhocAttribution.estimateInput ?? (endSession.adhocAttribution.estimateMinutes > 0 ? "\(endSession.adhocAttribution.estimateMinutes)m" : "") },
+            get: { endSession.adhocAttribution.estimateText },
             set: { value in
                 endSession.adhocAttribution.estimateInput = value
                 switch FlexibleDurationParser.optionalMinutes(value) {

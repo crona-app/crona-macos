@@ -5,17 +5,11 @@ struct ManualSessionDraft: Equatable {
     var summary = ""
     var date = ""
     var notes = ""
-    var workHours = 1
-    var workMinutes = 0
-    var breakHours = 0
-    var breakMinutes = 0
+    var workDuration = "1h0m"
+    var breakDuration = "0m"
     var timesEnabled = false
-    var startHour = 9
-    var startMinute = 0
-    var startPeriod = "AM"
-    var endHour = 10
-    var endMinute = 45
-    var endPeriod = "AM"
+    var startTime = "09:00"
+    var endTime = ""
 }
 
 @MainActor
@@ -134,38 +128,34 @@ final class IssueActionEditorModel: ObservableObject {
         case .manualSession(let issue):
             manualSessionError = nil
             let draft = manualSession
-            let workMinutes = draft.workHours * 60 + draft.workMinutes
-            let breakMinutes = draft.breakHours * 60 + draft.breakMinutes
-            guard workMinutes > 0 else {
+            guard let workMinutes = DurationInput.minutes(draft.workDuration), workMinutes > 0 else {
                 manualSessionError = "Work duration must be a positive duration."
+                return
+            }
+            guard let breakMinutes = DurationInput.minutes(draft.breakDuration) else {
+                manualSessionError = "Enter a valid break duration, such as 13m or 1h07m."
                 return
             }
             guard isValidManualDate(draft.date) else {
                 manualSessionError = "Choose a valid session date."
                 return
             }
-            let startTime =
-                draft.timesEnabled
-                ? formattedManualClock(
-                    hour: draft.startHour, minute: draft.startMinute,
-                    period: draft.startPeriod)
-                : nil
-            let endTime =
-                draft.timesEnabled
-                ? formattedManualClock(
-                    hour: draft.endHour, minute: draft.endMinute,
-                    period: draft.endPeriod)
-                : nil
+            let startTime = draft.timesEnabled ? optionalTrimmed(draft.startTime) : nil
+            let endTime = draft.timesEnabled ? optionalTrimmed(draft.endTime) : nil
+            guard [startTime, endTime].compactMap({ $0 }).allSatisfy(Self.isValidClock) else {
+                manualSessionError = "Enter times as HH:mm, such as 09:07 or 17:43."
+                return
+            }
             Task {
                 let request = CronaManualSessionLogRequest(
                     issueID: issue.id,
-                    date: manualSession.date.trimmingCharacters(in: .whitespacesAndNewlines),
+                    date: draft.date.trimmingCharacters(in: .whitespacesAndNewlines),
                     workDurationSeconds: workMinutes * 60,
                     breakDurationSeconds: breakMinutes * 60,
                     startTime: startTime,
                     endTime: endTime,
-                    commitMessage: optionalTrimmed(manualSession.summary),
-                    notes: optionalTrimmed(manualSession.notes)
+                    commitMessage: optionalTrimmed(draft.summary),
+                    notes: optionalTrimmed(draft.notes)
                 )
                 let succeeded = await issueActionsService.logManualSession(request)
                 if succeeded {
@@ -184,10 +174,12 @@ final class IssueActionEditorModel: ObservableObject {
         }
     }
 
-    private func formattedManualClock(hour: Int, minute: Int, period: String) -> String {
-        var hour24 = hour % 12
-        if period == "PM" { hour24 += 12 }
-        return String(format: "%02d:%02d", hour24, minute)
+    private static func isValidClock(_ text: String) -> Bool {
+        let parts = text.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 2, parts[0].count == 2, parts[1].count == 2,
+              parts.allSatisfy({ $0.allSatisfy({ $0.isASCII && $0.isNumber }) }),
+              let hour = Int(parts[0]), let minute = Int(parts[1]) else { return false }
+        return (0...23).contains(hour) && (0...59).contains(minute)
     }
 
     private func isValidManualDate(_ value: String) -> Bool {

@@ -34,6 +34,10 @@ struct AdhocAttributionState {
     var isLoading = false
     var loadError: String?
 
+    var estimateText: String {
+        estimateInput ?? (estimateMinutes > 0 ? MenuBarTextFormatter.formatMinutes(estimateMinutes) : "")
+    }
+
     static func initial(elapsedSeconds: Int, date: String, streamID: Int64?) -> Self {
         Self(destinationID: streamID, estimateMinutes: max(0, (elapsedSeconds + 899) / 900 * 15), date: date)
     }

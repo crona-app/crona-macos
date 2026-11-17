@@ -39,7 +39,7 @@ struct DailySectionPicker: View {
 
     static func emptyText(for section: DailySection) -> String {
         switch section {
-        case .planned: return "Nothing planned"
+        case .planned: return "No issues planned"
         case .overdue: return "Nothing overdue"
         case .upcoming: return "Nothing in the next \(DailyIssueSections.upcomingDays) days"
         case .inbox: return "Inbox is empty"
@@ -48,7 +48,7 @@ struct DailySectionPicker: View {
 
     static func emptyHint(for section: DailySection) -> String {
         switch section {
-        case .planned: return "Pin an issue or give it this day's due date to plan it."
+        case .planned: return "Create an issue, pin one, or set its due date to this day."
         case .overdue: return "Every issue due before this day is closed."
         case .upcoming: return "Issues due in the coming week show up here."
         case .inbox: return "Captured issues without a stream land here."

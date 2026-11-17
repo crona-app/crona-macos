@@ -180,8 +180,10 @@ final class IssueCreatorTestTransport: CronaDaemonTransport {
                 "totalEstimatedMinutes": 0, "completedIssues": 0,
                 "abandonedIssues": 0, "workedSeconds": 0] as [String: Any]
         case "daily_plan.get":
-            result = ["id": "plan", "date": probe.params["date"]?.stringValue ?? logicalDate, "createdAt": "", "updatedAt": "",
-                "entries": planEntriesFixture] as [String: Any]
+            var plan: [String: Any] = ["id": "plan", "date": probe.params["date"]?.stringValue ?? logicalDate,
+                "createdAt": "", "updatedAt": ""]
+            if !planEntriesFixture.isEmpty { plan["entries"] = planEntriesFixture }
+            result = plan
         case "timer.get_state":
             if let timerStateFixture {
                 result = timerStateFixture

@@ -6,12 +6,20 @@ enum FlexibleDurationParser {
         guard !raw.isEmpty else { return .success(nil) }
         if let minutes = Int(raw), minutes >= 0 { return .success(minutes) }
         if let hours = Double(raw), hours >= 0 {
-            return .success(Int((hours * 60).rounded()))
+            return roundedMinutes(hours * 60)
         }
         guard let seconds = durationSeconds(raw), seconds >= 0 else {
             return .failure(.invalid)
         }
-        return .success(Int((seconds / 60).rounded()))
+        return roundedMinutes(seconds / 60)
+    }
+
+    private static func roundedMinutes(_ value: Double) -> Result<Int?, ValidationError> {
+        let rounded = value.rounded()
+        guard rounded.isFinite, rounded >= 0, rounded < Double(Int.max) else {
+            return .failure(.invalid)
+        }
+        return .success(Int(rounded))
     }
 
     enum ValidationError: Error, Equatable {

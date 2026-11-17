@@ -14,14 +14,7 @@ struct WellbeingTabView: View {
     private let onSaved: () -> Void
     @State private var mood = 0
     @State private var energy = 0
-    @State private var hasSleepDuration = false
-    @State private var sleepHours = 8
-    @State private var sleepMinutes = 0
-    @State private var hasSleepScore = false
-    @State private var sleepScore = 80
-    @State private var hasScreenTime = false
-    @State private var screenHours = 2
-    @State private var screenMinutes = 0
+    @State private var timing = WellbeingTimingDraft()
     @State private var notes = ""
     @State private var validationError: String?
     @State private var loadedEntry: CronaDailyCheckIn?
@@ -30,7 +23,6 @@ struct WellbeingTabView: View {
     @State private var feedbackDismissTask: Task<Void, Never>?
     @State private var suppressServiceError = false
 
-    private let minuteOptions = [0, 15, 30, 45]
     private let leadingRailWidth: CGFloat = 22
     private let leadingRailSpacing: CGFloat = 11
     private let textColumnWidth: CGFloat = 106
@@ -75,9 +67,8 @@ struct WellbeingTabView: View {
                     title: "Sleep duration",
                     subtitle: isHistorical ? "Time asleep the night before" : "Time asleep last night",
                     symbol: "moon.zzz.fill",
-                    isIncluded: $hasSleepDuration,
-                    hours: $sleepHours,
-                    minutes: $sleepMinutes
+                    isIncluded: $timing.hasSleepDuration,
+                    text: $timing.sleepDuration
                 )
                 Divider().padding(.leading, 42)
                 scoreInput
@@ -86,9 +77,8 @@ struct WellbeingTabView: View {
                     title: "Screen time",
                     subtitle: isHistorical ? "Total device time that day" : "Total device time today",
                     symbol: "display",
-                    isIncluded: $hasScreenTime,
-                    hours: $screenHours,
-                    minutes: $screenMinutes
+                    isIncluded: $timing.hasScreenTime,
+                    text: $timing.screenDuration
                 )
             }
             .background(cardBackground(stroke: PopupVisualTheme.border, cornerRadius: 14))
@@ -135,6 +125,7 @@ struct WellbeingTabView: View {
 
     private var canSave: Bool {
         (historyDate == nil || historyModel.mutationsAllowed)
+            && timing.validationError == nil
             && mood > 0
             && energy > 0
             && !wellbeingService.snapshot.isSaving
@@ -153,7 +144,7 @@ struct WellbeingTabView: View {
                     .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.9))
                     .lineLimit(2)
             case nil:
-                if let error = validationError
+                if let error = timing.validationError ?? validationError
                     ?? (suppressServiceError ? nil : wellbeingService.snapshot.lastErrorDescription) {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(PopupVisualTheme.semantic(.error).opacity(0.9))
@@ -211,8 +202,7 @@ struct WellbeingTabView: View {
         subtitle: String,
         symbol: String,
         isIncluded: Binding<Bool>,
-        hours: Binding<Int>,
-        minutes: Binding<Int>
+        text: Binding<String>
     ) -> some View {
         HStack(spacing: 11) {
             Image(systemName: symbol)
@@ -225,14 +215,7 @@ struct WellbeingTabView: View {
             }
             Spacer(minLength: 8)
             if isIncluded.wrappedValue {
-                Picker("Hours", selection: hours) {
-                    ForEach(0...24, id: \.self) { Text("\($0) hr").tag($0) }
-                }
-                .labelsHidden().frame(width: 72)
-                Picker("Minutes", selection: minutes) {
-                    ForEach(minuteOptions, id: \.self) { Text("\($0) min").tag($0) }
-                }
-                .labelsHidden().frame(width: 78)
+                DurationTextField(title: title, text: text, maximumMinutes: 1_440)
                 clearButton { isIncluded.wrappedValue = false }
             } else {
                 addButton { isIncluded.wrappedValue = true }
@@ -253,17 +236,20 @@ struct WellbeingTabView: View {
                 Text("Recovery quality, from 0 to 100").font(.caption).foregroundStyle(PopupVisualTheme.secondaryText)
             }
             Spacer(minLength: 8)
-            if hasSleepScore {
-                Stepper(value: $sleepScore, in: 0...100) {
-                    Text("\(sleepScore)")
-                        .font(.system(.body, design: .rounded).weight(.semibold))
-                        .monospacedDigit()
-                        .frame(minWidth: 28, alignment: .trailing)
-                }
-                .fixedSize()
-                clearButton { hasSleepScore = false }
+            if timing.hasSleepScore {
+                TextField("80", text: $timing.sleepScoreText)
+                    .textFieldStyle(.plain)
+                    .monospacedDigit()
+                    .multilineTextAlignment(.trailing)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .popupInputSurface(cornerRadius: 8)
+                    .frame(width: 64)
+                    .accessibilityLabel("Sleep score")
+                    .help("Enter a score from 0 to 100")
+                clearButton { timing.hasSleepScore = false }
             } else {
-                addButton { hasSleepScore = true }
+                addButton { timing.hasSleepScore = true }
             }
         }
         .padding(.horizontal, 12)
@@ -290,33 +276,20 @@ struct WellbeingTabView: View {
         suppressServiceError = false
         mood = entry?.mood ?? 0
         energy = entry?.energy ?? 0
-        hasSleepDuration = entry?.sleepHours != nil
-        if let value = entry?.sleepHours {
-            (sleepHours, sleepMinutes) = splitMinutes(Int((value * 60).rounded()))
-        }
-        hasSleepScore = entry?.sleepScore != nil
-        sleepScore = entry?.sleepScore ?? 80
-        hasScreenTime = entry?.screenTimeMinutes != nil
-        if let value = entry?.screenTimeMinutes {
-            (screenHours, screenMinutes) = splitMinutes(value)
-        }
+        timing = WellbeingTimingDraft(entry: entry)
         notes = entry?.notes ?? ""
         baselineRequest = request(
             mood: mood,
             energy: energy,
-            sleepHours: hasSleepDuration ? Double(sleepHours) + Double(sleepMinutes) / 60 : nil,
-            sleepScore: hasSleepScore ? sleepScore : nil,
-            screenTimeMinutes: hasScreenTime ? screenHours * 60 + screenMinutes : nil,
+            sleepHours: timing.sleepHours,
+            sleepScore: timing.sleepScore,
+            screenTimeMinutes: timing.screenTimeMinutes,
             notes: notes
         )
     }
 
-    private func splitMinutes(_ total: Int) -> (Int, Int) {
-        let rounded = max(0, Int((Double(total) / 15).rounded()) * 15)
-        return (min(24, rounded / 60), rounded % 60)
-    }
-
     private func save() {
+        guard timing.validationError == nil else { return }
         validationError = nil
         suppressServiceError = true
         feedbackDismissTask?.cancel()
@@ -346,9 +319,9 @@ struct WellbeingTabView: View {
         request(
             mood: mood,
             energy: energy,
-            sleepHours: hasSleepDuration ? Double(sleepHours) + Double(sleepMinutes) / 60 : nil,
-            sleepScore: hasSleepScore ? sleepScore : nil,
-            screenTimeMinutes: hasScreenTime ? screenHours * 60 + screenMinutes : nil,
+            sleepHours: timing.sleepHours,
+            sleepScore: timing.sleepScore,
+            screenTimeMinutes: timing.screenTimeMinutes,
             notes: notes
         )
     }

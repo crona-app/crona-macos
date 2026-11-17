@@ -156,7 +156,10 @@ enum HabitDurationFormatter {
         let hours = clamped / 3600
         let minutes = (clamped % 3600) / 60
         let remainingSeconds = clamped % 60
-        return "\(hours)h\(minutes)m\(remainingSeconds)s"
+        if remainingSeconds == 0 { return MenuBarTextFormatter.formatCompactDuration(seconds: clamped) }
+        if hours > 0 { return "\(hours)h\(minutes)m\(remainingSeconds)s" }
+        if minutes > 0 { return "\(minutes)m\(remainingSeconds)s" }
+        return "\(remainingSeconds)s"
     }
 
     static func seconds(from raw: String) -> Int? {

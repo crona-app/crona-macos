@@ -125,7 +125,7 @@ enum FocusPresetChoice: String, CaseIterable, Equatable, Identifiable {
         switch self {
         case .preset25: return "25m"
         case .preset50: return "50m"
-        case .preset90: return "90m"
+        case .preset90: return MenuBarTextFormatter.formatMinutes(90)
         case .preset5: return "5m"
         case .preset10: return "10m"
         case .preset15: return "15m"

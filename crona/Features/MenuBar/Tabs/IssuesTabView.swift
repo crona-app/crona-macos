@@ -937,7 +937,7 @@ struct FocusIssueRow: View {
     private var metaLine: String {
         let worked = MenuBarTextFormatter.formatCompactDuration(seconds: issue.workedSeconds)
         if let estimate = issue.estimateMinutes, estimate > 0 {
-            return "\(worked) / \(estimate)m"
+            return "\(worked) / \(MenuBarTextFormatter.formatMinutes(estimate))"
         }
         return worked
     }

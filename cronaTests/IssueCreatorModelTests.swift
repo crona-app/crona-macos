@@ -268,4 +268,19 @@ final class IssueCreatorModelTests: DaemonTestCase {
         XCTAssertEqual(create.params["tags"]?.stringArrayValue, ["urgent"])
         XCTAssertEqual(appState.issueCreator.tagDraft, "")
     }
+
+    func testIssueEditorPrefillsHoursAndMinutesAndPreservesStoredEstimate() async throws {
+        let (connection, transport) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+        let issue = DailyFocusIssue(id: 42, streamID: 7, title: "Long task", status: "planned",
+                                   estimateMinutes: 90, workedSeconds: 0, todoForDate: nil)
+        appState.issueCreator.presentEditor(for: issue)
+        XCTAssertEqual(appState.issueCreator.estimate, "1h30m")
+        appState.issueCreator.submit()
+        await waitForIssueCreator { !appState.issueCreator.isSubmitting }
+        let update = try XCTUnwrap(transport.requests.last { $0.method == "issue.update" })
+        XCTAssertEqual(update.params["estimateMinutes"]?.intValue, 90)
+    }
+
 }

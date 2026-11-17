@@ -107,4 +107,15 @@ final class HabitEditorModelTests: DaemonTestCase {
         let create = try XCTUnwrap(transport.requests.first { $0.method == "habit.create" })
         XCTAssertEqual(create.params["tags"]?.stringArrayValue, ["health"])
     }
+
+    func testHabitEditorPrefillsTargetWithHoursAndMinutes() async throws {
+        let (connection, _) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let appState = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+        let habit = HabitRowModel(id: 9, name: "Read", repoName: "Repo", streamName: "Stream", status: "due",
+                                  completed: false, durationMinutes: nil, targetMinutes: 75)
+        appState.habitEditor.presentEditor(for: habit)
+        XCTAssertEqual(appState.habitEditor.target, "1h15m")
+    }
+
 }
