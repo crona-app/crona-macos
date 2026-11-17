@@ -266,6 +266,7 @@ struct PopoverRootView: View {
 
             HStack {
                 if appState.popoverDetailsRoute == nil,
+                    !(appState.selectedPopoverTab == .now && appState.hasActiveFocusSession),
                     !appState.todayIsAway
                     && (appState.isStatsCalendarPresented
                         || appState.selectedPopoverTab == .stats
