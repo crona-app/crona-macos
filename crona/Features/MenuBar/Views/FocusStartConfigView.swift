@@ -22,7 +22,7 @@ struct FocusStartConfigView: View {
 
             Text(formattedPopoverDate(appState.dailyFocusService.snapshot.date, appState: appState))
                 .font(.caption).foregroundStyle(.secondary)
-            Label(issue?.title ?? "Ad Hoc Focus", systemImage: "record.circle.fill")
+            Label(issue?.title ?? "Quick Session", systemImage: "record.circle.fill")
                 .font(.title3.weight(.semibold)).lineLimit(2)
 
             SegmentedControl(selection: $setup.mode, title: \.title)

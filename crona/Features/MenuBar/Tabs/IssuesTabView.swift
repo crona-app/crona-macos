@@ -170,7 +170,7 @@ struct ActiveTimerView: View {
             }
 
             if appState.timerService.snapshot.adhoc {
-                Text("Ad Hoc Focus").font(.headline)
+                Text("Quick Session").font(.headline)
             } else if hasContext {
                 VStack(alignment: .center, spacing: 10) {
                     if let issue = appState.contextService.snapshot.issueTitle {
@@ -331,7 +331,7 @@ struct IdleFocusView: View {
                     HStack(spacing: 10) {
                         Image(systemName: "timer").foregroundStyle(
                             PopupVisualTheme.semantic(.focus))
-                        Text("Quick Timer").font(.subheadline.weight(.semibold))
+                        Text("Quick Session").font(.subheadline.weight(.semibold))
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .semibold))

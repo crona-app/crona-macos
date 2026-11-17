@@ -90,7 +90,7 @@ struct AdhocAttributionView: View {
             HStack(spacing: 8) {
                 Image(systemName: "timer")
                     .foregroundStyle(PopupVisualTheme.semantic(.focus))
-                Text("Ad Hoc Focus")
+                Text("Quick Session")
                 Spacer()
                 Text(MenuBarTextFormatter.formatClock(seconds: endSession.adhocElapsedSeconds))
                     .monospacedDigit()
@@ -266,7 +266,7 @@ struct AdhocAttributionView: View {
     private var keepContext: some View {
         Label {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Ad hoc / Sessions").font(.subheadline.weight(.semibold))
+                Text("Quick Sessions").font(.subheadline.weight(.semibold))
                 Text("Saved as completed for today.").font(.caption).foregroundStyle(PopupVisualTheme.secondaryText)
             }
         } icon: {

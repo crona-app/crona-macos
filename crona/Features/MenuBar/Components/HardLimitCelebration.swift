@@ -32,7 +32,9 @@ struct FocusCompleteRing: View {
                 return
             }
             withAnimation(.easeOut(duration: 0.6)) { progress = 1 }
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.6).delay(0.5)) { showsCheck = true }
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.6).delay(0.5)) {
+                showsCheck = true
+            }
         }
     }
 }
@@ -155,12 +157,13 @@ struct FocusIssueContextCard: View {
     private var isAdhoc: Bool { timerService.snapshot.adhoc }
 
     private var title: String {
-        isAdhoc ? "Ad Hoc Focus" : (contextService.snapshot.issueTitle ?? "Focus session")
+        isAdhoc ? "Quick Session" : (contextService.snapshot.issueTitle ?? "Focus session")
     }
 
     private var location: String? {
         guard !isAdhoc else { return nil }
-        let parts = [contextService.snapshot.repoName, contextService.snapshot.streamName].compactMap { $0 }
+        let parts = [contextService.snapshot.repoName, contextService.snapshot.streamName]
+            .compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " › ")
     }
 
@@ -168,7 +171,8 @@ struct FocusIssueContextCard: View {
         guard !isAdhoc, let issueID = timerService.snapshot.issueID,
             let issue = dailyIssues.allIssues.first(where: { $0.id == issueID })
         else { return nil }
-        return Self.progressText(workedSeconds: issue.workedSeconds, estimateMinutes: issue.estimateMinutes)
+        return Self.progressText(
+            workedSeconds: issue.workedSeconds, estimateMinutes: issue.estimateMinutes)
     }
 
     static func progressText(workedSeconds: Int, estimateMinutes: Int?) -> String {

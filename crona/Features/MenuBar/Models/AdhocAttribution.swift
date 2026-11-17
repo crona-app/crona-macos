@@ -7,13 +7,16 @@ enum CronaAdhocResolution: String, Codable, CaseIterable, Identifiable, Sendable
         switch self {
         case .attach: "Attach to Issue"
         case .create: "Create Issue"
-        case .keep: "Keep Ad Hoc"
+        case .keep: "Keep Quick Session"
         }
     }
 }
 
 enum AdhocIssueFilter: String, CaseIterable, Identifiable {
-    case today = "Due Today", overdue = "Overdue", pinned = "Pinned", all = "All"
+    case today = "Due Today"
+    case overdue = "Overdue"
+    case pinned = "Pinned"
+    case all = "All"
     var id: String { rawValue }
 }
 
@@ -35,11 +38,14 @@ struct AdhocAttributionState {
     var loadError: String?
 
     var estimateText: String {
-        estimateInput ?? (estimateMinutes > 0 ? MenuBarTextFormatter.formatMinutes(estimateMinutes) : "")
+        estimateInput
+            ?? (estimateMinutes > 0 ? MenuBarTextFormatter.formatMinutes(estimateMinutes) : "")
     }
 
     static func initial(elapsedSeconds: Int, date: String, streamID: Int64?) -> Self {
-        Self(destinationID: streamID, estimateMinutes: max(0, (elapsedSeconds + 899) / 900 * 15), date: date)
+        Self(
+            destinationID: streamID, estimateMinutes: max(0, (elapsedSeconds + 899) / 900 * 15),
+            date: date)
     }
 
     func filteredIssues(today: String) -> [CronaIssue] {
@@ -68,6 +74,6 @@ enum AdhocCompletionLayout {
 
 extension CompanionAppState {
     var activeFocusTitle: String? {
-        timerService.snapshot.adhoc ? "Ad Hoc Focus" : contextService.snapshot.issueTitle
+        timerService.snapshot.adhoc ? "Quick Session" : contextService.snapshot.issueTitle
     }
 }

@@ -68,7 +68,7 @@ final class EndSessionModel: ObservableObject {
         switch adhocAttribution.resolution {
         case .attach: return "Attach & Finish"
         case .create: return adhocAttribution.createdIssue == nil ? "Create & Finish" : "Retry & Finish"
-        case .keep: return "Keep Ad Hoc & Finish"
+        case .keep: return "Keep Quick Session & Finish"
         case nil: return "End Session"
         }
     }
