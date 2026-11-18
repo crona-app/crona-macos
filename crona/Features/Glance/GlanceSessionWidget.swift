@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Focus setup card for Peek; the rows come from the shared `FocusSetupForm` so it matches the popover.
-struct PeekSessionWidget: View {
+/// Focus setup card for Glance; the rows come from the shared `FocusSetupForm` so it matches the popover.
+struct GlanceSessionWidget: View {
     @ObservedObject var state: CompanionAppState
-    @ObservedObject var model: PeekModel
+    @ObservedObject var model: GlanceModel
     @ObservedObject var setup: FocusSetupModel
 
     var body: some View {
@@ -28,12 +28,12 @@ struct PeekSessionWidget: View {
                         Button("Continue in Crona") {
                             model.dismiss(restoreFocus: false)
                             state.statusBarService.showPopupFromShortcut()
-                        }.buttonStyle(PeekButtonStyle())
+                        }.buttonStyle(GlanceButtonStyle())
                     }
                     Button(model.isStarting ? "Starting…" : (setup.mode == .timer ? "Start Timer" : "Start Focus")) {
                         Task { await model.start() }
                     }
-                    .buttonStyle(PeekButtonStyle(prominent: true))
+                    .buttonStyle(GlanceButtonStyle(prominent: true))
                     .keyboardShortcut(.defaultAction)
                     .disabled(setup.configuration == nil || model.isStarting)
                 }.frame(height: 36)

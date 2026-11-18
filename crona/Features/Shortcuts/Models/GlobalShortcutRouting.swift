@@ -3,7 +3,7 @@ import Foundation
 extension CompanionAppState {
     @MainActor
     func performGlobalShortcut(_ action: GlobalShortcutAction) async {
-        if action == .peek { peek.toggle(appState: self); return }
+        if action == .glance { glance.toggle(appState: self); return }
         if action == .settings { openSettings(); return }
         if action == .pauseResume {
             let presentation = TimerPresentation.from(timerService.snapshot)

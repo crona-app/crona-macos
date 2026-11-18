@@ -2,7 +2,7 @@ import Combine
 import Foundation
 
 @MainActor
-final class PeekModel: ObservableObject {
+final class GlanceModel: ObservableObject {
     @Published private(set) var isPresented = false
     @Published private(set) var selectedIssue: DailyFocusIssue?
     @Published var showsSetup = false
@@ -20,7 +20,7 @@ final class PeekModel: ObservableObject {
     let stats: PopoverStatsService
     private weak var appState: CompanionAppState?
     private let connection: DaemonConnectionService
-    private let window = PeekWindowController()
+    private let window = GlanceWindowController()
     private var refreshTask: Task<Void, Never>?
     private var generation = 0
     private var subscriptions: Set<AnyCancellable> = []
@@ -77,7 +77,7 @@ final class PeekModel: ObservableObject {
         showsCapture.toggle()
     }
 
-    /// Escape closes the open card first, then Peek itself.
+    /// Escape closes the open card first, then Glance itself.
     func handleEscape() {
         if showsSetup { showsSetup = false } else if showsCapture { showsCapture = false } else { dismiss() }
     }

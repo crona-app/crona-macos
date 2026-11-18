@@ -1,11 +1,11 @@
 import SwiftUI
 
-struct PeekView: View {
+struct GlanceView: View {
     @ObservedObject var appState: CompanionAppState
-    @ObservedObject var model: PeekModel
+    @ObservedObject var model: GlanceModel
     @ObservedObject var day: PopoverDayModel
 
-    init(appState: CompanionAppState, model: PeekModel) {
+    init(appState: CompanionAppState, model: GlanceModel) {
         self.appState = appState
         self.model = model
         day = model.day
@@ -26,34 +26,34 @@ struct PeekView: View {
 
     private var content: some View {
         VStack(spacing: 16) {
-            PeekHeader(state: appState, model: model)
+            GlanceHeader(state: appState, model: model)
             if appState.hasActiveFocusSession {
-                PeekLiveSessionStrip(state: appState, model: model, timer: appState.timerService)
+                GlanceLiveSessionStrip(state: appState, model: model, timer: appState.timerService)
             } else if day.isToday {
                 HStack {
                     Text("Ready to focus").foregroundStyle(.secondary)
                     Spacer()
                     Button { model.prepare() } label: { Label("Quick Session", systemImage: "timer") }
-                        .buttonStyle(PeekButtonStyle())
+                        .buttonStyle(GlanceButtonStyle())
                 }
             }
             if appState.daemonConnection.connectionState != .connected {
                 HStack {
                     Label("Disconnected · showing cached day data", systemImage: "wifi.slash")
-                    Button("Reconnect", action: appState.manualReconnect).buttonStyle(PeekButtonStyle())
+                    Button("Reconnect", action: appState.manualReconnect).buttonStyle(GlanceButtonStyle())
                 }
             }
             if day.isRecordedAway(in: appState.coreSettingsService.settings) {
                 Label("Recorded away day", systemImage: "figure.walk")
             }
-            PeekDayPanes(state: appState, model: model, day: day, issues: model.issues, habits: model.habits, stats: model.stats)
+            GlanceDayPanes(state: appState, model: model, day: day, issues: model.issues, habits: model.habits, stats: model.stats)
         }.padding(24).frame(maxWidth: 1800).frame(maxWidth: .infinity)
     }
 
     @ViewBuilder private var card: some View {
         Group {
             if model.showsSetup {
-                PeekSessionWidget(state: appState, model: model, setup: model.setup)
+                GlanceSessionWidget(state: appState, model: model, setup: model.setup)
             } else {
                 IssueCaptureView(appState: appState, issueCapture: model.capture, width: 460,
                     onImport: { await model.importCapture() }, onClose: { model.showsCapture = false })

@@ -2,23 +2,23 @@ import XCTest
 @testable import crona
 
 @MainActor
-final class PeekTests: DaemonTestCase {
-    private let issue = DailyFocusIssue(id: 42, streamID: 7, title: "Peek work", status: "planned",
+final class GlanceTests: DaemonTestCase {
+    private let issue = DailyFocusIssue(id: 42, streamID: 7, title: "Glance work", status: "planned",
         estimateMinutes: 45, workedSeconds: 0, todoForDate: nil, repoName: "Crona", streamName: "Mac")
 
-    func testPeekDraftsDoNotChangeMenuDraftsAndSurviveDismissal() async throws {
+    func testGlanceDraftsDoNotChangeMenuDraftsAndSurviveDismissal() async throws {
         let (connection, _) = try await issueCreatorConnection()
         defer { connection.stop() }
         let state = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
         state.issueCapture.text = "Menu draft"
-        state.peek.capture.text = "Peek draft"
-        state.peek.prepare(issue)
-        state.peek.setup.countdown = "47m"
-        state.peek.dismiss()
+        state.glance.capture.text = "Glance draft"
+        state.glance.prepare(issue)
+        state.glance.setup.countdown = "47m"
+        state.glance.dismiss()
         XCTAssertEqual(state.issueCapture.text, "Menu draft")
-        XCTAssertEqual(state.peek.capture.text, "Peek draft")
-        XCTAssertEqual(state.peek.selectedIssue, issue)
-        XCTAssertEqual(state.peek.setup.countdown, "47m")
+        XCTAssertEqual(state.glance.capture.text, "Glance draft")
+        XCTAssertEqual(state.glance.selectedIssue, issue)
+        XCTAssertEqual(state.glance.setup.countdown, "47m")
         XCTAssertNil(state.selectedFocusIssue)
     }
 
@@ -27,23 +27,23 @@ final class PeekTests: DaemonTestCase {
         defer { connection.stop() }
         let state = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
         transport.failStart = true
-        state.peek.prepare(issue)
-        await state.peek.start()
-        XCTAssertNotNil(state.peek.error)
-        XCTAssertTrue(state.peek.showsSetup)
-        XCTAssertEqual(state.peek.selectedIssue, issue)
-        XCTAssertFalse(state.peek.isStarting)
+        state.glance.prepare(issue)
+        await state.glance.start()
+        XCTAssertNotNil(state.glance.error)
+        XCTAssertTrue(state.glance.showsSetup)
+        XCTAssertEqual(state.glance.selectedIssue, issue)
+        XCTAssertFalse(state.glance.isStarting)
     }
 
-    func testSuccessfulStartClearsOnlyPeekSetup() async throws {
+    func testSuccessfulStartClearsOnlyGlanceSetup() async throws {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }
         let state = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
-        state.peek.prepare(issue)
-        await state.peek.start()
+        state.glance.prepare(issue)
+        await state.glance.start()
         XCTAssertTrue(transport.methods.contains("timer.start"))
-        XCTAssertFalse(state.peek.showsSetup)
-        XCTAssertNil(state.peek.selectedIssue)
+        XCTAssertFalse(state.glance.showsSetup)
+        XCTAssertNil(state.glance.selectedIssue)
         XCTAssertNil(state.selectedFocusIssue)
     }
 
@@ -52,10 +52,10 @@ final class PeekTests: DaemonTestCase {
         defer { connection.stop() }
         let state = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
         state.beginAdhocStart()
-        state.peek.prepare(issue)
-        await state.peek.start()
+        state.glance.prepare(issue)
+        await state.glance.start()
         XCTAssertFalse(transport.methods.contains("timer.start"))
-        XCTAssertNotNil(state.peek.error)
+        XCTAssertNotNil(state.glance.error)
         XCTAssertTrue(state.isAdhocStartSelected)
     }
 
@@ -63,17 +63,17 @@ final class PeekTests: DaemonTestCase {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }
         let state = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
-        transport.captureProposalsFixture = [["line": 1, "title": "Peek draft", "inbox": true]]
-        state.peek.capture.text = "Peek draft"
-        await state.peek.capture.parseNow()
-        XCTAssertTrue(state.peek.capture.canImport)
+        transport.captureProposalsFixture = [["line": 1, "title": "Glance draft", "inbox": true]]
+        state.glance.capture.text = "Glance draft"
+        await state.glance.capture.parseNow()
+        XCTAssertTrue(state.glance.capture.canImport)
         transport.failCaptureImport = true
-        await state.peek.importCapture()
-        XCTAssertEqual(state.peek.capture.text, "Peek draft")
-        XCTAssertNotNil(state.peek.capture.errorMessage)
+        await state.glance.importCapture()
+        XCTAssertEqual(state.glance.capture.text, "Glance draft")
+        XCTAssertNotNil(state.glance.capture.errorMessage)
         transport.failCaptureImport = false
-        await state.peek.importCapture()
-        XCTAssertEqual(state.peek.capture.text, "")
+        await state.glance.importCapture()
+        XCTAssertEqual(state.glance.capture.text, "")
         XCTAssertEqual(transport.lastImportProposalCount, 1)
     }
 
@@ -82,50 +82,50 @@ final class PeekTests: DaemonTestCase {
         defer { connection.stop() }
         let state = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
         transport.suspendStart = true
-        state.peek.prepare(issue)
-        let first = Task { await state.peek.start() }
-        await waitForIssueCreator { state.peek.isStarting }
-        await state.peek.start()
+        state.glance.prepare(issue)
+        let first = Task { await state.glance.start() }
+        await waitForIssueCreator { state.glance.isStarting }
+        await state.glance.start()
         transport.resumeStart()
         await first.value
         XCTAssertEqual(transport.methods.filter { $0 == "timer.start" }.count, 1)
     }
 
-    func testPeekRefreshDoesNotChangeSelectedDatesElsewhere() async throws {
+    func testGlanceRefreshDoesNotChangeSelectedDatesElsewhere() async throws {
         let (connection, _) = try await issueCreatorConnection()
         defer { connection.stop() }
         let state = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
         state.popoverStatsService.selectDate("2000-01-01")
-        await state.peek.refresh()
+        await state.glance.refresh()
         XCTAssertEqual(state.popoverStatsService.functionalDate, "2000-01-01")
-        XCTAssertEqual(state.peek.daily.snapshot.date, connection.currentDate)
+        XCTAssertEqual(state.glance.daily.snapshot.date, connection.currentDate)
     }
     func testHistoricalDayBlocksStartAndCaptureWithoutDestroyingDrafts() async throws {
         let (connection, transport) = try await issueCreatorConnection()
         defer { connection.stop() }
         let state = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
-        state.peek.prepare(issue)
-        state.peek.capture.text = "Keep this draft"
-        state.peek.day.select("2000-01-01")
-        await state.peek.start()
-        await state.peek.importCapture()
+        state.glance.prepare(issue)
+        state.glance.capture.text = "Keep this draft"
+        state.glance.day.select("2000-01-01")
+        await state.glance.start()
+        await state.glance.importCapture()
         XCTAssertFalse(transport.methods.contains("timer.start"))
         XCTAssertFalse(transport.methods.contains("issue.capture.import"))
-        XCTAssertEqual(state.peek.capture.text, "Keep this draft")
-        XCTAssertEqual(state.peek.selectedIssue, issue)
+        XCTAssertEqual(state.glance.capture.text, "Keep this draft")
+        XCTAssertEqual(state.glance.selectedIssue, issue)
     }
 
-    func testCalendarSelectionRefreshesEveryPeekPaneAndClearsPreview() async throws {
+    func testCalendarSelectionRefreshesEveryGlancePaneAndClearsPreview() async throws {
         let (connection, _) = try await issueCreatorConnection()
         defer { connection.stop() }
         let state = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
-        state.peek.previewIssue = issue
-        state.peek.day.select("2000-01-01")
-        XCTAssertNil(state.peek.previewIssue)
-        await state.peek.refresh()
-        XCTAssertEqual(state.peek.habits.snapshot.date, "2000-01-01")
-        XCTAssertEqual(state.peek.stats.functionalDate, "2000-01-01")
-        XCTAssertEqual(state.peek.issues.loadedDate, "2000-01-01")
+        state.glance.previewIssue = issue
+        state.glance.day.select("2000-01-01")
+        XCTAssertNil(state.glance.previewIssue)
+        await state.glance.refresh()
+        XCTAssertEqual(state.glance.habits.snapshot.date, "2000-01-01")
+        XCTAssertEqual(state.glance.stats.functionalDate, "2000-01-01")
+        XCTAssertEqual(state.glance.issues.loadedDate, "2000-01-01")
         XCTAssertNotEqual(state.day.selectedDate, "2000-01-01")
     }
 

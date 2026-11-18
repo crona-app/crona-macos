@@ -1,8 +1,8 @@
 import SwiftUI
 
-struct PeekDayPanes: View {
+struct GlanceDayPanes: View {
     @ObservedObject var state: CompanionAppState
-    @ObservedObject var model: PeekModel
+    @ObservedObject var model: GlanceModel
     @ObservedObject var day: PopoverDayModel
     @ObservedObject var issues: DailyIssuesModel
     @ObservedObject var habits: HabitsService
@@ -11,7 +11,7 @@ struct PeekDayPanes: View {
     @State private var logSeconds = 60
     @ObservedObject private var tags: TagsModel
 
-    init(state: CompanionAppState, model: PeekModel, day: PopoverDayModel, issues: DailyIssuesModel,
+    init(state: CompanionAppState, model: GlanceModel, day: PopoverDayModel, issues: DailyIssuesModel,
          habits: HabitsService, stats: PopoverStatsService) {
         self.state = state
         self.model = model
@@ -123,7 +123,7 @@ struct PeekDayPanes: View {
 
     private func calendar(compact: Bool) -> some View {
         pane("Calendar") {
-            PeekCalendarPane(day: day, stats: stats,
+            GlanceCalendarPane(day: day, stats: stats,
                 today: state.daemonConnection.currentDate.isEmpty ? DailyFocusService.todayString() : state.daemonConnection.currentDate,
                 settings: state.coreSettingsService.settings, compact: compact)
         }
@@ -135,7 +135,7 @@ struct PeekDayPanes: View {
                 VStack(alignment: .leading, spacing: 10) { previewContent }
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if !day.isToday { Button("Return to Today for actions") { day.showToday() }.buttonStyle(PeekButtonStyle()) }
+            if !day.isToday { Button("Return to Today for actions") { day.showToday() }.buttonStyle(GlanceButtonStyle()) }
         }
     }
 
@@ -153,7 +153,7 @@ struct PeekDayPanes: View {
             TagChipsView(tags: issue.tags, tagsModel: tags)
             if day.isToday {
                 Button { model.prepare(issue) } label: { Label("Focus on this issue", systemImage: "play.fill") }
-                    .buttonStyle(PeekButtonStyle(prominent: true))
+                    .buttonStyle(GlanceButtonStyle(prominent: true))
             }
         } else if let habit = model.selectedHabit {
             Text(habit.name).font(.title3.bold())
@@ -166,7 +166,7 @@ struct PeekDayPanes: View {
                 Button { complete(habit) } label: {
                     Label(habit.targetMinutes == nil ? "Complete" : "Log duration…", systemImage: "checkmark")
                 }
-                .buttonStyle(PeekButtonStyle(prominent: true))
+                .buttonStyle(GlanceButtonStyle(prominent: true))
                 .disabled(habits.actionInFlightHabitID != nil)
             }
         } else { Text("Select an issue or habit to see its details.").foregroundStyle(.secondary) }
@@ -198,11 +198,11 @@ struct PeekDayPanes: View {
             content()
         }.padding(18)
             .frame(maxWidth: .infinity, maxHeight: flexible ? .infinity : nil, alignment: .topLeading)
-            .modifier(PeekPaneSurface())
+            .modifier(GlancePaneSurface())
     }
 }
 
-private struct PeekPaneSurface: ViewModifier {
+private struct GlancePaneSurface: ViewModifier {
     @ObservedObject private var glass = SystemGlassSettings.shared
     @ViewBuilder func body(content: Content) -> some View {
         if glass.reduceTransparency {

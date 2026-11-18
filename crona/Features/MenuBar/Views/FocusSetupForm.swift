@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The mode-specific rows of the focus setup, shared by the menu popover and Peek so both keep one look.
+/// The mode-specific rows of the focus setup, shared by the menu popover and Glance so both keep one look.
 struct FocusSetupForm: View {
     @ObservedObject var setup: FocusSetupModel
     let onSubmit: () -> Void

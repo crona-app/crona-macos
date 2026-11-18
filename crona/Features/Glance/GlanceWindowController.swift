@@ -2,20 +2,20 @@ import AppKit
 import SwiftUI
 
 @MainActor
-final class PeekWindowController {
-    private var panel: PeekPanel?
+final class GlanceWindowController {
+    private var panel: GlancePanel?
     private var previousApp: NSRunningApplication?
     private var displayID: CGDirectDisplayID?
     private var screenObserver: NSObjectProtocol?
     private var monitor: Any?
     private var hostingView: NSHostingView<AnyView>?
 
-    func show(appState: CompanionAppState, model: PeekModel) -> Bool {
+    func show(appState: CompanionAppState, model: GlanceModel) -> Bool {
         guard let screen = NSScreen.screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }) ?? NSScreen.main else { return false }
         previousApp = NSWorkspace.shared.frontmostApplication
         displayID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
-        let panel = PeekPanel(contentRect: screen.frame, styleMask: [.borderless], backing: .buffered, defer: false)
-        panel.title = "Peek"
+        let panel = GlancePanel(contentRect: screen.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        panel.title = "Glance"
         panel.isReleasedWhenClosed = false
         panel.backgroundColor = .clear
         panel.isOpaque = false
@@ -65,8 +65,8 @@ final class PeekWindowController {
         return blur
     }
 
-    private static func rootView(appState: CompanionAppState, model: PeekModel, screen: NSScreen) -> AnyView {
-        AnyView(PeekView(appState: appState, model: model)
+    private static func rootView(appState: CompanionAppState, model: GlanceModel, screen: NSScreen) -> AnyView {
+        AnyView(GlanceView(appState: appState, model: model)
             .padding(contentInsets(frame: screen.frame, visibleFrame: screen.visibleFrame, safeTop: screen.safeAreaInsets.top)))
     }
 
@@ -95,6 +95,6 @@ final class PeekWindowController {
     }
 }
 
-private final class PeekPanel: NSPanel {
+private final class GlancePanel: NSPanel {
     override var canBecomeKey: Bool { true }
 }

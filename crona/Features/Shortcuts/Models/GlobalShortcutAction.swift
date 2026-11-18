@@ -1,11 +1,11 @@
 import Foundation
 
 enum GlobalShortcutAction: String, CaseIterable, Identifiable {
-    case peek, show, createIssue, startFocus, pauseResume, endSession, settings
+    case glance, show, createIssue, startFocus, pauseResume, endSession, settings
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .peek: "Toggle Peek"
+        case .glance: "Toggle Glance"
         case .show: "Show Crona"
         case .createIssue: "Create Issue"
         case .startFocus: "Start Focus Session"

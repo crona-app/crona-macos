@@ -13,7 +13,7 @@ struct IssueCaptureView: View {
     private let onImport: (() async -> Void)?
     private let onClose: (() -> Void)?
 
-    /// `onImport` and `onClose` let a host such as Peek own what happens after an import or when the
+    /// `onImport` and `onClose` let a host such as Glance own what happens after an import or when the
     /// view is closed; the defaults keep the popover behavior.
     init(
         appState: CompanionAppState, issueCapture: IssueCaptureModel, width: CGFloat = 420,

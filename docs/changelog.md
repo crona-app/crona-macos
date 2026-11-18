@@ -6,7 +6,7 @@ All notable changes to **Crona for macOS** are documented here.
 
 ### Added
 
-- Add Peek, a fullscreen glance and action overlay with responsive native glass widgets, inline focus setup and issue capture, habits, and today’s progress. Open it from the Crona menu or assign Toggle Peek in Shortcuts.
+- Add Glance, a fullscreen overlay with responsive native glass widgets, inline focus setup and issue capture, habits, and today’s progress. Open it from the Crona menu or assign Toggle Glance in Shortcuts.
 
 - Add Settings > Shortcuts with configurable global shortcuts for Show Crona, Create Issue, Start Focus Session, Pause / Resume Session, End Session, and Open Settings. Existing Settings bindings are preserved; new actions start unassigned. Interface shortcuts also work with the menu bar icon hidden.
 

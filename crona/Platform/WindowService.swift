@@ -436,7 +436,7 @@ final class WindowService {
     }
 
     func showBreakScreens() {
-        appState?.peek.dismiss(restoreFocus: false)
+        appState?.glance.dismiss(restoreFocus: false)
         guard let appState else { return }
         let screens = NSScreen.screens
         let activeIDs = Set(screens.compactMap(Self.displayID))
@@ -766,7 +766,7 @@ final class WindowService {
     }
 
     func showHardLimitPopup() {
-        appState?.peek.dismiss(restoreFocus: false)
+        appState?.glance.dismiss(restoreFocus: false)
         guard let appState else { return }
 
         // The expired timer must not remain visible behind the action popup.
@@ -864,7 +864,7 @@ final class WindowService {
     }
 
     func showInactivityPopup() {
-        appState?.peek.dismiss(restoreFocus: false)
+        appState?.glance.dismiss(restoreFocus: false)
         guard let appState else { return }
 
         let targetScreen = popupTargetScreen()

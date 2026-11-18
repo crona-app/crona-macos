@@ -1,8 +1,8 @@
 import SwiftUI
 
-struct PeekLiveSessionStrip: View {
+struct GlanceLiveSessionStrip: View {
     @ObservedObject var state: CompanionAppState
-    @ObservedObject var model: PeekModel
+    @ObservedObject var model: GlanceModel
     @ObservedObject var timer: TimerService
 
     var body: some View {
@@ -19,15 +19,15 @@ struct PeekLiveSessionStrip: View {
                 Text(Duration.seconds(presentation.displaySeconds).formatted(.time(pattern: .hourMinuteSecond)))
                     .font(.title2.monospacedDigit())
                 if presentation.canPause || presentation.canResume {
-                    Button(presentation.canPause ? "Pause" : "Resume") { Task { await model.timerCommand() } }.buttonStyle(PeekButtonStyle())
+                    Button(presentation.canPause ? "Pause" : "Resume") { Task { await model.timerCommand() } }.buttonStyle(GlanceButtonStyle())
                 }
                 if presentation.canAdvance, let title = presentation.advanceTitle {
-                    Button(title) { Task { await model.timerCommand(advance: true) } }.buttonStyle(PeekButtonStyle())
+                    Button(title) { Task { await model.timerCommand(advance: true) } }.buttonStyle(GlanceButtonStyle())
                 }
                 Button("End") {
                     model.dismiss(restoreFocus: false)
                     Task { await state.performGlobalShortcut(.endSession) }
-                }.buttonStyle(PeekButtonStyle())
+                }.buttonStyle(GlanceButtonStyle())
             }.disabled(model.commandInFlight)
         }.padding(12).background(subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 18))
     }

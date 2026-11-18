@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct PeekCalendarPane: View {
+struct GlanceCalendarPane: View {
     @ObservedObject var day: PopoverDayModel
     @ObservedObject var stats: PopoverStatsService
     let today: String

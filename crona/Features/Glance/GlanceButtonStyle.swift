@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Capsule action button matching the popover's glass controls; `prominent` is the single primary action.
-struct PeekButtonStyle: ButtonStyle {
+struct GlanceButtonStyle: ButtonStyle {
     var prominent = false
     @Environment(\.isEnabled) private var isEnabled
 
