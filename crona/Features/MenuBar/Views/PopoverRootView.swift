@@ -332,6 +332,11 @@ struct PopoverRootView: View {
 
                     Divider()
 
+                    Button("Open Peek") {
+                        appState.statusBarService.dismissPopup {
+                            appState.peek.toggle(appState: appState)
+                        }
+                    }
                     SettingsLink {
                         Text("Settings…")
                     }

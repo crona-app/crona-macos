@@ -93,6 +93,7 @@ final class CompanionAppState: ObservableObject {
         preferences: preferences, registry: settingsShortcutService,
         perform: { [weak self] action in await self?.performGlobalShortcut(action) }
     )
+    private(set) lazy var peek = PeekModel(appState: self)
     let shortcutFeedback = ShortcutFeedbackPanel()
     let settingsShortcutService: SettingsShortcutService
     let smartPauseService: SmartPauseService
@@ -535,6 +536,7 @@ final class CompanionAppState: ObservableObject {
     }
 
     func stop() {
+        peek.dismiss(restoreFocus: false)
         globalShortcuts.stop()
         presentationTimer?.invalidate()
         presentationTimer = nil

@@ -9,10 +9,21 @@ struct IssueCaptureView: View {
     @State private var editor = CaptureEditorController()
     @State private var token: CaptureToken?
     @State private var highlighted = 0
+    private let width: CGFloat
+    private let onImport: (() async -> Void)?
+    private let onClose: (() -> Void)?
 
-    init(appState: CompanionAppState, issueCapture: IssueCaptureModel) {
+    /// `onImport` and `onClose` let a host such as Peek own what happens after an import or when the
+    /// view is closed; the defaults keep the popover behavior.
+    init(
+        appState: CompanionAppState, issueCapture: IssueCaptureModel, width: CGFloat = 420,
+        onImport: (() async -> Void)? = nil, onClose: (() -> Void)? = nil
+    ) {
         self.appState = appState
         self.issueCapture = issueCapture
+        self.width = width
+        self.onImport = onImport
+        self.onClose = onClose
         self.issueCreationService = appState.issueCreationService
         self.tagsModel = appState.tags
     }
@@ -26,7 +37,7 @@ struct IssueCaptureView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
-                Button(action: issueCapture.dismiss) {
+                Button(action: close) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .semibold))
                         .frame(width: 30, height: 30)
@@ -97,7 +108,9 @@ struct IssueCaptureView: View {
             }
 
             Button {
-                Task { await issueCapture.importAll() }
+                Task {
+                    if let onImport { await onImport() } else { _ = await issueCapture.importAll() }
+                }
             } label: {
                 Text(
                     issueCapture.isImporting
@@ -111,9 +124,9 @@ struct IssueCaptureView: View {
             .disabled(!issueCapture.canImport)
         }
         .padding(20)
-        .frame(width: 420)
+        .frame(width: width)
         .fixedSize(horizontal: false, vertical: true)
-        .onExitCommand(perform: issueCapture.dismiss)
+        .onExitCommand(perform: close)
         .task {
             if issueCreationService.destinations.isEmpty { await issueCreationService.loadDestinations() }
         }
@@ -151,11 +164,13 @@ struct IssueCaptureView: View {
         .background(RoundedRectangle(cornerRadius: 12).fill(PopupVisualTheme.primaryText.opacity(0.05)))
     }
 
+    private func close() { (onClose ?? issueCapture.dismiss)() }
+
     private func handleKey(_ key: CaptureEditorKey) -> Bool {
         let options = suggestions
         guard !options.isEmpty else {
             // NSTextView would otherwise show its own word completions on Escape.
-            if key == .dismiss { issueCapture.dismiss(); return true }
+            if key == .dismiss { close(); return true }
             return false
         }
         switch key {

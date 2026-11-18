@@ -425,6 +425,9 @@ struct FocusIssueRow: View {
     @ObservedObject private var issueActionsService: IssueActionsService
     let issue: DailyFocusIssue
     let onStart: () -> Void
+    let onDetails: (() -> Void)?
+    let beforeAction: (() -> Void)?
+    let actionsEnabled: Bool
     @State private var isActionsHovered = false
 
     let carryAction: CronaCarryAction?
@@ -433,18 +436,23 @@ struct FocusIssueRow: View {
 
     init(
         appState: CompanionAppState, issue: DailyFocusIssue, carryAction: CronaCarryAction? = nil,
-        isInbox: Bool = false, onStart: @escaping () -> Void
+        isInbox: Bool = false, onDetails: (() -> Void)? = nil, beforeAction: (() -> Void)? = nil,
+        actionsEnabled: Bool = true, onStart: @escaping () -> Void
     ) {
         self.appState = appState
         self.issue = issue
         self.carryAction = carryAction
         self.isInbox = isInbox
         self.onStart = onStart
+        self.onDetails = onDetails
+        self.beforeAction = beforeAction
+        self.actionsEnabled = actionsEnabled
         self.issueActionsService = appState.issueActionsService
     }
 
     private var editTagsButton: some View {
         Button {
+            beforeAction?()
             appState.tagEditor.present(.issue(id: issue.id, title: issue.title), tags: issue.tags)
         } label: {
             Label("Edit Tags…", systemImage: TagPresentation.icon)
@@ -464,7 +472,7 @@ struct FocusIssueRow: View {
                     TagChipsView(tags: issue.tags, tagsModel: appState.tags)
                 }
                 .onTapGesture {
-                    appState.openIssueDetails(issue)
+                    if let onDetails { onDetails() } else { appState.openIssueDetails(issue) }
                 }
 
                 HStack(spacing: 12) {
@@ -494,11 +502,12 @@ struct FocusIssueRow: View {
 
             Menu {
                 Button {
-                    appState.openIssueDetails(issue)
+                    if let onDetails { onDetails() } else { appState.openIssueDetails(issue) }
                 } label: {
                     Label("View Details", systemImage: "info.circle")
                 }
                 Button {
+                    beforeAction?()
                     appState.issueCreator.presentEditor(for: issue)
                 } label: {
                     Label("Edit Issue", systemImage: "pencil")
@@ -506,6 +515,7 @@ struct FocusIssueRow: View {
                 editTagsButton
 
                 Button(role: .destructive) {
+                    beforeAction?()
                     appState.issueActions.presentDelete(for: issue)
                 } label: {
                     Label("Delete Issue", systemImage: "trash")
@@ -513,6 +523,7 @@ struct FocusIssueRow: View {
 
                 Divider()
                 Button {
+                    beforeAction?()
                     appState.issueActions.presentManualSession(for: issue)
                 } label: {
                     Label("Log Session…", systemImage: "clock.fill")
@@ -544,6 +555,7 @@ struct FocusIssueRow: View {
                     )
                     .menuBarIconHitTarget()
             }
+            .disabled(!actionsEnabled)
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
@@ -561,6 +573,7 @@ struct FocusIssueRow: View {
                         .contentShape(Circle())
                         .background(glassCapsuleBackground(emphasis: 0.08))
                 }
+                .disabled(!actionsEnabled)
                 .buttonStyle(GlassPressButtonStyle())
                 .help("Start focus")
                 .accessibilityLabel("Start focus")
@@ -569,27 +582,39 @@ struct FocusIssueRow: View {
         .padding(16)
         .background(subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 18))
         .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .onTapGesture { onDetails?() }
         .contextMenu {
-            Button {
-                appState.issueCreator.presentEditor(for: issue)
-            } label: {
-                Label("Edit Issue", systemImage: "pencil")
+            if actionsEnabled {
+                Button {
+                    beforeAction?()
+                    appState.issueCreator.presentEditor(for: issue)
+                } label: {
+                    Label("Edit Issue", systemImage: "pencil")
+                }
+                editTagsButton
+                Button(role: .destructive) {
+                    beforeAction?()
+                    appState.issueActions.presentDelete(for: issue)
+                } label: {
+                    Label("Delete Issue", systemImage: "trash")
+                }
+                Divider()
+                Button {
+                    beforeAction?()
+                    appState.issueActions.presentManualSession(for: issue)
+                } label: {
+                    Label("Log Session…", systemImage: "clock.fill")
+                }
+                Divider()
+                statusMenu
+                dueDateMenu
+            } else {
+                Button {
+                    if let onDetails { onDetails() } else { appState.openIssueDetails(issue) }
+                } label: {
+                    Label("View Details", systemImage: "info.circle")
+                }
             }
-            editTagsButton
-            Button(role: .destructive) {
-                appState.issueActions.presentDelete(for: issue)
-            } label: {
-                Label("Delete Issue", systemImage: "trash")
-            }
-            Divider()
-            Button {
-                appState.issueActions.presentManualSession(for: issue)
-            } label: {
-                Label("Log Session…", systemImage: "clock.fill")
-            }
-            Divider()
-            statusMenu
-            dueDateMenu
         }
         .disabled(isWorking)
     }
@@ -605,6 +630,7 @@ struct FocusIssueRow: View {
                 } else {
                     ForEach(transitions.allowedStatuses) { status in
                         Button {
+                            beforeAction?()
                             appState.issueActions.requestStatusChange(issue: issue, status: status)
                         } label: {
                             Label(status.title, systemImage: status.systemImage)
@@ -623,6 +649,7 @@ struct FocusIssueRow: View {
     private var dueDateMenu: some View {
         Menu {
             Button {
+                beforeAction?()
                 appState.issueActions.setDueDate(issue, date: anchorDate)
             } label: {
                 Label("Today", systemImage: "calendar")
@@ -630,6 +657,7 @@ struct FocusIssueRow: View {
 
             if let tomorrow = CronaCalendarDate.adding(days: 1, to: anchorDate) {
                 Button {
+                    beforeAction?()
                     appState.issueActions.setDueDate(issue, date: tomorrow)
                 } label: {
                     Label("Tomorrow", systemImage: "sunrise")
@@ -638,6 +666,7 @@ struct FocusIssueRow: View {
 
             if let nextWeek = CronaCalendarDate.adding(days: 7, to: anchorDate) {
                 Button {
+                    beforeAction?()
                     appState.issueActions.setDueDate(issue, date: nextWeek)
                 } label: {
                     Label("Next Week", systemImage: "calendar.badge.plus")
@@ -647,6 +676,7 @@ struct FocusIssueRow: View {
             Divider()
 
             Button {
+                beforeAction?()
                 appState.issueActions.presentCustomDueDate(for: issue)
             } label: {
                 Label("Choose Date…", systemImage: "calendar.circle")
@@ -654,6 +684,7 @@ struct FocusIssueRow: View {
 
             if issue.todoForDate != nil {
                 Button(role: .destructive) {
+                    beforeAction?()
                     appState.issueActions.clearDueDate(issue)
                 } label: {
                     Label("Clear Due Date", systemImage: "calendar.badge.minus")

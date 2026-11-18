@@ -11,7 +11,6 @@ struct DetailActionBar<Content: View>: View {
         }
         .padding(.top, 8)
         .padding(.bottom, 2)
-        .background(.regularMaterial)
     }
 }
 

@@ -134,6 +134,8 @@ struct HabitRow: View {
     let editHabit: () -> Void
     let editTags: () -> Void
     let deleteHabit: () -> Void
+    var isReadOnly = false
+    var selectsOnRowTap = false
 
     var body: some View {
         VStack(spacing: isLogging ? 10 : 0) {
@@ -170,13 +172,13 @@ struct HabitRow: View {
                     }
                     Button(action: editHabit) {
                         Label("Edit Habit", systemImage: "pencil")
-                    }
+                    }.disabled(isReadOnly)
                     Button(action: editTags) {
                         Label("Edit Tags…", systemImage: TagPresentation.icon)
-                    }
+                    }.disabled(isReadOnly)
                     Button(role: .destructive, action: deleteHabit) {
                         Label("Delete Habit", systemImage: "trash")
-                    }
+                    }.disabled(isReadOnly)
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 14, weight: .bold))
@@ -232,19 +234,21 @@ struct HabitRow: View {
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .background(subtleCardBackground(stroke: statusColor.opacity(0.2), cornerRadius: 16))
+        .contentShape(Rectangle())
+        .onTapGesture { if selectsOnRowTap { openDetails() } }
         .contextMenu {
             Button(action: openDetails) {
                 Label("View Details", systemImage: "info.circle")
             }
             Button(action: editHabit) {
                 Label("Edit Habit", systemImage: "pencil")
-            }
+            }.disabled(isReadOnly)
             Button(action: editTags) {
                 Label("Edit Tags…", systemImage: TagPresentation.icon)
-            }
+            }.disabled(isReadOnly)
             Button(role: .destructive, action: deleteHabit) {
                 Label("Delete Habit", systemImage: "trash")
-            }
+            }.disabled(isReadOnly)
         }
     }
 

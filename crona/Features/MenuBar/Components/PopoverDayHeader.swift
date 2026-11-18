@@ -6,10 +6,10 @@ struct PopoverDayHeader: View {
     let libraryDestination: LibraryDestination?
     @ObservedObject private var day: PopoverDayModel
 
-    init(appState: CompanionAppState, libraryDestination: LibraryDestination? = nil) {
+    init(appState: CompanionAppState, libraryDestination: LibraryDestination? = nil, day: PopoverDayModel? = nil) {
         self.appState = appState
         self.libraryDestination = libraryDestination
-        self._day = ObservedObject(wrappedValue: appState.day)
+        self._day = ObservedObject(wrappedValue: day ?? appState.day)
     }
 
     var body: some View {

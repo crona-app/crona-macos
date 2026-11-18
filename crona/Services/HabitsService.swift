@@ -115,13 +115,17 @@ final class HabitsService: ObservableObject {
         }
     }
 
+    private var refreshGeneration = 0
+
     /// The shared popover day; nil follows the daemon's current date.
     var selectedDate: String?
 
     func refresh(date requestedDate: String? = nil) async {
         let daemonDate = requestedDate ?? selectedDate ?? daemonConnection.currentDate
         let date = daemonDate.isEmpty ? DailyFocusService.todayString() : daemonDate
-        snapshot.date = date
+        refreshGeneration += 1
+        let generation = refreshGeneration
+        if snapshot.date != date { snapshot = HabitsSnapshot(date: date) }
         snapshot.isLoading = true
 
         do {
@@ -129,6 +133,7 @@ final class HabitsService: ObservableObject {
             let items = try await daemonConnection.withClient {
                 try await $0.listDueHabits(date: date)
             }
+            guard generation == refreshGeneration else { return }
             snapshot = HabitsSnapshot(
                 date: date,
                 items: items.map(Self.project),
@@ -139,6 +144,7 @@ final class HabitsService: ObservableObject {
             logger.debug("Applied due habits: \(items.count, privacy: .public)")
         } catch {
             logger.error("Habits refresh failed: \(error.localizedDescription, privacy: .private)")
+            guard generation == refreshGeneration else { return }
             snapshot.isLoading = false
             snapshot.isConnected = false
             snapshot.lastRefreshError = error.localizedDescription
