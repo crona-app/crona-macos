@@ -1,10 +1,17 @@
 import AppKit
 import Carbon.HIToolbox
+import Combine
 
 struct SettingsShortcut: Codable, Equatable {
     let keyCode: UInt32
     let modifiers: UInt32
     let display: String
+
+    init(keyCode: UInt32, modifiers: UInt32, display: String) {
+        self.keyCode = keyCode
+        self.modifiers = modifiers
+        self.display = display
+    }
 
     init?(event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -14,7 +21,7 @@ struct SettingsShortcut: Codable, Equatable {
         if flags.contains(.option) { carbonModifiers |= UInt32(optionKey); prefix += "⌥" }
         if flags.contains(.shift) { carbonModifiers |= UInt32(shiftKey); prefix += "⇧" }
         if flags.contains(.command) { carbonModifiers |= UInt32(cmdKey); prefix += "⌘" }
-        guard carbonModifiers != 0,
+        guard flags.contains(.command) || flags.contains(.control) || flags.contains(.option),
               let character = event.charactersIgnoringModifiers?.uppercased(),
               !character.isEmpty
         else { return nil }
@@ -25,59 +32,56 @@ struct SettingsShortcut: Codable, Equatable {
 }
 
 @MainActor
-final class SettingsShortcutService {
-    private weak var appState: CompanionAppState?
-    private var hotKey: EventHotKeyRef?
-    private var eventHandler: EventHandlerRef?
+protocol ShortcutRegistering: AnyObject {
+    var onEvent: ((UInt32, Bool) -> Void)? { get set }
+    func register(_ binding: SettingsShortcut, id: UInt32) throws
+    func unregister(id: UInt32)
+}
 
-    func configure(appState: CompanionAppState) {
-        self.appState = appState
-        installEventHandlerIfNeeded()
-        update(shortcut: appState.preferences.preferences.settingsShortcut)
+@MainActor
+final class SettingsShortcutService: ShortcutRegistering {
+    var onEvent: ((UInt32, Bool) -> Void)?
+    private var registrations: [UInt32: EventHotKeyRef] = [:]
+    private var handler: EventHandlerRef?
+
+    init() {
+        var types = [
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed)),
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased))
+        ]
+        InstallEventHandler(GetEventDispatcherTarget(), { _, event, data in
+            guard let event, let data else { return noErr }
+            var identifier = EventHotKeyID()
+            guard GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil,
+                MemoryLayout<EventHotKeyID>.size, nil, &identifier) == noErr,
+                identifier.signature == OSType(0x43524F4E) else { return noErr }
+            let service = Unmanaged<SettingsShortcutService>.fromOpaque(data).takeUnretainedValue()
+            let id = identifier.id
+            let released = GetEventKind(event) == UInt32(kEventHotKeyReleased)
+            Task { @MainActor [weak service] in service?.onEvent?(id, released) }
+            return noErr
+        }, 2, &types, Unmanaged.passUnretained(self).toOpaque(), &handler)
     }
 
-    func update(shortcut: SettingsShortcut?) {
-        if let hotKey {
-            UnregisterEventHotKey(hotKey)
-            self.hotKey = nil
-        }
-        guard let shortcut else { return }
-
-        let identifier = EventHotKeyID(signature: OSType(0x43524F4E), id: 1)
-        var registered: EventHotKeyRef?
-        let result = RegisterEventHotKey(
-            shortcut.keyCode,
-            shortcut.modifiers,
-            identifier,
-            GetEventDispatcherTarget(),
-            0,
-            &registered
-        )
-        if result == noErr {
-            hotKey = registered
-        }
+    func register(_ binding: SettingsShortcut, id: UInt32) throws {
+        guard handler != nil else { throw RegistrationError() }
+        var reference: EventHotKeyRef?
+        let result = RegisterEventHotKey(binding.keyCode, binding.modifiers,
+            EventHotKeyID(signature: OSType(0x43524F4E), id: id), GetEventDispatcherTarget(), 0, &reference)
+        guard result == noErr, let reference else { throw RegistrationError() }
+        registrations[id] = reference
     }
 
-    private func installEventHandlerIfNeeded() {
-        guard eventHandler == nil else { return }
-        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(
-            GetEventDispatcherTarget(),
-            { _, _, userData in
-                guard let userData else { return noErr }
-                let service = Unmanaged<SettingsShortcutService>.fromOpaque(userData).takeUnretainedValue()
-                Task { @MainActor in service.appState?.openSettings() }
-                return noErr
-            },
-            1,
-            &eventType,
-            Unmanaged.passUnretained(self).toOpaque(),
-            &eventHandler
-        )
+    func unregister(id: UInt32) {
+        if let reference = registrations.removeValue(forKey: id) { UnregisterEventHotKey(reference) }
+    }
+
+    struct RegistrationError: LocalizedError {
+        var errorDescription: String? { "This shortcut could not be registered. Choose another combination." }
     }
 
     isolated deinit {
-        if let hotKey { UnregisterEventHotKey(hotKey) }
-        if let eventHandler { RemoveEventHandler(eventHandler) }
+        for reference in registrations.values { UnregisterEventHotKey(reference) }
+        if let handler { RemoveEventHandler(handler) }
     }
 }

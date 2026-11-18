@@ -165,6 +165,14 @@ final class StatusBarService: NSObject {
         }
     }
 
+    func showPopupFromShortcut() {
+        if let panel = popupPanel, panel.isVisible {
+            panel.makeKeyAndOrderFront(nil)
+            return
+        }
+        showPopup()
+    }
+
     func showPopupFromNotification() {
         guard popupPanel?.isVisible != true else { return }
         showPopup()
@@ -508,15 +516,20 @@ final class StatusBarService: NSObject {
 
         panel.alphaValue = 0
 
-        let restingOrigin = Self.popupOrigin(
+        var restingOrigin = Self.popupOrigin(
             iconRect: statusIconScreenRect(for: button),
             menuBarBottomY: button.window?.frame.minY ?? button.window?.screen?.visibleFrame.maxY ?? 0,
             panelSize: viewportSize,
             visibleFrame: button.window?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
         )
+        if !statusItem.isVisible {
+            let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
+            if let screen {
+                restingOrigin = ShortcutPopupPositioner.centeredOrigin(size: viewportSize, visibleFrame: screen.visibleFrame)
+            }
+        }
         var openingOrigin = restingOrigin
         openingOrigin.y += 8
-
         panel.setFrameOrigin(openingOrigin)
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()

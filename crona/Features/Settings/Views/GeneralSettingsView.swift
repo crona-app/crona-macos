@@ -67,14 +67,7 @@ struct GeneralSettingsView: View {
                 )
             }
 
-            SettingsCard("Access") {
-                SettingsShortcutRow(
-                    shortcut: Binding(
-                        get: { appState.preferences.preferences.settingsShortcut },
-                        set: { appState.preferences.preferences.settingsShortcut = $0 }
-                    )
-                )
-            }
+
 
         }
     }

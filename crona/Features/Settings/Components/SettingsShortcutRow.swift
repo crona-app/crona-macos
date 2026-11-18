@@ -2,19 +2,16 @@ import AppKit
 import SwiftUI
 
 struct SettingsShortcutRow: View {
+    var title: String = "Open Settings"
+    var onRecording: (Bool) -> Void = { _ in }
     @Binding var shortcut: SettingsShortcut?
     @State private var recordingState: ShortcutRecordingState?
     @State private var confirmationDismissTask: Task<Void, Never>?
 
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Open Settings")
-                    .font(.subheadline.weight(.medium))
-                Text("Choose a global shortcut to open Crona Settings.")
-                    .font(.caption)
-                    .foregroundStyle(PopupVisualTheme.secondaryText)
-            }
+            Text(title)
+                .font(.subheadline.weight(.medium))
 
             Spacer(minLength: 16)
 
@@ -42,10 +39,11 @@ struct SettingsShortcutRow: View {
             }
         }
         .padding(.vertical, 5)
-        .onDisappear { confirmationDismissTask?.cancel() }
+        .onDisappear { confirmationDismissTask?.cancel(); onRecording(false) }
     }
 
     private func handleRecordingStateChange(_ state: ShortcutRecordingState?) {
+        if case .recording = state { onRecording(true) } else { onRecording(false) }
         confirmationDismissTask?.cancel()
         withAnimation(.easeOut(duration: 0.14)) {
             recordingState = state
@@ -63,6 +61,8 @@ struct SettingsShortcutRow: View {
 }
 
 private struct ShortcutRecorder: NSViewRepresentable {
+    var title: String = "Open Settings"
+    var onRecording: (Bool) -> Void = { _ in }
     @Binding var shortcut: SettingsShortcut?
     let onRecordingStateChange: (ShortcutRecordingState?) -> Void
 
@@ -72,7 +72,10 @@ private struct ShortcutRecorder: NSViewRepresentable {
         let button = ShortcutRecorderButton()
         button.target = context.coordinator
         button.action = #selector(Coordinator.beginRecording)
-        button.onShortcut = { shortcut in context.coordinator.parent.shortcut = shortcut }
+        button.onShortcut = { shortcut in
+            context.coordinator.parent.shortcut = shortcut
+            return context.coordinator.parent.shortcut == shortcut
+        }
         button.onRecordingStateChange = { state in
             context.coordinator.parent.onRecordingStateChange(state)
         }
@@ -80,6 +83,7 @@ private struct ShortcutRecorder: NSViewRepresentable {
     }
 
     func updateNSView(_ button: ShortcutRecorderButton, context: Context) {
+        context.coordinator.parent = self
         button.shortcut = shortcut
     }
 
@@ -92,7 +96,7 @@ private struct ShortcutRecorder: NSViewRepresentable {
 
 private final class ShortcutRecorderButton: NSButton {
     var shortcut: SettingsShortcut? { didSet { updateTitle() } }
-    var onShortcut: ((SettingsShortcut) -> Void)?
+    var onShortcut: ((SettingsShortcut) -> Bool)?
     var onRecordingStateChange: ((ShortcutRecordingState?) -> Void)?
     private var isRecording = false
 
@@ -113,6 +117,15 @@ private final class ShortcutRecorderButton: NSButton {
         window?.makeFirstResponder(self)
     }
 
+    override func resignFirstResponder() -> Bool {
+        if isRecording {
+            isRecording = false
+            updateTitle()
+            onRecordingStateChange?(nil)
+        }
+        return super.resignFirstResponder()
+    }
+
     override func flagsChanged(with event: NSEvent) {
         guard isRecording else { return super.flagsChanged(with: event) }
         onRecordingStateChange?(.recording(modifiers: modifierDisplay(for: event.modifierFlags)))
@@ -131,9 +144,13 @@ private final class ShortcutRecorderButton: NSButton {
             return
         }
         isRecording = false
-        onShortcut?(shortcut)
-        self.shortcut = shortcut
-        onRecordingStateChange?(.confirmed(shortcut.display))
+        if onShortcut?(shortcut) == true {
+            self.shortcut = shortcut
+            onRecordingStateChange?(.confirmed(shortcut.display))
+        } else {
+            updateTitle()
+            onRecordingStateChange?(nil)
+        }
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {

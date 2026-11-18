@@ -6,6 +6,7 @@ import SwiftUI
 
 enum SettingsDestination: String, CaseIterable, Hashable, Identifiable {
     case general
+    case shortcuts
     case away
     case menuBar
     case daySchedule
@@ -88,6 +89,11 @@ final class CompanionAppState: ObservableObject {
     let inactivityPopupCountdownService: HardLimitCountdownService
     let windowService: WindowService
     let statusBarService: StatusBarService
+    private(set) lazy var globalShortcuts = GlobalShortcutsModel(
+        preferences: preferences, registry: settingsShortcutService,
+        perform: { [weak self] action in await self?.performGlobalShortcut(action) }
+    )
+    let shortcutFeedback = ShortcutFeedbackPanel()
     let settingsShortcutService: SettingsShortcutService
     let smartPauseService: SmartPauseService
     let breakScreenService: BreakScreenService
@@ -376,7 +382,7 @@ final class CompanionAppState: ObservableObject {
 
         self.windowService.configure(appState: self)
         self.statusBarService.configure(appState: self)
-        self.settingsShortcutService.configure(appState: self)
+        self.globalShortcuts.reload()
         appUpdateService.configurePresentation(
             shouldDefer: { [weak self] in
                 self?.isUpdatePresentationBlocked ?? false
@@ -517,6 +523,7 @@ final class CompanionAppState: ObservableObject {
     }
 
     func start() {
+        globalShortcuts.reload()
         notificationService.start()
         userActivityMonitor.start()
         launchAtLoginService.refresh()
@@ -528,6 +535,7 @@ final class CompanionAppState: ObservableObject {
     }
 
     func stop() {
+        globalShortcuts.stop()
         presentationTimer?.invalidate()
         presentationTimer = nil
         notificationService.stop()
@@ -885,11 +893,11 @@ final class CompanionAppState: ObservableObject {
             .store(in: &cancellables)
 
         preferences.$preferences
-            .map(\.settingsShortcut)
+            .map(\.globalShortcuts)
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] shortcut in
-                self?.settingsShortcutService.update(shortcut: shortcut)
+            .sink { [weak self] _ in
+                self?.globalShortcuts.reload()
             }
             .store(in: &cancellables)
 

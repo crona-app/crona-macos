@@ -4,6 +4,10 @@ All notable changes to **Crona for macOS** are documented here.
 
 ## Unreleased
 
+### Added
+
+- Add Settings > Shortcuts with configurable global shortcuts for Show Crona, Create Issue, Start Focus Session, Pause / Resume Session, End Session, and Open Settings. Existing Settings bindings are preserved; new actions start unassigned. Interface shortcuts also work with the menu bar icon hidden.
+
 ### Changed
 
 - Use Quick Session consistently for sessions started without an issue, including timer setup, active timers, and completion actions.

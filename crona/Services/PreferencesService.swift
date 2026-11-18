@@ -254,7 +254,11 @@ struct CompanionPreferences: Codable, Equatable {
     var menuBarIdleTextMode: MenuBarIdleTextMode = .idle
     var menuBarTimeFormat: MenuBarTimeFormat = .clock
     var showMenuBarItem = true
-    var settingsShortcut: SettingsShortcut?
+    var globalShortcuts: [String: SettingsShortcut] = [:]
+    var settingsShortcut: SettingsShortcut? {
+        get { globalShortcuts["settings"] }
+        set { globalShortcuts["settings"] = newValue }
+    }
     var showTimerHUD = false
     var showTimerHUDProgress = false
     var timerHUDPosition: CompanionPopupPosition = .bottomCenter
@@ -311,6 +315,7 @@ extension CompanionPreferences {
         case menuBarIdleTextMode
         case menuBarTimeFormat
         case showMenuBarItem
+        case globalShortcuts
         case settingsShortcut
         case showTimerHUD
         case showTimerHUDProgress
@@ -358,7 +363,11 @@ extension CompanionPreferences {
             try values.decodeIfPresent(MenuBarTimeFormat.self, forKey: .menuBarTimeFormat)
             ?? .clock
         showMenuBarItem = try values.decodeIfPresent(Bool.self, forKey: .showMenuBarItem) ?? true
-        settingsShortcut = try values.decodeIfPresent(SettingsShortcut.self, forKey: .settingsShortcut)
+        if values.contains(.globalShortcuts) {
+            globalShortcuts = try values.decode([String: SettingsShortcut].self, forKey: .globalShortcuts)
+        } else if let legacy = try values.decodeIfPresent(SettingsShortcut.self, forKey: .settingsShortcut) {
+            globalShortcuts = ["settings": legacy]
+        }
         showTimerHUDProgress = try values.decodeIfPresent(Bool.self, forKey: .showTimerHUDProgress) ?? false
         showTimerHUD = try values.decodeIfPresent(Bool.self, forKey: .showTimerHUD) ?? false
         timerHUDPosition = try values.decodeIfPresent(CompanionPopupPosition.self, forKey: .timerHUDPosition) ?? .bottomCenter
@@ -434,7 +443,7 @@ extension CompanionPreferences {
         try values.encode(menuBarIdleTextMode, forKey: .menuBarIdleTextMode)
         try values.encode(menuBarTimeFormat, forKey: .menuBarTimeFormat)
         try values.encode(showMenuBarItem, forKey: .showMenuBarItem)
-        try values.encodeIfPresent(settingsShortcut, forKey: .settingsShortcut)
+        try values.encode(globalShortcuts, forKey: .globalShortcuts)
         try values.encode(showTimerHUD, forKey: .showTimerHUD)
         try values.encode(showTimerHUDProgress, forKey: .showTimerHUDProgress)
         try values.encode(timerHUDPosition, forKey: .timerHUDPosition)

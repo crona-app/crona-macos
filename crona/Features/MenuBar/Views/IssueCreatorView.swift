@@ -5,6 +5,7 @@ struct IssueCreatorView: View {
     @ObservedObject private var issueActionsService: IssueActionsService
     @ObservedObject private var issueCreationService: IssueCreationService
     @ObservedObject var issueCreator: IssueCreatorModel
+    @ObservedObject private var shortcuts: GlobalShortcutsModel
     @FocusState private var focusedField: Field?
     @State private var selectedRepoID: Int64?
     @State private var selectedFollowUp: IssueCreationFollowUp?
@@ -15,6 +16,7 @@ struct IssueCreatorView: View {
     init(appState: CompanionAppState, issueCreator: IssueCreatorModel) {
         self.appState = appState
         self.issueCreator = issueCreator
+        self.shortcuts = appState.globalShortcuts
         self.issueActionsService = appState.issueActionsService
         self.issueCreationService = appState.issueCreationService
     }
@@ -45,6 +47,7 @@ struct IssueCreatorView: View {
             TextField("What needs doing?", text: $issueCreator.title)
                 .textFieldStyle(.plain)
                 .focused($focusedField, equals: .title)
+                .onChange(of: shortcuts.creatorFocusGeneration) { _, _ in focusedField = .title }
                 .onChange(of: issueCreator.title) { _, value in
                     if value.count > 120 { issueCreator.title = String(value.prefix(120)) }
                 }
