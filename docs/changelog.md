@@ -4,6 +4,10 @@ All notable changes to **Crona for macOS** are documented here.
 
 ## Unreleased
 
+## [1.1.0-beta.5] - 2026-11-18
+
+The fifth 1.1.0 beta adds Glance, a fullscreen overlay for your day, and configurable global shortcuts, and simplifies timer setup and time entry.
+
 ### Added
 
 - Add Glance, a fullscreen overlay with responsive native glass widgets, inline focus setup and issue capture, habits, and today’s progress. Open it from the Crona menu or assign Toggle Glance in Shortcuts.
@@ -16,9 +20,11 @@ All notable changes to **Crona for macOS** are documented here.
 - Replace expanding focus timer setup cards with directly editable duration and cycle fields, compact presets, stable break rows, and a fixed-position start action.
 - Replace check-in and manual-session duration dropdowns with hour/minute text inputs, preserve individual minutes when editing check-ins, and allow direct entry of sleep scores from 0 to 100.
 - Use hour/minute duration notation consistently for popup targets, estimates, timer presets, and pre-filled edit fields; custom timer durations accept the same notation and habit logs retain second-level precision when needed.
+- Remove the extra background band behind the issue and habit details action footer.
 
 ### Fixed
 
+- Ignore late habit refreshes for a previously selected day and clear the list when the day changes.
 - Replace the pointer countdown with a brief Break deferred confirmation after a confirmed deferral, then dismiss the stale boundary warning.
 - Treat omitted daily-plan entries as an empty plan and show the normal planned-issues empty state instead of a decoding error.
 
