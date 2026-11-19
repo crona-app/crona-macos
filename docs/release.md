@@ -61,15 +61,15 @@ Generate the Sparkle key pair once with Sparkle's `generate_keys` tool. Store th
 
 ## 1.1.0 beta preparation
 
-The next planned release is `v1.1.0-beta.7`, with marketing version `1.1.0`, build `25`, and semantic release version `1.1.0-beta.7`. It requires daemon protocol `1.7`, unchanged from beta.6.
+The metadata for `v1.1.0-beta.7` is set, with marketing version `1.1.0`, build `25`, and semantic release version `1.1.0-beta.7`. It requires daemon protocol `1.7`, unchanged from beta.6.
 
-Release notes are prepared in [`docs/release-notes/v1.1.0-beta.7.md`](release-notes/v1.1.0-beta.7.md), with a matching changelog entry. The changelog date reflects this preparation date; update it if publication happens on a later day.
+Release notes are prepared in [`docs/release-notes/v1.1.0-beta.7.md`](release-notes/v1.1.0-beta.7.md), with a matching changelog entry. The changelog entry is dated 2026-11-19.
 
-This preparation is documentation-only. Project metadata remains at build `24`; bump `CURRENT_PROJECT_VERSION` to `25` before cutting the release. No release commit or tag is part of this preparation.
+Project metadata uses build `25` for the app and test targets.
 
 Build numbers continue across marketing versions: 1.0.0 used build `18`; 1.1.0 betas 1 through 6 used builds `19` through `24`. Build `25` continues that sequence to preserve Sparkle appcast ordering.
 
-The Debug unit suite passed all 492 tests during development. Release-optimized validation is still required before tagging; memory savings have not been quantified in a before/after Release measurement.
+The Debug unit suite passed all 492 tests during development. Release-optimized validation also passed all 492 tests with parallel testing disabled. The initial parallel run exceeded the socket-timeout test’s three-second deadline; that test passed in isolation and in the complete serial run. Memory savings have not been quantified in a before/after Release measurement.
 
 ## Cutting a Release
 
