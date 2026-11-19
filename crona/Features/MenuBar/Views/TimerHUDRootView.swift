@@ -40,29 +40,46 @@ struct TimerHUDRootView: View {
     @ObservedObject var endSession: EndSessionModel
     var size: TimerHUDSize = .spacious
     var isPreview = false
+    @ObservedObject private var expansion: TimerHUDExpansionModel
     @State private var isHovered = false
     @State private var dragGrabOffset: CGPoint?
     @State private var isDragging = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    init(appState: CompanionAppState, endSession: EndSessionModel, size: TimerHUDSize = .spacious, isPreview: Bool = false) {
+        self.appState = appState
+        self.endSession = endSession
+        self.size = size
+        self.isPreview = isPreview
+        expansion = appState.timerHUDExpansion
+    }
+
     var body: some View {
         Group {
             if endSession.presentationSource == .timerHUD {
                 commitView
-                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    .transition(.opacity)
             } else {
                 timerView
                     .transition(.opacity)
             }
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: endSession.presentationSource)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: endSession.presentationSource)
         .padding(8)
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { notification in
+            expansion.lostFocus(notification.object as? NSWindow)
+        }
+        .onExitCommand { expansion.collapse() }
         .companionAppearance(appState)
     }
 
     private var timerView: some View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
             let presentation = TimerPresentation.from(appState.timerService.snapshot, at: timeline.date)
+            if expansion.isExpanded && !isPreview {
+                TimerHUDExpandedView(state: appState, context: appState.contextService,
+                    expansion: expansion, presentation: presentation, actions: hudActions(for: presentation), collapse: { expansion.collapse() })
+            } else {
             HStack(spacing: size == .compact ? 8 : 12) {
                 Image(systemName: presentation.phaseSymbolName)
                     .font(.system(size: size == .compact ? 12 : 14, weight: .semibold))
@@ -140,6 +157,7 @@ struct TimerHUDRootView: View {
                     }
             )
             .allowsHitTesting(!isPreview)
+            }
         }
     }
 
@@ -151,12 +169,18 @@ struct TimerHUDRootView: View {
 
     @ViewBuilder
     private func hudActions(for presentation: TimerPresentation) -> some View {
-        if isHovered || isPreview {
+        if isHovered || isPreview || expansion.isExpanded {
             HStack(spacing: size == .compact ? 2 : 5) {
                 if presentation.canAdvance { hudButton(presentation.advanceTitle ?? "Advance", symbol: "forward.fill", action: appState.advanceTimer) }
                 if presentation.canPause { hudButton("Pause", symbol: "pause.fill", action: appState.pauseTimer) }
                 if presentation.canResume { hudButton("Resume", symbol: "play.fill", action: appState.resumeTimer) }
                 if presentation.canEnd { hudButton("End", symbol: "stop.fill", action: appState.endTimerFromHUD) }
+                if !expansion.isExpanded {
+                    hudButton("Expand timer", symbol: "arrow.up.left.and.arrow.down.right") {
+                        guard !isPreview, !isDragging, let panel = timerHUDPanel else { return }
+                        expansion.expand(panel: panel)
+                    }
+                }
             }
             .transition(.opacity.combined(with: .move(edge: .trailing)))
         }

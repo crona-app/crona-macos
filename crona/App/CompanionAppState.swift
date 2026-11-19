@@ -95,6 +95,7 @@ final class CompanionAppState: ObservableObject {
         preferences: preferences, registry: settingsShortcutService,
         perform: { [weak self] action in await self?.performGlobalShortcut(action) }
     )
+    private(set) lazy var timerHUDExpansion = TimerHUDExpansionModel()
     private(set) lazy var glance = GlanceModel(appState: self)
     let shortcutFeedback = ShortcutFeedbackPanel()
     let settingsShortcutService: SettingsShortcutService

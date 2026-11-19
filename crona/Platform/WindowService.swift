@@ -115,6 +115,7 @@ final class WindowService {
                 hardLimitPopupPresented: appState.popups.hardLimitPopupPhase != nil || hardLimitPopupVisible
             )
         else {
+            appState.timerHUDExpansion.collapse(animated: false)
             timerHUDPanel?.orderOut(nil)
             return
         }
@@ -135,10 +136,12 @@ final class WindowService {
         let preferences = appState.preferences.preferences
         let desiredSize = preferences.timerHUDSize
         if timerHUDAppliedSize != desiredSize {
+            appState.timerHUDExpansion.collapse(animated: false)
             resizeTimerHUD(panel, to: desiredSize)
             timerHUDAppliedSize = desiredSize
         }
         if timerHUDAppliedPosition != preferences.timerHUDPosition {
+            appState.timerHUDExpansion.collapse(animated: false)
             positionTimerHUD(panel, preference: preferences.timerHUDPosition)
             timerHUDAppliedPosition = preferences.timerHUDPosition
         }
@@ -160,6 +163,7 @@ final class WindowService {
     func setMenuBarPopoverPresented(_ presented: Bool) {
         guard presented != isMenuBarPopoverPresented else { return }
         if presented {
+            appState?.timerHUDExpansion.collapse(animated: false)
             timerHUDWasVisibleBeforeMenuBarPopover = timerHUDPanel?.isVisible == true
             isMenuBarPopoverPresented = true
             timerHUDPanel?.orderOut(nil)
@@ -198,14 +202,16 @@ final class WindowService {
     func setTimerHUDCommitPresented(_ presented: Bool) {
         guard let panel = timerHUDPanel else { return }
         if presented {
-            timerHUDCompactFrame = panel.frame
+            let restingFrame = appState?.timerHUDExpansion.beginCompletion()
+            timerHUDCompactFrame = restingFrame ?? panel.frame
             var frame = panel.frame
             let size = appState?.timerService.snapshot.adhoc == true ? NSSize(width: 396, height: (appState?.endSession.adhocCompletionHeight ?? 600) + 16) : TimerHUDMetrics.commitSize
-            frame.origin.y = frame.maxY - size.height
+            // Expanded HUDs grow directly into the form from their existing bottom edge.
+            if restingFrame == nil { frame.origin.y = frame.maxY - size.height }
             frame.size = size
             frame = clampedWindowFrame(frame)
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.2
+                context.duration = SystemGlassSettings.shared.reduceMotion ? 0 : 0.2
                 context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 panel.animator().setFrame(frame, display: true)
             }
