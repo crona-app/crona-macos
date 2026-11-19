@@ -4,6 +4,20 @@ All notable changes to **Crona for macOS** are documented here.
 
 ## Unreleased
 
+## [1.1.0-beta.6] - 2026-11-19
+
+### Changed
+
+- Keep Glance open after actions and host task editors and confirmations centered over its overview, reusing existing drafts.
+- Fit menu popup windows and Glance dialogs to their content; animate native popup height around a stable top edge and share one outer glass background.
+- Keep Glance beneath blocking timer prompts and use its selected date for habit actions.
+
+### Fixed
+
+- Remove the invisible area below short popup windows from window captures.
+- Reserve dedicated footer space in habit details so history text cannot overlap action buttons.
+- Keep Glance visible during app deactivation and reconcile unexpectedly hidden windows so the menu popup is not blocked.
+
 ## [1.1.0-beta.5] - 2026-11-18
 
 The fifth 1.1.0 beta adds Glance, a fullscreen overlay for your day, and configurable global shortcuts, and simplifies timer setup and time entry.
