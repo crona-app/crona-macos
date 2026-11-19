@@ -5,6 +5,8 @@ import OSLog
 /// Planned, Overdue and Upcoming issues for the shared popover day.
 @MainActor
 final class DailyIssuesModel: ObservableObject {
+    private var backgroundRefreshEnabled: Bool
+    private var activityGeneration = UUID()
     private static let refreshEvents: Set<String> = [
         "session.history_changed", "session.started", "session.stopped", "session.ended",
         "context.issue.changed", "issue.updated", "issue.created", "issue.deleted",
@@ -32,8 +34,9 @@ final class DailyIssuesModel: ObservableObject {
 
     init(
         daemonConnection: DaemonConnectionService, day: PopoverDayModel,
-        issueCreationService: IssueCreationService, tags: TagsModel
+        issueCreationService: IssueCreationService, tags: TagsModel, backgroundRefreshEnabled: Bool = true
     ) {
+        self.backgroundRefreshEnabled = backgroundRefreshEnabled
         self.daemonConnection = daemonConnection
         self.day = day
         self.issueCreationService = issueCreationService
@@ -61,7 +64,22 @@ final class DailyIssuesModel: ObservableObject {
             guard let event = notification.object as? CronaProtocolEvent,
                 Self.refreshEvents.contains(event.type)
             else { return }
-            Task { await self?.refresh() }
+            Task { @MainActor [weak self] in
+                guard let self, self.backgroundRefreshEnabled else { return }
+                await self.refresh()
+            }
+        }
+    }
+
+    func setBackgroundRefreshEnabled(_ enabled: Bool) {
+        backgroundRefreshEnabled = enabled
+        activityGeneration = UUID()
+        if !enabled {
+            refreshID = UUID()
+            unfilteredSections = DailyIssueSections()
+            sections = DailyIssueSections()
+            loadedDate = nil
+            isLoading = false
         }
     }
 

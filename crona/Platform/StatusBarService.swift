@@ -94,7 +94,7 @@ final class StatusBarService: NSObject {
             logger.error("Install skipped: status item has no button")
             return
         }
-        guard let appState else {
+        guard appState != nil else {
             logger.error("Install skipped: app state is nil")
             return
         }
@@ -102,8 +102,7 @@ final class StatusBarService: NSObject {
         button.target = self
         button.action = #selector(handleStatusItemClick(_:))
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-        makePopupPanel(appState: appState)
-        logger.info("Status item installed; popup panel exists: \(self.popupPanel != nil, privacy: .public)")
+        logger.info("Status item installed; popup will be created on demand")
         updateStatusItem()
     }
 
@@ -366,12 +365,7 @@ final class StatusBarService: NSObject {
     }
 
     private func togglePopup() {
-        guard let panel = popupPanel else {
-            logger.error("Toggle skipped: popup panel is nil")
-            return
-        }
-        logger.info("Toggling popup; visible=\(panel.isVisible, privacy: .public)")
-        if panel.isVisible {
+        if popupPanel?.isVisible == true {
             dismissPopup()
         } else {
             showPopup()
@@ -497,6 +491,7 @@ final class StatusBarService: NSObject {
     private func showPopup(centered: Bool = false) {
         appState?.glance.reconcileWindowVisibility()
         guard appState?.glance.isPresented != true else { return }
+        if popupPanel == nil, let appState { makePopupPanel(appState: appState) }
         guard let panel = popupPanel else {
             logger.error("Show skipped: popup panel is nil")
             return

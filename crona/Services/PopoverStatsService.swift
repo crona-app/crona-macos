@@ -14,12 +14,15 @@ struct PopoverStatsSnapshot: Equatable {
 
 @MainActor
 final class PopoverStatsService: ObservableObject {
+    private var backgroundRefreshEnabled: Bool
+    private var activityGeneration = UUID()
     private let daemonConnection: DaemonConnectionService
     private var eventObserver: NSObjectProtocol?
     private var connectObserver: NSObjectProtocol?
     private let logger = Logger(subsystem: "com.crona.macos", category: "stats")
     private var selectedDate = DailyFocusService.todayString()
-    private var cache: [String: PopoverStatsSnapshot] = [:]
+    private var cache = StatsSnapshotCache()
+    private let eventRefresh = StatsRefreshQueue()
     private var refreshGeneration = 0
 
     @Published var snapshot = PopoverStatsSnapshot(
@@ -33,7 +36,8 @@ final class PopoverStatsService: ObservableObject {
     @Published private(set) var calendarAnchorDate: String?
     @Published private(set) var calendarMonthDate: String?
 
-    init(daemonConnection: DaemonConnectionService) {
+    init(daemonConnection: DaemonConnectionService, backgroundRefreshEnabled: Bool = true) {
+        self.backgroundRefreshEnabled = backgroundRefreshEnabled
         self.daemonConnection = daemonConnection
         eventObserver = NotificationCenter.default.addObserver(
             forName: .cronaDaemonEventReceived,
@@ -50,13 +54,34 @@ final class PopoverStatsService: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { await self?.refresh() }
+            Task { @MainActor [weak self] in
+                guard let self, self.backgroundRefreshEnabled else { return }
+                await self.refresh()
+            }
         }
 
-        Task { await refresh() }
+        if backgroundRefreshEnabled {
+            Task { if self.backgroundRefreshEnabled { await self.refresh() } }
+        }
+    }
+
+    func setBackgroundRefreshEnabled(_ enabled: Bool) {
+        backgroundRefreshEnabled = enabled
+        activityGeneration = UUID()
+        if !enabled {
+            eventRefresh.cancel()
+            refreshGeneration += 1
+            cache.removeAll()
+            snapshot = PopoverStatsSnapshot()
+            todayMetrics = nil
+            todayFocusScore = nil
+            todayWorkedSeconds = nil
+            endCalendar()
+        }
     }
 
     isolated deinit {
+        eventRefresh.cancel()
         if let eventObserver {
             NotificationCenter.default.removeObserver(eventObserver)
         }
@@ -66,6 +91,7 @@ final class PopoverStatsService: ObservableObject {
     }
 
     func refresh() async {
+        cache.protectedDates = [selectedDate, todayDate]
         let date = selectedDate
         refreshGeneration += 1
         let generation = refreshGeneration
@@ -122,7 +148,7 @@ final class PopoverStatsService: ObservableObject {
     func showPreviousDay() {
         selectedDate = Self.shift(date: selectedDate, byDays: -1)
         presentSelectedDate()
-        Task { await refresh() }
+        Task { if self.backgroundRefreshEnabled { await self.refresh() } }
     }
 
     func showNextDay() {
@@ -131,7 +157,7 @@ final class PopoverStatsService: ObservableObject {
         guard candidate <= today else { return }
         selectedDate = candidate
         presentSelectedDate()
-        Task { await refresh() }
+        Task { if self.backgroundRefreshEnabled { await self.refresh() } }
     }
 
     func selectDate(_ date: String, isHistoricalAway: Bool = false) {
@@ -146,13 +172,13 @@ final class PopoverStatsService: ObservableObject {
             )
             return
         }
-        Task { await refresh() }
+        Task { if self.backgroundRefreshEnabled { await self.refresh() } }
     }
 
     func showToday() {
         selectedDate = todayDate
         presentSelectedDate()
-        Task { await refresh() }
+        Task { if self.backgroundRefreshEnabled { await self.refresh() } }
     }
 
     var functionalDate: String { selectedDate }
@@ -220,12 +246,15 @@ final class PopoverStatsService: ObservableObject {
     }
 
     func prefetchCalendarDates(_ dates: [String]) async {
+        cache.protectedDates = [selectedDate, todayDate]
+        let activity = activityGeneration
         guard let start = dates.first, let end = dates.last else { return }
 
         do {
             let range = try await daemonConnection.withClient {
                 try await $0.dashboardFocusScoreRange(start: start, end: end)
             }
+            guard activity == activityGeneration else { return }
             for day in range where dates.contains(day.date) {
                 var snapshot = cache[day.date] ?? PopoverStatsSnapshot(date: day.date)
                 if day.hasData {
@@ -259,6 +288,8 @@ final class PopoverStatsService: ObservableObject {
     }
 
     func refreshTodayMetrics() async {
+        cache.protectedDates = [selectedDate, todayDate]
+        let activity = activityGeneration
         let today = todayDate
         async let metricResult = Self.capture {
             try await self.daemonConnection.withClient {
@@ -271,6 +302,7 @@ final class PopoverStatsService: ObservableObject {
             }
         }
         let (loadedMetricsResult, loadedFocusScoreResult) = await (metricResult, focusScoreResult)
+        guard activity == activityGeneration else { return }
         var refreshed = cache[today] ?? PopoverStatsSnapshot(date: today)
         var loadedAnyValue = false
 
@@ -352,10 +384,13 @@ final class PopoverStatsService: ObservableObject {
     }
 
     private func handle(event: CronaProtocolEvent) {
+        guard backgroundRefreshEnabled else { return }
         switch event.type {
         case "checkin.updated", "checkin.deleted":
             if let payload = try? event.decodePayload(CronaDailyCheckInQuery.self) {
-                Task { await checkInDidChange(date: payload.date) }
+                cache[payload.date] = nil
+                calendarCacheRevision += 1
+                scheduleEventRefresh(dates: [payload.date])
             }
         case "session.history_changed", "timer.state", "timer.break_deferral_warning", "timer.break_deferred",
              "session.started", "session.stopped", "session.ended", "timer.extended", "timer.boundary",
@@ -368,17 +403,21 @@ final class PopoverStatsService: ObservableObject {
             cache[selectedDate] = nil
             let today = todayDate
             cache[today] = nil
-            Task {
-                await refresh()
-                if selectedDate != today {
-                    await refreshTodayMetrics()
-                }
-                if event.type == "session.history_changed", let month = calendarMonthDate {
-                    await prefetchCalendarDates(Self.monthRange(for: month, through: today))
-                }
-            }
+            scheduleEventRefresh(dates: [selectedDate, today], reloadCalendar: event.type == "session.history_changed")
         default:
             break
+        }
+    }
+
+    private func scheduleEventRefresh(dates: Set<String>, reloadCalendar: Bool = false) {
+        eventRefresh.enqueue(dates: dates, reloadCalendar: reloadCalendar) { [weak self] dates, calendar in
+            guard let self, backgroundRefreshEnabled else { return }
+            if dates.contains(selectedDate) { await refresh() }
+            guard backgroundRefreshEnabled, !Task.isCancelled else { return }
+            if dates.contains(todayDate), selectedDate != todayDate { await refreshTodayMetrics() }
+            if calendar, backgroundRefreshEnabled, !Task.isCancelled, let month = calendarMonthDate {
+                await prefetchCalendarDates(Self.monthRange(for: month, through: todayDate))
+            }
         }
     }
 
@@ -390,7 +429,7 @@ final class PopoverStatsService: ObservableObject {
         cache[previousDate] = nil
         cache[date] = nil
         await refresh()
-        await refreshTodayMetrics()
+        if selectedDate != todayDate { await refreshTodayMetrics() }
     }
 
     private var todayDate: String {
@@ -415,31 +454,6 @@ final class PopoverStatsService: ObservableObject {
     private func isCachedCalendarDateLoaded(for date: String) -> Bool {
         guard let cached = cache[date] else { return false }
         return !cached.isLoading
-    }
-
-    static func title(for reason: String) -> String {
-        switch reason {
-        case "no_activity": return "Ready to begin"
-        case "under_target": return "Build momentum"
-        case "needs_breaks": return "Take a break"
-        case "overextended": return "Overextended"
-        default: return "Steady rhythm"
-        }
-    }
-
-    static func message(for reason: String) -> String {
-        switch reason {
-        case "no_activity":
-            return "Start a focused session to build today’s score."
-        case "under_target":
-            return "You’re below today’s planned focus time."
-        case "needs_breaks":
-            return "Your focus time is outpacing your recovery time."
-        case "overextended":
-            return "You’ve pushed beyond your target without enough recovery."
-        default:
-            return "Your work and recovery are in a healthy balance."
-        }
     }
 
     private static func shift(date: String, byDays days: Int) -> String {

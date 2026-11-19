@@ -18,9 +18,13 @@ final class TimerHUDExpansionModel: ObservableObject {
     func loadDescription(state: CompanionAppState) async {
         issueDescription = nil
         guard let id = state.timerService.snapshot.issueID else { return }
-        issueDescription = state.detailsIssue(id: id)?.description
-        guard let client = state.daemonConnection.client else { return }
-        if let issues = try? await client.listAllIssues(), !Task.isCancelled,
+        if let issue = state.detailsIssue(id: id) {
+            issueDescription = issue.description
+            return
+        }
+        guard let streamID = state.contextService.snapshot.streamID,
+              let client = state.daemonConnection.client else { return }
+        if let issues = try? await client.listIssues(streamID: streamID), !Task.isCancelled,
            state.timerService.snapshot.issueID == id {
             issueDescription = issues.first { $0.id == id }?.description
         }

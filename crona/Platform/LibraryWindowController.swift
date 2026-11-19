@@ -29,6 +29,7 @@ final class LibraryWindowController: NSObject, NSWindowDelegate {
             window.setContentSize(NSSize(width: 1000, height: 720))
             window.center()
             window.setFrameAutosaveName("CronaLibrary")
+            window.setFrameUsingName("CronaLibrary")
             self.window = window
         }
         if !isPresented {
@@ -43,6 +44,10 @@ final class LibraryWindowController: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         guard isPresented else { return }
         isPresented = false
+        window?.saveFrame(usingName: "CronaLibrary")
+        window?.contentViewController = nil
+        window?.delegate = nil
+        window = nil
         onClosed()
         windowService.endExternalWindowPresentation()
     }

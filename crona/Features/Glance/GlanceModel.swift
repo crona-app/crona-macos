@@ -39,10 +39,10 @@ final class GlanceModel: ObservableObject {
         })
         self.day = day
         issues = DailyIssuesModel(daemonConnection: connection, day: day,
-            issueCreationService: appState.issueCreationService, tags: appState.tags)
-        daily = DailyFocusService(daemonConnection: connection)
-        habits = HabitsService(daemonConnection: connection)
-        stats = PopoverStatsService(daemonConnection: connection)
+            issueCreationService: appState.issueCreationService, tags: appState.tags, backgroundRefreshEnabled: false)
+        daily = DailyFocusService(daemonConnection: connection, backgroundRefreshEnabled: false)
+        habits = HabitsService(daemonConnection: connection, backgroundRefreshEnabled: false)
+        stats = PopoverStatsService(daemonConnection: connection, backgroundRefreshEnabled: false)
         issues.$sections.dropFirst().sink { [weak self] sections in
             guard let self, let selected = previewIssue else { return }
             previewIssue = (sections.planned + sections.overdue + sections.upcoming + sections.inbox).first { $0.id == selected.id }
@@ -76,6 +76,7 @@ final class GlanceModel: ObservableObject {
         generation += 1
         isPresented = window.show(appState: appState, model: self)
         guard isPresented else { return }
+        setBackgroundRefreshEnabled(true)
         refreshTask?.cancel()
         refreshTask = Task { [weak self] in await self?.refresh() }
     }
@@ -114,6 +115,14 @@ final class GlanceModel: ObservableObject {
         window.dismiss(restoreFocus: restoreFocus)
         isPresented = false
         refreshTask?.cancel()
+        setBackgroundRefreshEnabled(false)
+    }
+
+    private func setBackgroundRefreshEnabled(_ enabled: Bool) {
+        issues.setBackgroundRefreshEnabled(enabled)
+        daily.setBackgroundRefreshEnabled(enabled)
+        habits.setBackgroundRefreshEnabled(enabled)
+        stats.setBackgroundRefreshEnabled(enabled)
     }
 
     func refresh() async {

@@ -71,6 +71,8 @@ struct HabitsSnapshot: Equatable {
 
 @MainActor
 final class HabitsService: ObservableObject {
+    private var backgroundRefreshEnabled: Bool
+    private var activityGeneration = UUID()
     private let daemonConnection: DaemonConnectionService
     private var eventObserver: NSObjectProtocol?
     private var connectObserver: NSObjectProtocol?
@@ -82,7 +84,8 @@ final class HabitsService: ObservableObject {
     @Published private(set) var isManagingHabit = false
     @Published private(set) var lastManagementError: String?
 
-    init(daemonConnection: DaemonConnectionService) {
+    init(daemonConnection: DaemonConnectionService, backgroundRefreshEnabled: Bool = true) {
+        self.backgroundRefreshEnabled = backgroundRefreshEnabled
         self.daemonConnection = daemonConnection
         eventObserver = NotificationCenter.default.addObserver(
             forName: .cronaDaemonEventReceived,
@@ -100,10 +103,24 @@ final class HabitsService: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             self?.logger.debug("Habits refresh triggered by daemon connect")
-            Task { await self?.refresh() }
+            Task { @MainActor [weak self] in
+                guard let self, self.backgroundRefreshEnabled else { return }
+                await self.refresh()
+            }
         }
 
-        Task { await refresh() }
+        if backgroundRefreshEnabled {
+            Task { if self.backgroundRefreshEnabled { await self.refresh() } }
+        }
+    }
+
+    func setBackgroundRefreshEnabled(_ enabled: Bool) {
+        backgroundRefreshEnabled = enabled
+        activityGeneration = UUID()
+        if !enabled {
+            refreshGeneration += 1
+            snapshot = HabitsSnapshot()
+        }
     }
 
     isolated deinit {
@@ -292,9 +309,10 @@ final class HabitsService: ObservableObject {
     }
 
     private func handle(event: CronaProtocolEvent) {
+        guard backgroundRefreshEnabled else { return }
         guard Self.shouldRefresh(for: event.type) else { return }
         logger.debug("Habits refresh triggered by event: \(event.type, privacy: .public)")
-        Task { await refresh() }
+        Task { if self.backgroundRefreshEnabled { await self.refresh() } }
     }
 
     static func project(_ item: CronaHabitDailyItem) -> HabitRowModel {

@@ -4,6 +4,10 @@ All notable changes to **Crona for macOS** are documented here.
 
 ## Unreleased
 
+- Batch stats refresh events, bound calendar snapshots to three recently used months plus active dates, and use cached or stream-scoped issue data for HUD descriptions.
+
+- Reduce idle UI retention by creating the menu popup on demand, releasing Library content on close, and suspending Glance background refreshes and discarding its caches while closed.
+
 - Expand the timer HUD with a dedicated hover action to show issue context, description, session controls, and timed-session progress. Collapse on blur or Escape while preserving the running timer.
 
 - Show the shared session timer and progress in Glance during active sessions, replacing task lists and details. Keep Calendar and Summary on larger layouts and block task editing until the session ends.

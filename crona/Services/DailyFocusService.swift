@@ -129,6 +129,8 @@ struct DailyFocusSnapshot: Equatable {
 
 @MainActor
 final class DailyFocusService: ObservableObject {
+    private var backgroundRefreshEnabled: Bool
+    private var activityGeneration = UUID()
     private let daemonConnection: DaemonConnectionService
     private var eventObserver: NSObjectProtocol?
     private var connectObserver: NSObjectProtocol?
@@ -136,7 +138,8 @@ final class DailyFocusService: ObservableObject {
 
     @Published var snapshot = DailyFocusSnapshot()
 
-    init(daemonConnection: DaemonConnectionService) {
+    init(daemonConnection: DaemonConnectionService, backgroundRefreshEnabled: Bool = true) {
+        self.backgroundRefreshEnabled = backgroundRefreshEnabled
         self.daemonConnection = daemonConnection
         eventObserver = NotificationCenter.default.addObserver(
             forName: .cronaDaemonEventReceived,
@@ -153,10 +156,21 @@ final class DailyFocusService: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { await self?.refresh() }
+            Task { @MainActor [weak self] in
+                guard let self, self.backgroundRefreshEnabled else { return }
+                await self.refresh()
+            }
         }
 
-        Task { await refresh() }
+        if backgroundRefreshEnabled {
+            Task { if self.backgroundRefreshEnabled { await self.refresh() } }
+        }
+    }
+
+    func setBackgroundRefreshEnabled(_ enabled: Bool) {
+        backgroundRefreshEnabled = enabled
+        activityGeneration = UUID()
+        if !enabled { snapshot = DailyFocusSnapshot() }
     }
 
     isolated deinit {
@@ -169,6 +183,7 @@ final class DailyFocusService: ObservableObject {
     }
 
     func refresh(date requestedDate: String? = nil) async {
+        let activity = activityGeneration
         do {
             let today = requestedDate ?? daemonConnection.currentDate
             let resolvedDate = today.isEmpty ? Self.todayString() : today
@@ -177,6 +192,7 @@ final class DailyFocusService: ObservableObject {
                 try await $0.dailyPlanGet(date: resolvedDate)
             }
             let (issueSummary, dailyPlan) = try await (summary, plan)
+            guard activity == activityGeneration else { return }
             let orderedIssues = Self.buildIssues(summary: issueSummary, plan: dailyPlan)
             snapshot = DailyFocusSnapshot(
                 date: resolvedDate, issues: orderedIssues, isConnected: true)
@@ -184,16 +200,18 @@ final class DailyFocusService: ObservableObject {
         } catch {
             logger.error(
                 "Daily focus refresh failed: \(error.localizedDescription, privacy: .private)")
+            guard activity == activityGeneration else { return }
             snapshot = DailyFocusSnapshot()
         }
     }
 
     private func handle(event: CronaProtocolEvent) {
+        guard backgroundRefreshEnabled else { return }
         switch event.type {
         case "session.history_changed", "session.started", "session.stopped", "session.ended", "timer.extended",
             "timer.break_deferral_warning", "timer.break_deferred", "context.issue.changed",
             "issue.updated", "issue.created", "issue.deleted":
-            Task { await refresh() }
+            Task { if self.backgroundRefreshEnabled { await self.refresh() } }
         default:
             break
         }
