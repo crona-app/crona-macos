@@ -104,7 +104,7 @@ final class EndSessionModel: ObservableObject {
         pendingSessionID = sessionID
         presentationSource = source
         errorMessage = nil
-        isSheetPresented = source == .menuPopover
+        isSheetPresented = source == .menuPopover || source == .glance
         requestFocus()
     }
 

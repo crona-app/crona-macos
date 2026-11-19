@@ -23,6 +23,7 @@ enum SettingsDestination: String, CaseIterable, Hashable, Identifiable {
 }
 
 enum EndSessionPresentationSource: Equatable {
+    case glance
     case menuPopover
     case timerHUD
     case hardLimitPopup
@@ -236,6 +237,10 @@ final class CompanionAppState: ObservableObject {
         canPresent: { [weak self] in
             guard let self else { return false }
             return !endSession.isSheetPresented && issueActions.editor == nil
+        },
+        actionService: { [weak self] in
+            guard let self else { return nil }
+            return self.glance.isPresented ? self.glance.habits : self.habitsService
         }
     )
     private(set) lazy var issueCreator = IssueCreatorModel(
@@ -250,6 +255,7 @@ final class CompanionAppState: ObservableObject {
         },
         hasActiveFocusSession: { [weak self] in self?.hasActiveFocusSession ?? false },
         focusIssue: { [weak self] issue in
+            if let self, self.glance.isPresented { self.glance.prepare(issue); return }
             self?.selectedPopoverTab = .now
             self?.selectedFocusIssue = issue
         }

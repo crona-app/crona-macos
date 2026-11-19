@@ -6,13 +6,15 @@ struct PopoverDetailView: View {
     @ObservedObject private var dailyIssues: DailyIssuesModel
     @ObservedObject private var tags: TagsModel
     @ObservedObject private var browser: DetailBrowserModel
+    @ObservedObject private var day: PopoverDayModel
     let route: PopoverDetailRoute
 
-    init(appState: CompanionAppState, route: PopoverDetailRoute) {
+    init(appState: CompanionAppState, route: PopoverDetailRoute, habits: HabitsService? = nil, issues: DailyIssuesModel? = nil, day: PopoverDayModel? = nil) {
         self.appState = appState
         self.route = route
-        self.habitsService = appState.habitsService
-        self.dailyIssues = appState.dailyIssues
+        self.habitsService = habits ?? appState.habitsService
+        self.dailyIssues = issues ?? appState.dailyIssues
+        self.day = day ?? appState.day
         self.tags = appState.tags
         self.browser = appState.detailBrowser
     }
@@ -23,14 +25,14 @@ struct PopoverDetailView: View {
             Group {
             switch route {
             case .issueDetails(let issueID):
-                if let issue = appState.detailsIssue(id: issueID) {
+                if let issue = dailyIssues.allIssues.first(where: { $0.id == issueID }) ?? appState.detailsIssue(id: issueID) {
                     IssueDetailView(appState: appState, issue: issue)
                 } else {
                     missingDetail(title: "Issue unavailable")
                 }
             case .habitDetails(let habitID):
                 if let habit = habitsService.snapshot.filtered(by: tags.filter(for: .habits), known: tags.knownNames).items.first(where: { $0.id == habitID }) {
-                    HabitDetailView(appState: appState, habit: habit)
+                    HabitDetailView(appState: appState, habit: habit, day: day)
                 } else {
                     missingDetail(title: "Habit unavailable")
                 }
@@ -141,11 +143,19 @@ struct IssueDetailView: View {
 struct HabitDetailView: View {
     @ObservedObject var appState: CompanionAppState
     let habit: HabitRowModel
+    @ObservedObject private var day: PopoverDayModel
+
+    init(appState: CompanionAppState, habit: HabitRowModel, day: PopoverDayModel? = nil) {
+        self.appState = appState
+        self.habit = habit
+        self.day = day ?? appState.day
+    }
     @State private var isLoggingDuration = false
     @State private var durationDraft = ""
     @State private var durationError: String?
 
     var body: some View {
+        VStack(spacing: 0) {
         detailScroll {
             DetailHeader(
                 title: habit.name,
@@ -202,7 +212,7 @@ struct HabitDetailView: View {
                 .buttonStyle(.plain)
             }
 
-            DetailSection(title: appState.day.isToday ? "Today" : appState.day.selectedDate, icon: habitStatusIcon) {
+            DetailSection(title: day.isToday ? "Today" : day.selectedDate, icon: habitStatusIcon) {
                 DetailStatusRow(title: habitStatusTitle, tint: habitTint)
             }
 
@@ -214,7 +224,7 @@ struct HabitDetailView: View {
                 }
             }
 
-            HabitHistorySection(habit: habit, model: appState.habitHistory, day: appState.day)
+            HabitHistorySection(habit: habit, model: appState.habitHistory, day: day)
 
             DetailSection(title: "Schedule", icon: "calendar") {
                 DetailMetadataGrid(rows: [
@@ -233,7 +243,7 @@ struct HabitDetailView: View {
                 }
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+
             HabitDetailActionBar(
                 appState: appState, habit: habit,
                 isLoggingDuration: $isLoggingDuration, durationDraft: $durationDraft, durationError: $durationError,

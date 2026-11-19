@@ -187,8 +187,7 @@ struct GlanceDayPanes: View {
     }
 
     private func handoff(_ action: () -> Void) {
-        model.dismiss(restoreFocus: false)
-        state.statusBarService.showPopupFromShortcut()
+        // Shared drafts are hosted over Glance.
         action()
     }
 

@@ -15,12 +15,14 @@ struct GlanceView: View {
 
     var body: some View {
         ZStack {
-            Color.clear.contentShape(Rectangle()).ignoresSafeArea().onTapGesture { model.dismiss() }
+            Color.clear.contentShape(Rectangle()).ignoresSafeArea()
             content
             if showsCard {
-                Color.black.opacity(0.28).ignoresSafeArea().onTapGesture { model.handleEscape() }
+                Color.black.opacity(0.28).ignoresSafeArea()
                 card.transition(.opacity)
             }
+            GlanceEditorHost(state: appState, creator: appState.issueCreator, actions: appState.issueActions,
+                habit: appState.habitEditor, tags: appState.tagEditor, sharedCapture: appState.issueCapture, end: appState.endSession)
         }.companionAppearance(appState)
     }
 

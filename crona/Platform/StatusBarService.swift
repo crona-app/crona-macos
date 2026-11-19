@@ -485,6 +485,8 @@ final class StatusBarService: NSObject {
     }
 
     private func showPopup() {
+        appState?.glance.reconcileWindowVisibility()
+        guard appState?.glance.isPresented != true else { return }
         guard let panel = popupPanel else {
             logger.error("Show skipped: popup panel is nil")
             return

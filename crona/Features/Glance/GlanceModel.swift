@@ -20,7 +20,7 @@ final class GlanceModel: ObservableObject {
     let stats: PopoverStatsService
     private weak var appState: CompanionAppState?
     private let connection: DaemonConnectionService
-    private let window = GlanceWindowController()
+    private let window: GlanceWindowPresenting
     private var refreshTask: Task<Void, Never>?
     private var generation = 0
     private var subscriptions: Set<AnyCancellable> = []
@@ -28,7 +28,8 @@ final class GlanceModel: ObservableObject {
         await self?.refresh()
     })
 
-    init(appState: CompanionAppState) {
+    init(appState: CompanionAppState, window: GlanceWindowPresenting = GlanceWindowController()) {
+        self.window = window
         self.appState = appState
         connection = appState.daemonConnection
         let day = PopoverDayModel(today: { [weak appState] in
@@ -56,9 +57,17 @@ final class GlanceModel: ObservableObject {
         }
     }
 
+    func reconcileWindowVisibility() {
+        if isPresented && !window.isVisible { dismiss(restoreFocus: false) }
+    }
+
     func toggle(appState: CompanionAppState) {
+        reconcileWindowVisibility()
         if isPresented { dismiss(); return }
         guard !isBlocked else { return }
+        let existingDetails = appState.popoverDetailsRoute
+        appState.statusBarService.dismissPopup(animated: false)
+        appState.popoverDetailsRoute = existingDetails
         generation += 1
         isPresented = window.show(appState: appState, model: self)
         guard isPresented else { return }
@@ -79,6 +88,16 @@ final class GlanceModel: ObservableObject {
 
     /// Escape closes the open card first, then Glance itself.
     func handleEscape() {
+        if let state = appState {
+            if state.endSession.isSheetPresented { state.endSession.cancel(); return }
+            if state.issueActions.editor != nil { state.issueActions.cancel(); return }
+            if state.tagEditor.isPresented { state.tagEditor.dismiss(); return }
+            if state.issueCreator.isPresented { state.issueCreator.cancel(); return }
+            if state.issueCapture.isPresented { state.issueCapture.dismiss(); return }
+            if state.habitEditor.actionEditor != nil { state.habitEditor.cancelActionEditor(); return }
+            if state.habitEditor.isPresented { state.habitEditor.cancel(); return }
+            if state.popoverDetailsRoute != nil { state.dismissDetails(); return }
+        }
         if showsSetup { showsSetup = false } else if showsCapture { showsCapture = false } else { dismiss() }
     }
 
@@ -138,7 +157,7 @@ final class GlanceModel: ObservableObject {
             await state.contextService.refresh()
             showsSetup = false
             selectedIssue = nil
-            if openedGeneration == generation { dismiss() }
+            if openedGeneration == generation { await refresh() }
         } catch { self.error = error.localizedDescription }
     }
 
@@ -146,7 +165,7 @@ final class GlanceModel: ObservableObject {
         guard day.isToday else { error = "Return to Today to capture issues."; return }
         guard !conflict else { error = "Finish the open Crona flow before capturing issues."; return }
         let openedGeneration = generation
-        if await capture.importAll(), openedGeneration == generation { dismiss() }
+        if await capture.importAll(), openedGeneration == generation { showsCapture = false }
     }
 
     func timerCommand(advance: Bool = false) async {

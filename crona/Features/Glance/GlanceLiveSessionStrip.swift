@@ -25,8 +25,7 @@ struct GlanceLiveSessionStrip: View {
                     Button(title) { Task { await model.timerCommand(advance: true) } }.buttonStyle(GlanceButtonStyle())
                 }
                 Button("End") {
-                    model.dismiss(restoreFocus: false)
-                    Task { await state.performGlobalShortcut(.endSession) }
+                    state.endSession.begin(source: .glance)
                 }.buttonStyle(GlanceButtonStyle())
             }.disabled(model.commandInFlight)
         }.padding(12).background(subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 18))

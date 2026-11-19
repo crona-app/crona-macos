@@ -4,6 +4,15 @@ extension CompanionAppState {
     @MainActor
     func performGlobalShortcut(_ action: GlobalShortcutAction) async {
         if action == .glance { glance.toggle(appState: self); return }
+        if glance.isPresented {
+            switch action {
+            case .createIssue: issueCreator.presentCreator(); return
+            case .startFocus: glance.prepare(); return
+            case .endSession: endSession.begin(source: .glance); return
+            case .show: return
+            default: break
+            }
+        }
         if action == .settings { openSettings(); return }
         if action == .pauseResume {
             let presentation = TimerPresentation.from(timerService.snapshot)

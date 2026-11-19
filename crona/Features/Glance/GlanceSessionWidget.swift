@@ -25,9 +25,8 @@ struct GlanceSessionWidget: View {
                     endsAt
                     Spacer(minLength: 8)
                     if model.error?.contains("open Crona flow") == true {
-                        Button("Continue in Crona") {
-                            model.dismiss(restoreFocus: false)
-                            state.statusBarService.showPopupFromShortcut()
+                        Button("Return to editor") {
+                            model.showsSetup = false
                         }.buttonStyle(GlanceButtonStyle())
                     }
                     Button(model.isStarting ? "Starting…" : (setup.mode == .timer ? "Start Timer" : "Start Focus")) {

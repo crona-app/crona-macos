@@ -21,6 +21,7 @@ final class HabitEditorModel: ObservableObject {
     private let habitsService: HabitsService
     private let issueCreationService: IssueCreationService
     private let contextService: ContextService
+    private let actionService: (() -> HabitsService?)?
     private let canPresent: () -> Bool
 
     init(
@@ -28,13 +29,15 @@ final class HabitEditorModel: ObservableObject {
         habitsService: HabitsService,
         issueCreationService: IssueCreationService,
         contextService: ContextService,
-        canPresent: @escaping () -> Bool
+        canPresent: @escaping () -> Bool,
+        actionService: (() -> HabitsService?)? = nil
     ) {
         self.daemonConnection = daemonConnection
         self.habitsService = habitsService
         self.issueCreationService = issueCreationService
         self.contextService = contextService
         self.canPresent = canPresent
+        self.actionService = actionService
     }
 
     func presentCreator() {
@@ -179,12 +182,12 @@ final class HabitEditorModel: ObservableObject {
     }
 
     func complete(_ habit: HabitRowModel) {
-        Task { await habitsService.complete(habit) }
+        Task { await (actionService?() ?? habitsService).complete(habit) }
     }
 
     func log(_ habit: HabitRowModel, durationMinutes: Int) {
         Task {
-            await habitsService.complete(
+            await (actionService?() ?? habitsService).complete(
                 habit,
                 durationMinutes: max(1, durationMinutes)
             )
@@ -192,10 +195,10 @@ final class HabitEditorModel: ObservableObject {
     }
 
     func fail(_ habit: HabitRowModel) {
-        Task { await habitsService.fail(habit) }
+        Task { await (actionService?() ?? habitsService).fail(habit) }
     }
 
     func clearCompletion(_ habit: HabitRowModel) {
-        Task { await habitsService.clearCompletion(habit) }
+        Task { await (actionService?() ?? habitsService).clearCompletion(habit) }
     }
 }

@@ -2,8 +2,16 @@ import AppKit
 import SwiftUI
 
 @MainActor
-final class GlanceWindowController {
+protocol GlanceWindowPresenting: AnyObject {
+    var isVisible: Bool { get }
+    func show(appState: CompanionAppState, model: GlanceModel) -> Bool
+    func dismiss(restoreFocus: Bool)
+}
+
+@MainActor
+final class GlanceWindowController: GlanceWindowPresenting {
     private var panel: GlancePanel?
+    var isVisible: Bool { panel?.isVisible == true }
     private var previousApp: NSRunningApplication?
     private var displayID: CGDirectDisplayID?
     private var screenObserver: NSObjectProtocol?
@@ -17,6 +25,7 @@ final class GlanceWindowController {
         let panel = GlancePanel(contentRect: screen.frame, styleMask: [.borderless], backing: .buffered, defer: false)
         panel.title = "Glance"
         panel.isReleasedWhenClosed = false
+        panel.hidesOnDeactivate = false
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.level = .floating
@@ -31,7 +40,8 @@ final class GlanceWindowController {
                 guard let self, let model else { return }
                 guard let screen = NSScreen.screens.first(where: {
                     ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == self.displayID
-                }) else { model.dismiss(); return }
+                }) ?? NSScreen.main ?? NSScreen.screens.first else { return }
+                self.displayID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
                 self.panel?.setFrame(screen.frame, display: true)
                 // Swap the root view in place so transient @State survives.
                 self.hostingView?.rootView = Self.rootView(appState: appState, model: model, screen: screen)

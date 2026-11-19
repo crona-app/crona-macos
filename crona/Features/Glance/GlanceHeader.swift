@@ -17,6 +17,9 @@ struct GlanceHeader: View {
             Spacer(minLength: 12)
             PopoverDayHeader(appState: state, day: model.day).frame(maxWidth: 280)
             Spacer(minLength: 12)
+            Button { state.issueCreator.presentCreator() } label: {
+                Label("Create Issue", systemImage: "plus")
+            }.buttonStyle(GlanceButtonStyle()).disabled(!day.isToday)
             Button { model.toggleCapture() } label: {
                 Label("Capture", systemImage: "text.badge.plus")
             }.buttonStyle(GlanceButtonStyle()).disabled(!day.isToday)
