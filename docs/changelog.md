@@ -4,6 +4,8 @@ All notable changes to **Crona for macOS** are documented here.
 
 ## Unreleased
 
+- Add Glance customization in Settings and a centered Glance panel: widget visibility and ordering, opening date, starting issue section, and unfinished habits.
+
 ### Changed
 
 - Add a Shortcuts setting to open hotkey popups at the screen center or menu bar. Centered popups stay centered as content resizes; menu-bar clicks retain their menu anchor.

@@ -11,8 +11,8 @@ struct DetailBrowsingControls: View {
     init(appState: CompanionAppState) {
         self.appState = appState
         browser = appState.detailBrowser
-        issues = appState.dailyIssues
-        habits = appState.habitsService
+        issues = appState.glance.isPresented ? appState.glance.issues : appState.dailyIssues
+        habits = appState.glance.isPresented ? appState.glance.habits : appState.habitsService
         tags = appState.tags
     }
     var body: some View {

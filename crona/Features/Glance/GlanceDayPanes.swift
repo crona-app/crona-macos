@@ -7,12 +7,14 @@ struct GlanceDayPanes: View {
     @ObservedObject var issues: DailyIssuesModel
     @ObservedObject var habits: HabitsService
     @ObservedObject var stats: PopoverStatsService
+    @ObservedObject private var preferences: PreferencesService
     @State private var loggingHabitID: Int64?
     @State private var logSeconds = 60
     @ObservedObject private var tags: TagsModel
 
     init(state: CompanionAppState, model: GlanceModel, day: PopoverDayModel, issues: DailyIssuesModel,
          habits: HabitsService, stats: PopoverStatsService) {
+        preferences = state.preferences
         self.state = state
         self.model = model
         self.day = day
@@ -24,29 +26,42 @@ struct GlanceDayPanes: View {
 
     var body: some View {
         GeometryReader { geometry in
-            if geometry.size.width >= 800 {
-                // Both columns span the full height, so selecting an item never changes the layout.
-                HStack(alignment: .top, spacing: 20) {
-                    VStack(spacing: 20) {
-                        issuePane
-                        habitPane
-                    }.frame(maxWidth: .infinity)
-                    VStack(spacing: 20) {
-                        calendar(compact: geometry.size.width < 1200 || geometry.size.height < 820)
-                        preview
-                        summary
-                    }.frame(width: max(340, geometry.size.width * 0.34))
-                }.frame(height: geometry.size.height)
+            let visible = preferences.preferences.glance.normalizedOrder.filter { preferences.preferences.glance.visible($0) }
+            let main = visible.filter { $0 == .issues || $0 == .habits }
+            let side = visible.filter { $0 != .issues && $0 != .habits }
+            if visible.isEmpty {
+                VStack(spacing: 16) {
+                    Text("Choose widgets to make Glance yours.")
+                    Button("Customize Glance") { model.showsCustomization = true }
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView { VStack(spacing: 20) {
-                    calendar(compact: true)
-                    issuePane.frame(height: 360)
-                    habitPane.frame(height: 320)
-                    preview.frame(height: 240)
-                    summary
-                } }
+                ScrollView {
+                    if geometry.size.width >= 800 {
+                        HStack(alignment: .top, spacing: 20) {
+                            if !main.isEmpty { column(main, height: geometry.size.height) }
+                            if !side.isEmpty {
+                                column(side, height: geometry.size.height)
+                                    .frame(maxWidth: main.isEmpty ? .infinity : GlanceLayoutMetrics.sideWidth(geometry.size.width))
+                            }
+                        }
+                    } else { column(main + side, height: geometry.size.height) }
+                }
             }
         }
+    }
+
+    private func column(_ widgets: [GlanceWidget], height: CGFloat) -> some View {
+        VStack(spacing: 20) {
+            ForEach(widgets) { widget in
+                switch widget {
+                case .issues: issuePane.frame(height: GlanceLayoutMetrics.height(.issues, availableHeight: height))
+                case .habits: habitPane.frame(height: GlanceLayoutMetrics.height(.habits, availableHeight: height))
+                case .calendar: calendar(compact: height < 820)
+                case .selection: preview.frame(height: GlanceLayoutMetrics.height(.selection, availableHeight: height))
+                case .summary: summary
+                }
+            }
+        }.frame(maxWidth: .infinity)
     }
 
     private var issuePane: some View {
@@ -64,7 +79,7 @@ struct GlanceDayPanes: View {
                     ForEach(issues.sections.issues(in: issues.section)) { issue in
                         FocusIssueRow(appState: state, issue: issue,
                             isInbox: issues.section == .inbox,
-                            onDetails: { model.previewIssue = issue; model.selectedHabit = nil },
+                            onDetails: { if preferences.preferences.glance.visible(.selection) { model.previewIssue = issue; model.selectedHabit = nil } else { state.openIssueDetails(issue); state.detailBrowser.open(issue: issue, section: issues.section) } },
                             beforeAction: { handoff {} }, actionsEnabled: day.isToday,
                             onStart: { model.prepare(issue) })
                             .overlay(RoundedRectangle(cornerRadius: 18).stroke(
@@ -86,7 +101,7 @@ struct GlanceDayPanes: View {
             if let error = habits.snapshot.lastRefreshError { Text(error).font(.caption).foregroundStyle(.red) }
             ScrollView {
                 LazyVStack(spacing: 10) {
-                    ForEach(habits.snapshot.date == day.selectedDate ? habits.snapshot.filtered(by: tags.filter(for: .habits), known: tags.knownNames).items : []) { habit in
+                    ForEach(habits.snapshot.date == day.selectedDate ? habits.snapshot.filtered(by: tags.filter(for: .habits), known: tags.knownNames).items.filter { !preferences.preferences.glance.unfinishedHabits || (!$0.completed && $0.status != "failed") } : []) { habit in
                         habitRow(habit)
                     }
                     if habits.snapshot.items.isEmpty { Text("No habits due").foregroundStyle(.secondary) }
@@ -108,7 +123,7 @@ struct GlanceDayPanes: View {
                             }, onCancelLog: { loggingHabitID = nil },
                             onFail: { Task { await habits.fail(habit) } },
                             onClear: { Task { await habits.clearCompletion(habit) } },
-                            openDetails: { model.selectedHabit = habit; model.previewIssue = nil },
+                            openDetails: { if preferences.preferences.glance.visible(.selection) { model.selectedHabit = habit; model.previewIssue = nil } else { state.openHabitDetails(habit) } },
                             editHabit: { if day.isToday { handoff { state.habitEditor.presentEditor(for: habit) } } },
                             editTags: { if day.isToday { handoff { state.tagEditor.present(.habit(id: habit.id, name: habit.name), tags: habit.tags) } } },
                             deleteHabit: { if day.isToday { handoff { state.habitEditor.presentDelete(for: habit) } } },

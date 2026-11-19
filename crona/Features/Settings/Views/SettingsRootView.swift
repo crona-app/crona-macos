@@ -40,7 +40,7 @@ struct SettingsRootView: View {
 
             VStack(spacing: 0) {
                 List(selection: $sidebarSelection) {
-                    sidebarSection("Preferences", items: [.general, .shortcuts, .menuBar])
+                    sidebarSection("Preferences", items: [.general, .shortcuts, .menuBar, .glance])
                     sidebarSection(
                         "Focus", items: [.away, .daySchedule, .smartPause, .breakScreen, .notifications])
                     sidebarSection("System", items: [.advanced])
@@ -94,6 +94,8 @@ struct SettingsRootView: View {
     @ViewBuilder
     var settingsPageContent: some View {
         switch sidebarSelection {
+        case .glance:
+            GlanceCustomizationView(preferences: appState.preferences)
         case .shortcuts:
             GlobalShortcutsView(model: appState.globalShortcuts, preferences: appState.preferences)
         case .general:
@@ -436,6 +438,7 @@ func settingsFootnote(_ text: String) -> some View {
 extension SettingsDestination {
     fileprivate var title: String {
         switch self {
+        case .glance: return "Glance"
         case .shortcuts: return "Shortcuts"
         case .general: return "General"
         case .away: return "Away"
@@ -454,6 +457,7 @@ extension SettingsDestination {
 
     fileprivate var iconName: String {
         switch self {
+        case .glance: return "rectangle.grid.2x2"
         case .shortcuts: return "keyboard"
         case .general: return "gearshape.fill"
         case .away: return "figure.walk.circle.fill"

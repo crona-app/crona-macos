@@ -5,6 +5,7 @@ import OSLog
 import SwiftUI
 
 enum SettingsDestination: String, CaseIterable, Hashable, Identifiable {
+    case glance
     case general
     case shortcuts
     case away

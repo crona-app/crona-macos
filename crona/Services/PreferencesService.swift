@@ -247,6 +247,7 @@ struct CompanionPreferences: Codable, Equatable {
     static let breakScreenActivityExtensionOptions = [30, 60, 120]
     static let smartPauseIdleOptions = [30, 60, 120, 300, 600]
 
+    var glance = GlancePreferences()
     var launchAtLogin = false
     var hideDockIconWhenNoWindowsOpen = true
     var appearance: CompanionAppearance = .system
@@ -309,6 +310,7 @@ struct CompanionPreferences: Codable, Equatable {
 
 extension CompanionPreferences {
     private enum CodingKeys: String, CodingKey {
+        case glance
         case launchAtLogin
         case hideDockIconWhenNoWindowsOpen
         case appearance
@@ -350,6 +352,7 @@ extension CompanionPreferences {
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        glance = try values.decodeIfPresent(GlancePreferences.self, forKey: .glance) ?? GlancePreferences()
         launchAtLogin = try values.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
         hideDockIconWhenNoWindowsOpen =
             try values.decodeIfPresent(Bool.self, forKey: .hideDockIconWhenNoWindowsOpen) ?? true
@@ -439,6 +442,7 @@ extension CompanionPreferences {
 
     func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(glance, forKey: .glance)
         try values.encode(launchAtLogin, forKey: .launchAtLogin)
         try values.encode(hideDockIconWhenNoWindowsOpen, forKey: .hideDockIconWhenNoWindowsOpen)
         try values.encode(appearance, forKey: .appearance)

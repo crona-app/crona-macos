@@ -23,6 +23,7 @@ struct GlanceHeader: View {
             Button { model.toggleCapture() } label: {
                 Label("Capture", systemImage: "text.badge.plus")
             }.buttonStyle(GlanceButtonStyle()).disabled(!day.isToday)
+            Button { model.showsCustomization = true } label: { Image(systemName: "slider.horizontal.3") }.buttonStyle(GlanceButtonStyle()).help("Customize Glance")
             Button { model.dismiss() } label: {
                 Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
                     .frame(width: 32, height: 32).background(glassCapsuleBackground(emphasis: 0.08))

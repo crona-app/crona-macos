@@ -5,6 +5,7 @@ import Foundation
 final class GlanceModel: ObservableObject {
     @Published private(set) var isPresented = false
     @Published private(set) var selectedIssue: DailyFocusIssue?
+    @Published var showsCustomization = false
     @Published var showsSetup = false
     @Published var showsCapture = false
     @Published private(set) var isStarting = false
@@ -53,6 +54,7 @@ final class GlanceModel: ObservableObject {
         day.onChange = { [weak self] _ in
             self?.previewIssue = nil
             self?.selectedHabit = nil
+            self?.appState?.preferences.preferences.glance.lastDate = self?.day.selectedDate
             Task { await self?.refresh() }
         }
     }
@@ -68,6 +70,9 @@ final class GlanceModel: ObservableObject {
         let existingDetails = appState.popoverDetailsRoute
         appState.statusBarService.dismissPopup(animated: false)
         appState.popoverDetailsRoute = existingDetails
+        let preferences = appState.preferences.preferences.glance
+        day.select(preferences.rememberDate ? (preferences.lastDate ?? day.selectedDate) : appState.daemonConnection.currentDate)
+        issues.section = DailySection(rawValue: preferences.startingSection) ?? .planned
         generation += 1
         isPresented = window.show(appState: appState, model: self)
         guard isPresented else { return }
@@ -88,6 +93,7 @@ final class GlanceModel: ObservableObject {
 
     /// Escape closes the open card first, then Glance itself.
     func handleEscape() {
+        if showsCustomization { showsCustomization = false; return }
         if let state = appState {
             if state.endSession.isSheetPresented { state.endSession.cancel(); return }
             if state.issueActions.editor != nil { state.issueActions.cancel(); return }
@@ -102,6 +108,8 @@ final class GlanceModel: ObservableObject {
     }
 
     func dismiss(restoreFocus: Bool = true) {
+        appState?.preferences.preferences.glance.lastDate = day.selectedDate
+        showsCustomization = false
         generation += 1
         window.dismiss(restoreFocus: restoreFocus)
         isPresented = false

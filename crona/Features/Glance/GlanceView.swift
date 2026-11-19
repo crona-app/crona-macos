@@ -21,6 +21,13 @@ struct GlanceView: View {
                 Color.black.opacity(0.28).ignoresSafeArea()
                 card.transition(.opacity)
             }
+            if model.showsCustomization {
+                Color.black.opacity(0.28).ignoresSafeArea()
+                VStack {
+                    ScrollView { GlanceCustomizationView(preferences: appState.preferences).padding(24) }
+                    Button("Done") { model.showsCustomization = false }.padding()
+                }.frame(width: 560).frame(maxHeight: 650).background(SheetGlassBackground())
+            }
             GlanceEditorHost(state: appState, creator: appState.issueCreator, actions: appState.issueActions,
                 habit: appState.habitEditor, tags: appState.tagEditor, sharedCapture: appState.issueCapture, end: appState.endSession)
         }.companionAppearance(appState)
