@@ -4,19 +4,26 @@ All notable changes to **Crona for macOS** are documented here.
 
 ## Unreleased
 
-- Batch stats refresh events, bound calendar snapshots to three recently used months plus active dates, and use cached or stream-scoped issue data for HUD descriptions.
+## [1.1.0-beta.7] - 2026-11-19
 
-- Reduce idle UI retention by creating the menu popup on demand, releasing Library content on close, and suspending Glance background refreshes and discarding its caches while closed.
+### Added
 
-- Expand the timer HUD with a dedicated hover action to show issue context, description, session controls, and timed-session progress. Collapse on blur or Escape while preserving the running timer.
-
-- Show the shared session timer and progress in Glance during active sessions, replacing task lists and details. Keep Calendar and Summary on larger layouts and block task editing until the session ends.
-
-- Add Glance customization in Settings and a centered Glance panel: widget visibility and ordering, opening date, starting issue section, and unfinished habits.
+- Add Settings > Glance and a centered customization panel with widget visibility, ordering within columns, a proportional layout preview, starting issue section, unfinished-habit filtering, opening-date preferences, and Restore defaults.
+- Add a dedicated timer HUD expansion action showing issue context and description above the running timer, session controls, and timed-session progress. Collapse on blur, Escape, or the collapse button without interfering with hover actions or dragging.
+- Add a Shortcuts setting for screen-centered or menu-bar-anchored hotkey popups. Centered popups follow the pointer’s display and remain centered as content resizes; menu-bar clicks retain their usual placement.
 
 ### Changed
 
-- Add a Shortcuts setting to open hotkey popups at the screen center or menu bar. Centered popups stay centered as content resizes; menu-bar clicks retain their menu anchor.
+- Show the shared timer and progress in Glance during active sessions, replacing task lists and Selection. Retain enabled Calendar and Summary cards when space permits, match the timer card’s height to the supporting column, and center its content.
+- Block task editing, creation, capture, and new-session setup in Glance while a session is active. When Selection is hidden outside a session, open details centered over Glance using its selected day and lists.
+- Improve Shortcuts settings grouping, text size, and spacing.
+- Reduce idle UI retention by creating the menu popup on demand, releasing Library content on close, and suspending Glance background refreshes and discarding its caches while closed.
+- Batch stats refresh events, bound calendar snapshots to three recently used months plus active dates, and use cached or stream-scoped issue data for HUD descriptions.
+- Limit the local build-and-run script to stopping Debug build executables, leaving installed and Release instances untouched.
+
+### Fixed
+
+- Transition directly from the expanded timer HUD into the completion form without an intermediate collapse.
 
 ## [1.1.0-beta.6] - 2026-11-19
 

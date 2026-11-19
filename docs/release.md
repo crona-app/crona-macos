@@ -61,9 +61,15 @@ Generate the Sparkle key pair once with Sparkle's `generate_keys` tool. Store th
 
 ## 1.1.0 beta preparation
 
-The metadata for `v1.1.0-beta.6` is marketing version `1.1.0`, build `24`, and semantic release version `1.1.0-beta.6`. It requires daemon protocol `1.7`.
+The next planned release is `v1.1.0-beta.7`, with marketing version `1.1.0`, build `25`, and semantic release version `1.1.0-beta.7`. It requires daemon protocol `1.7`, unchanged from beta.6.
 
-Build numbers continue across marketing versions. Build `19` (`v1.1.0-beta.1`) followed the 1.0.0 build `18`, build `20` (`v1.1.0-beta.2`), build `21` (`v1.1.0-beta.3`), and build `22` (`v1.1.0-beta.4`) followed it, build `23` (`v1.1.0-beta.5`) followed those, and build `24` follows it, to preserve Sparkle appcast ordering.
+Release notes are prepared in [`docs/release-notes/v1.1.0-beta.7.md`](release-notes/v1.1.0-beta.7.md), with a matching changelog entry. The changelog date reflects this preparation date; update it if publication happens on a later day.
+
+This preparation is documentation-only. Project metadata remains at build `24`; bump `CURRENT_PROJECT_VERSION` to `25` before cutting the release. No release commit or tag is part of this preparation.
+
+Build numbers continue across marketing versions: 1.0.0 used build `18`; 1.1.0 betas 1 through 6 used builds `19` through `24`. Build `25` continues that sequence to preserve Sparkle appcast ordering.
+
+The Debug unit suite passed all 492 tests during development. Release-optimized validation is still required before tagging; memory savings have not been quantified in a before/after Release measurement.
 
 ## Cutting a Release
 
