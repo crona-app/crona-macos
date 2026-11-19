@@ -6,7 +6,9 @@ extension CompanionAppState {
         if action == .glance { glance.toggle(appState: self); return }
         if glance.isPresented {
             switch action {
-            case .createIssue: issueCreator.presentCreator(); return
+            case .createIssue:
+                guard !hasActiveFocusSession else { return }
+                issueCreator.presentCreator(); return
             case .startFocus: glance.prepare(); return
             case .endSession: endSession.begin(source: .glance); return
             case .show: return

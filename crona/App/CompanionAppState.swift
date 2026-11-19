@@ -798,7 +798,7 @@ final class CompanionAppState: ObservableObject {
     }
 
     func endTimer() {
-        endSession.begin(source: .menuPopover)
+        endSession.begin(source: glance.isPresented ? .glance : .menuPopover)
     }
 
     func endTimerFromHUD() {

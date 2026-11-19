@@ -11,7 +11,7 @@ struct GlanceView: View {
         day = model.day
     }
 
-    private var showsCard: Bool { day.isToday && (model.showsCapture || model.showsSetup) }
+    private var showsCard: Bool { !appState.hasActiveFocusSession && day.isToday && (model.showsCapture || model.showsSetup) }
 
     var body: some View {
         ZStack {
@@ -36,9 +36,7 @@ struct GlanceView: View {
     private var content: some View {
         VStack(spacing: 16) {
             GlanceHeader(state: appState, model: model)
-            if appState.hasActiveFocusSession {
-                GlanceLiveSessionStrip(state: appState, model: model, timer: appState.timerService)
-            } else if day.isToday {
+            if !appState.hasActiveFocusSession && day.isToday {
                 HStack {
                     Text("Ready to focus").foregroundStyle(.secondary)
                     Spacer()

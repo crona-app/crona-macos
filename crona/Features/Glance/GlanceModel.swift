@@ -86,7 +86,7 @@ final class GlanceModel: ObservableObject {
     }
 
     func toggleCapture() {
-        guard day.isToday else { return }
+        guard day.isToday, appState?.hasActiveFocusSession != true else { return }
         showsSetup = false
         showsCapture.toggle()
     }
@@ -132,7 +132,7 @@ final class GlanceModel: ObservableObject {
     }
 
     func prepare(_ issue: DailyFocusIssue? = nil) {
-        guard day.isToday, !isStarting else { return }
+        guard day.isToday, !isStarting, appState?.hasActiveFocusSession != true else { return }
         if selectedIssue?.id != issue?.id {
             setup = FocusSetupModel(initialState: .defaultState(estimateMinutes: issue?.estimateMinutes, workedSeconds: issue?.workedSeconds ?? 0))
         }

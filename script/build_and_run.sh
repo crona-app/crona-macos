@@ -9,7 +9,15 @@ case "$MODE" in
   *) echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2; exit 2 ;;
 esac
 cd "$ROOT_DIR"
-pkill -x crona >/dev/null 2>&1 || true
+# Match the executable path, never the process name: release and installed apps
+# also run as "crona" and must remain untouched.
+while read -r process_id executable; do
+  case "$executable" in
+    /*/Build/Products/Debug/crona.app/Contents/MacOS/crona)
+      kill "$process_id" 2>/dev/null || true
+      ;;
+  esac
+done < <(/bin/ps -axo pid=,comm=)
 xcodebuild -project crona.xcodeproj -scheme crona -configuration Debug \
   -destination 'platform=macOS' -derivedDataPath "$DERIVED_DATA" CODE_SIGNING_ALLOWED=NO build
 APP_BUNDLE="$DERIVED_DATA/Build/Products/Debug/crona.app"
@@ -28,6 +36,6 @@ case "$MODE" in
   --verify)
     /usr/bin/open -n "$APP_BUNDLE"
     sleep 1
-    pgrep -x crona >/dev/null
+    /bin/ps -axo comm= | /usr/bin/grep -Fx -- "$APP_BINARY" >/dev/null
     ;;
 esac

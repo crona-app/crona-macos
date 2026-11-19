@@ -4,6 +4,8 @@ All notable changes to **Crona for macOS** are documented here.
 
 ## Unreleased
 
+- Show the shared session timer and progress in Glance during active sessions, replacing task lists and details. Keep Calendar and Summary on larger layouts and block task editing until the session ends.
+
 - Add Glance customization in Settings and a centered Glance panel: widget visibility and ordering, opening date, starting issue section, and unfinished habits.
 
 ### Changed

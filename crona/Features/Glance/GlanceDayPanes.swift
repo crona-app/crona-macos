@@ -29,7 +29,19 @@ struct GlanceDayPanes: View {
             let visible = preferences.preferences.glance.normalizedOrder.filter { preferences.preferences.glance.visible($0) }
             let main = visible.filter { $0 == .issues || $0 == .habits }
             let side = visible.filter { $0 != .issues && $0 != .habits }
-            if visible.isEmpty {
+            if state.hasActiveFocusSession {
+                GlanceSessionRowLayout(sideWidth: GlanceLayoutMetrics.sideWidth(geometry.size.width),
+                    availableHeight: geometry.size.height) {
+                    GlanceActiveSessionView(state: state)
+                    if geometry.size.width >= 1000 && geometry.size.height >= 600
+                        && (preferences.preferences.glance.visible(.calendar) || preferences.preferences.glance.visible(.summary)) {
+                        VStack(spacing: 20) {
+                            if preferences.preferences.glance.visible(.calendar) { calendar(compact: geometry.size.height < 820) }
+                            if preferences.preferences.glance.visible(.summary) { summary }
+                        }.frame(width: GlanceLayoutMetrics.sideWidth(geometry.size.width))
+                    }
+                }
+            } else if visible.isEmpty {
                 VStack(spacing: 16) {
                     Text("Choose widgets to make Glance yours.")
                     Button("Customize Glance") { model.showsCustomization = true }

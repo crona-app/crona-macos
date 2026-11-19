@@ -21,7 +21,7 @@ struct GlanceEditorHost: View {
     }
 
     var body: some View {
-        if visible {
+        if visible && (!state.hasActiveFocusSession || end.isSheetPresented) {
             GeometryReader { geometry in
                 ZStack {
                     Color.black.opacity(0.28).ignoresSafeArea()
