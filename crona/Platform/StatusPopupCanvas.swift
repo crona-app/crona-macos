@@ -17,8 +17,12 @@ final class StatusPopupCanvas: NSView {
     private func layoutCanvas() {
         hostingView.frame = bounds
     }
-    static func fittedFrame(_ frame: NSRect, height: CGFloat) -> NSRect {
+    static func fittedFrame(_ frame: NSRect, height: CGFloat, centeredIn visibleFrame: NSRect? = nil) -> NSRect {
         let height = min(StatusPopupSizing.viewportHeight, max(StatusPopupSizing.minimumHeight, height.rounded(.up)))
+        let size = NSSize(width: frame.width, height: height)
+        if let visibleFrame {
+            return NSRect(origin: ShortcutPopupPositioner.centeredOrigin(size: size, visibleFrame: visibleFrame), size: size)
+        }
         return NSRect(x: frame.minX, y: frame.maxY - height, width: frame.width, height: height)
     }
 }

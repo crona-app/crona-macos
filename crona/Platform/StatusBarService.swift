@@ -167,11 +167,20 @@ final class StatusBarService: NSObject {
     }
 
     func showPopupFromShortcut() {
+        let centered = appState?.preferences.preferences.shortcutPopupPlacement != .menuBar
+        guard centered else {
+            showPopup()
+            return
+        }
         if let panel = popupPanel, panel.isVisible {
+            if let screen = NSScreen.screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }) ?? NSScreen.main {
+                panel.centeredVisibleFrame = screen.visibleFrame
+                panel.setFrameOrigin(ShortcutPopupPositioner.centeredOrigin(size: panel.frame.size, visibleFrame: screen.visibleFrame))
+            }
             panel.makeKeyAndOrderFront(nil)
             return
         }
-        showPopup()
+        showPopup(centered: true)
     }
 
     func showPopupFromNotification() {
@@ -485,7 +494,7 @@ final class StatusBarService: NSObject {
         appState?.quitCrona()
     }
 
-    private func showPopup() {
+    private func showPopup(centered: Bool = false) {
         appState?.glance.reconcileWindowVisibility()
         guard appState?.glance.isPresented != true else { return }
         guard let panel = popupPanel else {
@@ -524,9 +533,11 @@ final class StatusBarService: NSObject {
             panelSize: viewportSize,
             visibleFrame: button.window?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
         )
-        if !statusItem.isVisible {
+        panel.centeredVisibleFrame = nil
+        if centered || !statusItem.isVisible {
             let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
             if let screen {
+                panel.centeredVisibleFrame = screen.visibleFrame
                 restingOrigin = ShortcutPopupPositioner.centeredOrigin(size: viewportSize, visibleFrame: screen.visibleFrame)
             }
         }
@@ -546,7 +557,7 @@ final class StatusBarService: NSObject {
         }
 
         panel.setFrameOrigin(StatusPopupCanvas.fittedFrame(
-            NSRect(origin: restingOrigin, size: viewportSize), height: panel.visibleSurfaceHeight).origin)
+            NSRect(origin: restingOrigin, size: viewportSize), height: panel.visibleSurfaceHeight, centeredIn: panel.centeredVisibleFrame).origin)
     }
 
     private func makePopupPanel(appState: CompanionAppState) {
@@ -768,6 +779,7 @@ final class StatusBarService: NSObject {
 private final class StatusPopupPanel: NSPanel {
     var onCancel: (() -> Void)?
     var surfaceController: NSViewController?
+    var centeredVisibleFrame: NSRect?
     var visibleSurfaceHeight = StatusPopupSizing.viewportHeight
     private var pendingVisibleSurfaceHeight: CGFloat?
     private var visibleSurfaceHeightTask: Task<Void, Never>?
@@ -785,7 +797,7 @@ private final class StatusPopupPanel: NSPanel {
             pendingVisibleSurfaceHeight = nil
             guard abs(visibleSurfaceHeight - height) > 0.5 else { return }
             visibleSurfaceHeight = height
-            let fitted = StatusPopupCanvas.fittedFrame(frame, height: height)
+            let fitted = StatusPopupCanvas.fittedFrame(frame, height: height, centeredIn: centeredVisibleFrame)
             if abs(frame.height - fitted.height) > 0.5 {
                 if !isVisible || SystemGlassSettings.shared.reduceMotion {
                     setFrame(fitted, display: true, animate: false)

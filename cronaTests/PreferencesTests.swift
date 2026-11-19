@@ -5,6 +5,16 @@ import XCTest
 
 @MainActor
 final class PreferencesTests: DaemonTestCase {
+    func testShortcutPopupPlacementDefaultsAndPersists() throws {
+        let legacy = try JSONDecoder().decode(CompanionPreferences.self, from: Data("{}".utf8))
+        XCTAssertEqual(legacy.shortcutPopupPlacement, .screenCenter)
+        let preferences = isolatedPreferences()
+        preferences.preferences.shortcutPopupPlacement = .menuBar
+        let decoded = try JSONDecoder().decode(
+            CompanionPreferences.self, from: JSONEncoder().encode(preferences.preferences))
+        XCTAssertEqual(decoded.shortcutPopupPlacement, .menuBar)
+    }
+
     func testPreferencesDefaultFloatingTimerHUDOffAndPersistsOptIn() throws {
         let legacy = try JSONDecoder().decode(CompanionPreferences.self, from: Data("{}".utf8))
         XCTAssertFalse(legacy.showTimerHUD)

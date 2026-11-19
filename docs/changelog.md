@@ -4,6 +4,10 @@ All notable changes to **Crona for macOS** are documented here.
 
 ## Unreleased
 
+### Changed
+
+- Add a Shortcuts setting to open hotkey popups at the screen center or menu bar. Centered popups stay centered as content resizes; menu-bar clicks retain their menu anchor.
+
 ## [1.1.0-beta.6] - 2026-11-19
 
 ### Changed

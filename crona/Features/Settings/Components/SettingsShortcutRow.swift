@@ -11,7 +11,7 @@ struct SettingsShortcutRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
             Text(title)
-                .font(.subheadline.weight(.medium))
+                .font(.body.weight(.medium))
 
             Spacer(minLength: 16)
 
@@ -20,7 +20,7 @@ struct SettingsShortcutRow: View {
                     shortcut: $shortcut,
                     onRecordingStateChange: handleRecordingStateChange
                 )
-                .frame(width: 150, height: 28)
+                .frame(width: 150, height: 32)
                 .overlay(alignment: .top) {
                     if let recordingState {
                         ShortcutRecordingOverlay(state: recordingState)
@@ -103,7 +103,7 @@ private final class ShortcutRecorderButton: NSButton {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         bezelStyle = .rounded
-        font = .systemFont(ofSize: NSFont.smallSystemFontSize, weight: .medium)
+        font = .systemFont(ofSize: NSFont.systemFontSize, weight: .medium)
         focusRingType = .default
         updateTitle()
     }

@@ -95,7 +95,7 @@ struct SettingsRootView: View {
     var settingsPageContent: some View {
         switch sidebarSelection {
         case .shortcuts:
-            GlobalShortcutsView(model: appState.globalShortcuts)
+            GlobalShortcutsView(model: appState.globalShortcuts, preferences: appState.preferences)
         case .general:
             SettingsPane(
                 title: "General",

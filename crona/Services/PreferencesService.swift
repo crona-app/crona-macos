@@ -254,6 +254,7 @@ struct CompanionPreferences: Codable, Equatable {
     var menuBarIdleTextMode: MenuBarIdleTextMode = .idle
     var menuBarTimeFormat: MenuBarTimeFormat = .clock
     var showMenuBarItem = true
+    var shortcutPopupPlacement: ShortcutPopupPlacement = .screenCenter
     var globalShortcuts: [String: SettingsShortcut] = [:]
     var settingsShortcut: SettingsShortcut? {
         get { globalShortcuts["settings"] }
@@ -315,6 +316,7 @@ extension CompanionPreferences {
         case menuBarIdleTextMode
         case menuBarTimeFormat
         case showMenuBarItem
+        case shortcutPopupPlacement
         case globalShortcuts
         case settingsShortcut
         case showTimerHUD
@@ -363,6 +365,7 @@ extension CompanionPreferences {
             try values.decodeIfPresent(MenuBarTimeFormat.self, forKey: .menuBarTimeFormat)
             ?? .clock
         showMenuBarItem = try values.decodeIfPresent(Bool.self, forKey: .showMenuBarItem) ?? true
+        shortcutPopupPlacement = try values.decodeIfPresent(ShortcutPopupPlacement.self, forKey: .shortcutPopupPlacement) ?? .screenCenter
         if values.contains(.globalShortcuts) {
             globalShortcuts = try values.decode([String: SettingsShortcut].self, forKey: .globalShortcuts)
         } else if let legacy = try values.decodeIfPresent(SettingsShortcut.self, forKey: .settingsShortcut) {
@@ -443,6 +446,7 @@ extension CompanionPreferences {
         try values.encode(menuBarIdleTextMode, forKey: .menuBarIdleTextMode)
         try values.encode(menuBarTimeFormat, forKey: .menuBarTimeFormat)
         try values.encode(showMenuBarItem, forKey: .showMenuBarItem)
+        try values.encode(shortcutPopupPlacement, forKey: .shortcutPopupPlacement)
         try values.encode(globalShortcuts, forKey: .globalShortcuts)
         try values.encode(showTimerHUD, forKey: .showTimerHUD)
         try values.encode(showTimerHUDProgress, forKey: .showTimerHUDProgress)

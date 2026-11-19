@@ -11,6 +11,16 @@ final class StatusPopupCanvasTests: XCTestCase {
         XCTAssertEqual(height, 470)
     }
 
+    func testShortcutPopupStaysCenteredAsContentHeightChanges() {
+        let screen = NSRect(x: -1600, y: 100, width: 1600, height: 1000)
+        var frame = NSRect(x: 0, y: 0, width: 420, height: 700)
+        for height: CGFloat in [250, 600, 180, 480] {
+            frame = StatusPopupCanvas.fittedFrame(frame, height: height, centeredIn: screen)
+            XCTAssertEqual(frame.midX, screen.midX)
+            XCTAssertEqual(frame.midY, screen.midY)
+        }
+    }
+
     func testResizeSequencePreservesMenuAnchorAndWidth() {
         var frame = NSRect(x: 1400, y: 200, width: 420, height: 700)
         let top = frame.maxY
