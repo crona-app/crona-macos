@@ -86,10 +86,15 @@ struct PopoverGlassBackground: View {
 }
 
 struct PopoverDialogBackground: View {
+    @Environment(\.dialogSurfaceProvided) private var surfaceProvided
     let cornerRadius: CGFloat
     @ObservedObject private var systemGlass = SystemGlassSettings.shared
 
     var body: some View {
+        Group { if !surfaceProvided { surface } }
+    }
+
+    @ViewBuilder private var surface: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
         ZStack {

@@ -136,7 +136,6 @@ struct IssueDetailView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             IssueDetailActionBar(appState: appState, issue: issue)
         }
-        .frame(maxHeight: 480)
     }
 }
 
@@ -250,7 +249,6 @@ struct HabitDetailView: View {
                 parsedDuration: parsedDuration, beginLogging: beginDuration, submitDuration: submitDuration
             )
         }
-        .frame(maxHeight: 480)
     }
 
     private func beginDuration() {
@@ -421,8 +419,8 @@ private struct DetailBodyText: View {
     }
 }
 
-private func detailScroll<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-    ScrollView(.vertical) {
+private func detailScroll<Content: View>(@ViewBuilder content: @escaping () -> Content) -> some View {
+    ContentSizedScrollView(maximumHeight: 480) {
         VStack(alignment: .leading, spacing: 10) {
             content()
         }

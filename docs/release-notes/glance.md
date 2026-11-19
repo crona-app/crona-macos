@@ -15,3 +15,5 @@ Glance shares the menu popup’s date pill, issue rows, and habit rows, includin
 Glance remains open after creating or editing work, importing capture, starting focus, and ending sessions. Editors, confirmations, tags, dates, and manual-session forms appear centered over Glance using the existing feature drafts. Close or cancel the form to return to the overview. Escape closes the active form first; only an explicit Close, toggle shortcut, or Escape on the overview closes Glance. Background clicks do nothing.
 
 Break screens and timer prompts appear above Glance without dismissing it. Relevant global shortcuts use Glance while it is visible, and the menu popup stays hidden to avoid duplicate copies of a draft.
+
+Dialogs fit their content up to a scrolling height cap. The menu popup window also follows its visible content height with a stable top anchor and a separate fixed measurement canvas, avoiding resize feedback.

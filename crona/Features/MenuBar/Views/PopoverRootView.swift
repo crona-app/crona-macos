@@ -30,11 +30,11 @@ enum PopoverModalKind: Equatable {
 
 //
 
-private struct PopupSurfaceHeightKey: PreferenceKey {
-    static let defaultValue = StatusPopupSizing.viewportHeight
+struct PopupSurfaceHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+        value = max(value, nextValue())
     }
 }
 
@@ -109,7 +109,7 @@ struct PopoverRootView: View {
         )
         .clipped()
         .onPreferenceChange(PopupSurfaceHeightKey.self) { height in
-            onVisibleSurfaceHeightChange?(height)
+            if height > 0 { onVisibleSurfaceHeightChange?(height) }
         }
         .onAppear {
             appState.registerSettingsSceneAction {
@@ -132,9 +132,7 @@ struct PopoverRootView: View {
                 )
             }
         }
-        .background(PopoverGlassBackground())
         .clipped()
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 
     private var dashboardSurface: some View {
@@ -226,16 +224,10 @@ struct PopoverRootView: View {
         .frame(width: StatusPopupSizing.width, alignment: .top)
         .padding(.vertical, hasDashboardModal ? 14 : 0)
         .background {
-            if issueCreator.isPresented || issueCapture.isPresented || tagEditor.isPresented || habitEditor.isPresented {
-                PopoverGlassBackground()
-            }
-        }
-        .background {
             GeometryReader { proxy in
                 Color.clear.preference(key: PopupSurfaceHeightKey.self, value: proxy.size.height)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 
     private var hasDashboardModal: Bool {

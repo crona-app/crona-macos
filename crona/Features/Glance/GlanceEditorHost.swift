@@ -30,7 +30,7 @@ struct GlanceEditorHost: View {
                         PopoverDetailView(appState: state, route: route, habits: state.glance.habits,
                             issues: state.glance.issues, day: state.glance.day).padding(20)
                     } else {
-                    ScrollView {
+                    ContentSizedScrollView(maximumHeight: min(760, geometry.size.height - 40)) {
                         Group {
                             if end.isSheetPresented {
                                 EndSessionSheetView(appState: state, endSession: end)
@@ -53,7 +53,8 @@ struct GlanceEditorHost: View {
                     }
                     }
                     }
-                    .frame(width: min(480, geometry.size.width - 16), height: min(760, geometry.size.height - 40))
+                    .environment(\.dialogSurfaceProvided, true)
+                    .frame(width: min(480, geometry.size.width - 16))
                     .background(SheetGlassBackground())
                 }
             }

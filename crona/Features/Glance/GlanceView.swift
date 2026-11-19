@@ -60,6 +60,7 @@ struct GlanceView: View {
                 IssueCaptureView(appState: appState, issueCapture: model.capture, width: 460,
                     onImport: { await model.importCapture() }, onClose: { model.showsCapture = false })
             }
-        }.background(SheetGlassBackground())
+        }.environment(\.dialogSurfaceProvided, true)
+        .background(SheetGlassBackground())
     }
 }

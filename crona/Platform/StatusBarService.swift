@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import OSLog
+import QuartzCore
 import SwiftUI
 
 @MainActor
@@ -500,10 +501,9 @@ final class StatusBarService: NSObject {
         }
         let viewportSize = NSSize(
             width: StatusPopupSizing.width,
-            height: StatusPopupSizing.viewportHeight
+            height: panel.visibleSurfaceHeight
         )
-        // NSPanel may normalize its frame while its hosting controller is
-        // attached. Reassert the fixed viewport immediately before ordering.
+        // Restore the fitted native surface; the hosted measurement canvas remains fixed.
         panel.setContentSize(viewportSize)
         panel.setFrame(
             NSRect(origin: panel.frame.origin, size: viewportSize),
@@ -530,8 +530,8 @@ final class StatusBarService: NSObject {
                 restingOrigin = ShortcutPopupPositioner.centeredOrigin(size: viewportSize, visibleFrame: screen.visibleFrame)
             }
         }
-        var openingOrigin = restingOrigin
-        openingOrigin.y += 8
+        let openingOrigin = restingOrigin
+        // Height changes keep the same top anchor; do not slide the native window.
         panel.setFrameOrigin(openingOrigin)
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
@@ -545,11 +545,8 @@ final class StatusBarService: NSObject {
             self.startDismissalMonitoring()
         }
 
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.18
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrameOrigin(restingOrigin)
-        }
+        panel.setFrameOrigin(StatusPopupCanvas.fittedFrame(
+            NSRect(origin: restingOrigin, size: viewportSize), height: panel.visibleSurfaceHeight).origin)
     }
 
     private func makePopupPanel(appState: CompanionAppState) {
@@ -581,7 +578,7 @@ final class StatusBarService: NSObject {
             width: StatusPopupSizing.width,
             height: StatusPopupSizing.viewportHeight
         )
-        panel.contentMinSize = viewportSize
+        panel.contentMinSize = NSSize(width: viewportSize.width, height: StatusPopupSizing.minimumHeight)
         panel.contentMaxSize = viewportSize
         panel.setContentSize(viewportSize)
         panel.setFrame(
@@ -603,13 +600,18 @@ final class StatusBarService: NSObject {
                     }
                 }
             )
+            .environment(\.dialogSurfaceProvided, true)
+            .frame(minHeight: 0, maxHeight: .infinity, alignment: .top)
+            .background(PopoverGlassBackground(showsShadow: false))
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         )
         controller.sizingOptions = []
-        panel.contentViewController = controller
+        panel.surfaceController = controller
+        panel.contentView = StatusPopupCanvas(hostingView: controller.view, size: viewportSize)
         // AppKit can leave the hosting view at zero bounds until the window is
         // first ordered. Give it the fixed viewport explicitly.
         controller.view.frame = NSRect(origin: .zero, size: viewportSize)
-        controller.view.autoresizingMask = [.width, .height]
+        controller.view.autoresizingMask = []
         panel.onCancel = { [weak self] in
             self?.dismissPopup()
         }
@@ -765,27 +767,39 @@ final class StatusBarService: NSObject {
 
 private final class StatusPopupPanel: NSPanel {
     var onCancel: (() -> Void)?
+    var surfaceController: NSViewController?
     var visibleSurfaceHeight = StatusPopupSizing.viewportHeight
     private var pendingVisibleSurfaceHeight: CGFloat?
-    private var visibleSurfaceHeightUpdateScheduled = false
+    private var visibleSurfaceHeightTask: Task<Void, Never>?
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
     func updateVisibleSurfaceHeight(_ height: CGFloat) {
         pendingVisibleSurfaceHeight = height
-        guard !visibleSurfaceHeightUpdateScheduled else { return }
-        visibleSurfaceHeightUpdateScheduled = true
-
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            defer {
-                self.visibleSurfaceHeightUpdateScheduled = false
+        visibleSurfaceHeightTask?.cancel()
+        visibleSurfaceHeightTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(80))
+            guard !Task.isCancelled, let self,
+                  let height = pendingVisibleSurfaceHeight else { return }
+            pendingVisibleSurfaceHeight = nil
+            guard abs(visibleSurfaceHeight - height) > 0.5 else { return }
+            visibleSurfaceHeight = height
+            let fitted = StatusPopupCanvas.fittedFrame(frame, height: height)
+            if abs(frame.height - fitted.height) > 0.5 {
+                if !isVisible || SystemGlassSettings.shared.reduceMotion {
+                    setFrame(fitted, display: true, animate: false)
+                    invalidateShadow()
+                } else {
+                    NSAnimationContext.runAnimationGroup { context in
+                        context.duration = 0.2
+                        context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                        animator().setFrame(fitted, display: true)
+                    } completionHandler: { [weak self] in
+                        self?.invalidateShadow()
+                    }
+                }
             }
-            guard let height = self.pendingVisibleSurfaceHeight else { return }
-            self.pendingVisibleSurfaceHeight = nil
-            guard abs(self.visibleSurfaceHeight - height) > 0.5 else { return }
-            self.visibleSurfaceHeight = height
         }
     }
 
