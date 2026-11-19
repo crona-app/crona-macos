@@ -1,0 +1,77 @@
+name: Recover macOS appcast deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_run_id:
+        description: Release workflow run containing the signed github-pages artifact
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: macos-release
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - name: Validate source release run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ inputs.release_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]]
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN}" \
+            --jq 'select(.event == "push" and .path == ".github/workflows/release.yml") | .id' \
+            | grep -qx "$SOURCE_RUN"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: payload
+          run-id: ${{ inputs.release_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Restore signed feed
+        run: |
+          set -euo pipefail
+          mkdir feed
+          tar -xf payload/artifact.tar -C feed
+          test -s feed/appcast.xml
+          grep -q 'sparkle:edSignature=' feed/appcast.xml
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: feed
+
+      - name: Wait for Pages artifact visibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..20}; do
+            if gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts" \
+              --jq '.artifacts[].name' | grep -qx github-pages; then
+              sleep 5
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Pages artifact did not become visible" >&2
+          exit 1
+
+      - name: Deploy appcast
+        id: pages
+        uses: actions/deploy-pages@v4

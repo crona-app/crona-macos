@@ -131,3 +131,7 @@ spctl --assess --type open --context context:primary-signature --verbose=2 \
 ## Distribution Notes
 
 Homebrew distribution remains limited to the Crona terminal utility. The native macOS app is distributed through the DMG and updated through Sparkle.
+
+## Recovering appcast deployment
+
+If a release publishes successfully but Pages deployment fails, run the **Recover macOS appcast deployment** workflow with the original release workflow run ID. It restores the already-signed feed artifact and deploys it without rebuilding or replacing the release assets. Both workflows wait for the uploaded Pages artifact to become visible before deployment.
