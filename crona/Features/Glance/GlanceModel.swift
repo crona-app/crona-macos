@@ -86,8 +86,24 @@ final class GlanceModel: ObservableObject {
         return appState.windowService.breakScreensVisible || appState.windowService.hardLimitPopupVisible
     }
 
+    var isSelectedDayAway: Bool {
+        guard let state = appState else { return false }
+        return day.isToday ? state.todayIsAway : day.isRecordedAway(in: state.coreSettingsService.settings)
+    }
+
+    var canChangeAwayMode: Bool {
+        day.isToday && !isStarting && appState?.hasActiveFocusSession == false
+            && connection.connectionState == .connected
+    }
+
+    func setAwayMode(_ enabled: Bool) async {
+        guard canChangeAwayMode, let state = appState else { return }
+        if enabled ? state.todayIsAway : !state.coreSettingsService.settings.awayModeEnabled { return }
+        await state.coreSettingsService.setAwayMode(enabled)
+    }
+
     func toggleCapture() {
-        guard day.isToday, appState?.hasActiveFocusSession != true else { return }
+        guard day.isToday, !isSelectedDayAway, appState?.hasActiveFocusSession != true else { return }
         showsSetup = false
         showsCapture.toggle()
     }
@@ -141,7 +157,7 @@ final class GlanceModel: ObservableObject {
     }
 
     func prepare(_ issue: DailyFocusIssue? = nil) {
-        guard day.isToday, !isStarting, appState?.hasActiveFocusSession != true else { return }
+        guard day.isToday, !isSelectedDayAway, !isStarting, appState?.hasActiveFocusSession != true else { return }
         if selectedIssue?.id != issue?.id {
             setup = FocusSetupModel(initialState: .defaultState(estimateMinutes: issue?.estimateMinutes, workedSeconds: issue?.workedSeconds ?? 0))
         }
@@ -180,6 +196,7 @@ final class GlanceModel: ObservableObject {
 
     func importCapture() async {
         guard day.isToday else { error = "Return to Today to capture issues."; return }
+        guard !isSelectedDayAway else { error = "Turn off Away Mode before capturing issues."; return }
         guard !conflict else { error = "Finish the open Crona flow before capturing issues."; return }
         let openedGeneration = generation
         if await capture.importAll(), openedGeneration == generation { showsCapture = false }
