@@ -82,6 +82,9 @@ enum MenuBarIconState: Equatable {
         switch self {
         case .focus:
             let seconds = TimerPresentation.projectedDisplaySeconds(for: snapshot, at: now)
+            if snapshot.breakDeferral != nil {
+                return "Crona - Break deferred, \(MenuBarTextFormatter.formatClock(seconds: seconds)) remaining"
+            }
             let qualifier = snapshot.hardLimitActive ? "remaining" : "elapsed"
             return "Crona - Focus session, \(MenuBarTextFormatter.formatAdaptive(seconds: seconds)) \(qualifier)"
         case .paused:

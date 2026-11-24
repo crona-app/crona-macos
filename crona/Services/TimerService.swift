@@ -25,6 +25,7 @@ struct TimerSnapshot: Equatable {
     var hardLimitCyclesBeforeLongBreak = 0
     var snapshotAppliedAt = Date()
     var isConnected = false
+    var breakDeferral: TimerBreakDeferral?
 
     static func from(_ state: CronaTimerState) -> TimerSnapshot {
         TimerSnapshot(
@@ -104,6 +105,7 @@ struct TimerUpcomingSegment: Equatable {
 struct TimerPresentation: Equatable {
     let mode: FocusTimerMode
     let countsDown: Bool
+    let isBreakDeferred: Bool
     let displaySeconds: Int
     let progressFraction: Double?
     let phaseTitle: String
@@ -129,24 +131,29 @@ struct TimerPresentation: Equatable {
         let countsDown = snapshot.hardLimitActive
         let segment = activeSegment(for: snapshot)
         let displaySeconds = projectedDisplaySeconds(for: snapshot, at: now)
-        let displayDuration: Int
-        if mode == .timer {
-            displayDuration = snapshot.hardLimitTotalSeconds
+        let displayDuration: Double
+        if let duration = snapshot.breakDeferral?.duration(for: snapshot) {
+            displayDuration = duration
+        } else if mode == .timer {
+            displayDuration = Double(snapshot.hardLimitTotalSeconds)
         } else if let segment {
-            displayDuration = segmentDuration(for: segment, snapshot: snapshot)
+            displayDuration = Double(segmentDuration(for: segment, snapshot: snapshot))
         } else {
             displayDuration = 0
         }
         let progressFraction: Double?
         if countsDown, displayDuration > 0 {
-            progressFraction = max(0, min(1, Double(displaySeconds) / Double(displayDuration)))
+            progressFraction = max(0, min(1, Double(displaySeconds) / displayDuration))
         } else {
             progressFraction = nil
         }
 
         let phaseTitle: String
         let phaseSymbolName: String
-        if snapshot.hardLimitActive {
+        if snapshot.breakDeferral != nil {
+            phaseTitle = TimerBreakDeferral.title
+            phaseSymbolName = TimerBreakDeferral.symbolName
+        } else if snapshot.hardLimitActive {
             if snapshot.hardLimitExpired {
                 phaseTitle = "Session complete"
                 phaseSymbolName = "checkmark.circle"
@@ -187,6 +194,7 @@ struct TimerPresentation: Equatable {
         return TimerPresentation(
             mode: mode,
             countsDown: countsDown,
+            isBreakDeferred: snapshot.breakDeferral != nil,
             displaySeconds: displaySeconds,
             progressFraction: progressFraction,
             phaseTitle: phaseTitle,
@@ -196,16 +204,18 @@ struct TimerPresentation: Equatable {
             canEnd: snapshot.sessionID != nil,
             canAdvance: canAdvance,
             advanceTitle: advanceTitle,
-            currentFocusSeconds: currentFocusSeconds(
-                for: snapshot,
-                displaySeconds: displaySeconds
-            ),
+            currentFocusSeconds: currentFocusSeconds(for: snapshot, at: now),
             upcomingSegment: upcomingSegment(for: snapshot, mode: mode)
         )
     }
 
     static func elapsedProgressFraction(for snapshot: TimerSnapshot, at now: Date) -> Double? {
         guard snapshot.hardLimitActive else { return nil }
+        if let deferral = snapshot.breakDeferral,
+           let duration = deferral.duration(for: snapshot), duration > 0,
+           let remaining = deferral.remaining(for: snapshot, at: now) {
+            return max(0, min(1, 1 - remaining / duration))
+        }
         let duration: Int
         if snapshot.hardLimitKind == .countdown {
             duration = snapshot.hardLimitTotalSeconds
@@ -256,6 +266,17 @@ struct TimerPresentation: Equatable {
     }
 
     static func hardLimitDisplaySeconds(
+        for snapshot: TimerSnapshot,
+        at now: Date
+    ) -> Int {
+        if !snapshot.hardLimitExpired,
+           let remaining = snapshot.breakDeferral?.remainingSeconds(for: snapshot, at: now) {
+            return remaining
+        }
+        return scheduledHardLimitDisplaySeconds(for: snapshot, at: now)
+    }
+
+    private static func scheduledHardLimitDisplaySeconds(
         for snapshot: TimerSnapshot,
         at now: Date
     ) -> Int {
@@ -321,7 +342,7 @@ struct TimerPresentation: Equatable {
 
     private static func currentFocusSeconds(
         for snapshot: TimerSnapshot,
-        displaySeconds: Int
+        at now: Date
     ) -> Int {
         if !snapshot.hardLimitActive {
             return max(0, snapshot.elapsedSeconds)
@@ -331,7 +352,7 @@ struct TimerPresentation: Equatable {
             return max(0, snapshot.hardLimitWorkSeconds)
         }
 
-        let worked = snapshot.hardLimitWorkSeconds - displaySeconds
+        let worked = snapshot.hardLimitWorkSeconds - scheduledHardLimitDisplaySeconds(for: snapshot, at: now)
         return max(0, min(snapshot.hardLimitWorkSeconds, worked))
     }
 }
@@ -343,6 +364,7 @@ final class TimerService: ObservableObject {
     private var connectObserver: NSObjectProtocol?
     private var refreshTask: Task<Void, Never>?
     private var refreshPending = false
+    private var breakDeferral = TimerBreakDeferralTracker()
     private let logger = Logger(subsystem: "com.crona.macos", category: "timer")
 
     @Published var snapshot = TimerSnapshot()
@@ -432,18 +454,23 @@ final class TimerService: ObservableObject {
     }
 
     private func handle(event: CronaProtocolEvent) {
-        switch event.type {
-        case _ where Self.shouldRefresh(for: event.type):
-            logger.debug("Timer refresh triggered by event: \(event.type, privacy: .public)")
-            requestRefresh()
-        default:
-            break
+        guard Self.shouldRefresh(for: event.type) else { return }
+        if event.type == "timer.break_deferred" {
+            if let confirmed = breakDeferral.confirm(sessionID: event.sessionID, snapshot: snapshot, at: Date()) {
+                snapshot.breakDeferral = confirmed
+            }
+        } else if event.type == "timer.extended" {
+            breakDeferral.clearRecentIncrease()
         }
+        logger.debug("Timer refresh triggered by event: \(event.type, privacy: .public)")
+        requestRefresh()
     }
 
     private func apply(_ state: CronaTimerState) {
         logger.debug("Applying timer state: state=\(state.state, privacy: .public) sessionId=\(state.sessionID ?? "nil", privacy: .private(mask: .hash)) issueId=\(String(state.issueID ?? -1), privacy: .private(mask: .hash)) elapsed=\(state.elapsedSeconds ?? 0, privacy: .public)")
-        snapshot = .from(state)
+        var next = TimerSnapshot.from(state)
+        next.breakDeferral = breakDeferral.reconcile(next: next)
+        snapshot = next
     }
 
     private func requestRefresh() {

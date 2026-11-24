@@ -440,6 +440,9 @@ enum TimerEndProjection {
         guard !snapshot.hardLimitExpired, snapshot.state != "idle", snapshot.state != "disconnected" else {
             return nil
         }
+        if let deadline = snapshot.breakDeferral?.deadline(for: snapshot) {
+            return deadline
+        }
         let remaining = TimerPresentation.projectedDisplaySeconds(
             for: snapshot,
             at: now

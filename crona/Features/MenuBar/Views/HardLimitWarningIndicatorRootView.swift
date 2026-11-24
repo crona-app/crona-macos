@@ -10,10 +10,10 @@ struct HardLimitWarningIndicatorRootView: View {
             let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
 
             TimelineView(.periodic(from: .now, by: 1)) { timeline in
-                let remaining = max(0, TimerPresentation.projectedDisplaySeconds(
-                    for: appState.timerService.snapshot,
-                    at: timeline.date
-                ))
+                let snapshot = appState.timerService.snapshot
+                let remaining = model.kind == .breakDeferred
+                    ? snapshot.breakDeferral?.remainingSeconds(for: snapshot, at: timeline.date)
+                    : TimerPresentation.projectedDisplaySeconds(for: snapshot, at: timeline.date)
                 ZStack {
                     PopoverGlassBackground(cornerRadius: 20)
 
@@ -34,11 +34,12 @@ struct HardLimitWarningIndicatorRootView: View {
                             .truncationMode(.tail)
                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Spacer(minLength: 4)
-
-                        if model.kind != .breakDeferred {
-                            Text(String(format: "%02d", remaining))
-                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                        if let remaining {
+                            let time = model.kind == .breakDeferred
+                                ? MenuBarTextFormatter.formatClock(seconds: remaining)
+                                : String(format: "%02d", remaining)
+                            Text(time)
+                                .font(.system(size: model.kind == .breakDeferred ? 16 : 18, weight: .bold, design: .rounded))
                                 .monospacedDigit()
                                 .contentTransition(.numericText(countsDown: true))
                                 .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: remaining)

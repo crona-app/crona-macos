@@ -84,9 +84,9 @@ struct TimerHUDRootView: View {
                 Image(systemName: presentation.phaseSymbolName)
                     .font(.system(size: size == .compact ? 12 : 14, weight: .semibold))
                     .foregroundStyle(
-                        presentation.mode == .stopwatch
-                            ? PopupVisualTheme.semantic(.focus)
-                            : PopupVisualTheme.semantic(.breakTime)
+                        presentation.isBreakDeferred
+                            ? Color(nsColor: .systemTeal)
+                            : PopupVisualTheme.semantic(presentation.mode == .stopwatch ? .focus : .breakTime)
                     )
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -95,8 +95,8 @@ struct TimerHUDRootView: View {
                         .monospacedDigit()
                         .contentTransition(.numericText(countsDown: presentation.mode != .stopwatch))
                         .animation(reduceMotion ? nil : .snappy(duration: 0.22), value: presentation.displaySeconds)
-                    if size != .compact {
-                        Text(appState.activeFocusTitle ?? presentation.phaseTitle)
+                    if size != .compact || presentation.isBreakDeferred {
+                        Text(presentation.isBreakDeferred ? presentation.phaseTitle : (appState.activeFocusTitle ?? presentation.phaseTitle))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)

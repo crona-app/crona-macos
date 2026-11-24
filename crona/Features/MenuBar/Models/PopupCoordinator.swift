@@ -31,7 +31,6 @@ final class PopupCoordinator: ObservableObject {
     private let contextService: ContextService
     private let preferences: PreferencesService
     private let windowService: WindowService
-    private let breakDeferralNotice: BreakDeferralNoticeModel
     private let endSession: EndSessionModel
     private let hardLimitCountdownService: HardLimitCountdownService
     private let inactivityPopupCountdownService: HardLimitCountdownService
@@ -46,7 +45,6 @@ final class PopupCoordinator: ObservableObject {
         preferences: PreferencesService,
         windowService: WindowService,
         endSession: EndSessionModel,
-        breakDeferralNotice: BreakDeferralNoticeModel,
         hardLimitCountdownService: HardLimitCountdownService,
         inactivityPopupCountdownService: HardLimitCountdownService
     ) {
@@ -56,7 +54,6 @@ final class PopupCoordinator: ObservableObject {
         self.preferences = preferences
         self.windowService = windowService
         self.endSession = endSession
-        self.breakDeferralNotice = breakDeferralNotice
         self.hardLimitCountdownService = hardLimitCountdownService
         self.inactivityPopupCountdownService = inactivityPopupCountdownService
     }
@@ -446,9 +443,15 @@ final class PopupCoordinator: ObservableObject {
             return
         }
 
-        let deferred = breakDeferralNotice.suppressesWarning(for: snapshot)
-        let candidate = deferred ? breakDeferralNotice.indicator(for: snapshot)
-            : buildHardLimitWarningIndicatorModel(snapshot: snapshot)
+        let candidate: HardLimitWarningIndicatorModel?
+        if let deferral = snapshot.breakDeferral {
+            candidate = deferral.showsConfirmation(at: Date()) ? HardLimitWarningIndicatorModel(
+                id: "\(snapshot.sessionID ?? ""):breakDeferred",
+                kind: .breakDeferred, title: TimerBreakDeferral.title, remainingText: ""
+            ) : nil
+        } else {
+            candidate = buildHardLimitWarningIndicatorModel(snapshot: snapshot)
+        }
         guard let model = candidate else {
             finalizeHardLimitWarningIndicator()
             return
@@ -759,8 +762,10 @@ enum HardLimitWarningKind: String, Equatable {
         switch self {
         case .expiry:
             return "hourglass.circle.fill"
-        case .breakStart, .breakDeferred:
+        case .breakStart:
             return "cup.and.saucer.fill"
+        case .breakDeferred:
+            return TimerBreakDeferral.symbolName
         case .resume:
             return "bolt.fill"
         }

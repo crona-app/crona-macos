@@ -127,7 +127,6 @@ final class CompanionAppState: ObservableObject {
             popups.finalizePopups(forSessionID: nil)
         }
     )
-    private(set) lazy var breakDeferralNotice = BreakDeferralNoticeModel()
     private(set) lazy var popups: PopupCoordinator = {
         let popups = PopupCoordinator(
             daemonConnection: daemonConnection,
@@ -136,7 +135,6 @@ final class CompanionAppState: ObservableObject {
             preferences: preferences,
             windowService: windowService,
             endSession: endSession,
-            breakDeferralNotice: breakDeferralNotice,
             hardLimitCountdownService: hardLimitCountdownService,
             inactivityPopupCountdownService: inactivityPopupCountdownService
         )
@@ -1007,9 +1005,6 @@ final class CompanionAppState: ObservableObject {
             popups.handleHardLimitReached(sessionID: event.sessionID)
         case "timer.extended":
             popups.handleTimerExtended(sessionID: event.sessionID)
-        case "timer.break_deferred":
-            breakDeferralNotice.record(sessionID: event.sessionID, snapshot: timerService.snapshot)
-            popups.reconcileTimedPresentation()
         default:
             break
         }
