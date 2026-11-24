@@ -106,12 +106,7 @@ struct SettingsRootView: View {
                 GeneralSettingsView(appState: appState)
             }
         case .away:
-            SettingsPane(
-                title: "Away",
-                subtitle: "Manage Away Mode and the days Crona should protect."
-            ) {
-                AwaySettingsView(appState: appState)
-            }
+            AwaySettingsView(appState: appState)
         case .menuBar:
             SettingsPane(
                 title: "Menu Bar", subtitle: "Choose what Crona shows while you work."
