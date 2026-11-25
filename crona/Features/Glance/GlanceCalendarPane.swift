@@ -5,7 +5,6 @@ struct GlanceCalendarPane: View {
     @ObservedObject var stats: PopoverStatsService
     let today: String
     let settings: CronaCoreSettings
-    var compact = false
     @State private var showsMonth = false
     @State private var month: Date = Date()
 
@@ -18,22 +17,43 @@ struct GlanceCalendarPane: View {
         return (0..<cells).compactMap { calendar.date(byAdding: .day, value: $0 - offset, to: start) }
     }
     private var visibleDays: [Date] {
-        guard compact && !showsMonth else { return days }
+        guard !showsMonth else { return days }
         let selected = CronaCalendarDate.date(from: day.selectedDate) ?? month
         let start = calendar.dateInterval(of: .weekOfYear, for: selected)?.start ?? selected
         return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
     }
     private var dateKey: String { CronaCalendarDate.string(from: month) }
+    private var visibleDateKeys: [String] {
+        visibleDays.map { CronaCalendarDate.string(from: $0) }.filter { $0 <= today }
+    }
+
+    private var canMoveForward: Bool {
+        if showsMonth { return dateKey.prefix(7) < today.prefix(7) }
+        guard let last = visibleDays.last else { return false }
+        return CronaCalendarDate.string(from: last) < today
+    }
 
     var body: some View {
         VStack(spacing: 10) {
             HStack {
                 Button { shift(-1) } label: { Image(systemName: "chevron.left") }
                 Spacer()
-                Button(month.formatted(.dateTime.month(.wide).year())) { showsMonth.toggle() }.font(.subheadline.bold()).buttonStyle(.plain)
+                Button {
+                    showsMonth.toggle()
+                    month = CronaCalendarDate.date(from: day.selectedDate) ?? month
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(month.formatted(.dateTime.month(.wide).year()))
+                        Image(systemName: showsMonth ? "chevron.up" : "chevron.down")
+                            .font(.caption2)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.plain)
+                .help(showsMonth ? "Show week" : "Show month")
                 Spacer()
                 Button { shift(1) } label: { Image(systemName: "chevron.right") }
-                    .disabled(dateKey.prefix(7) >= today.prefix(7))
+                    .disabled(!canMoveForward)
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 6) {
                 ForEach(0..<7) { index in
@@ -62,7 +82,7 @@ struct GlanceCalendarPane: View {
                         }.frame(maxWidth: .infinity).padding(.vertical, 5)
                             .background(selected ? PopupVisualTheme.selectedControlBackground : .clear, in: RoundedRectangle(cornerRadius: 8))
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(key == today ? PopupVisualTheme.semantic(.focus) : .clear))
-                            .opacity(calendar.isDate(date, equalTo: month, toGranularity: .month) ? 1 : 0.35)
+                            .opacity(!showsMonth || calendar.isDate(date, equalTo: month, toGranularity: .month) ? 1 : 0.35)
                     }.buttonStyle(.plain).disabled(key > today)
                         .accessibilityLabel("\(key), score \(score.map(String.init) ?? "unavailable")")
                 }
@@ -70,9 +90,16 @@ struct GlanceCalendarPane: View {
         }
         .onAppear { month = CronaCalendarDate.date(from: day.selectedDate) ?? Date() }
         .onChange(of: day.selectedDate) { _, value in month = CronaCalendarDate.date(from: value) ?? month }
-        .task(id: dateKey + today) {
-            await stats.prefetchCalendarDates(days.map { CronaCalendarDate.string(from: $0) }.filter { $0 <= today })
+        .task(id: visibleDateKeys) {
+            await stats.prefetchCalendarDates(visibleDateKeys)
         }
     }
-    private func shift(_ count: Int) { month = calendar.date(byAdding: .month, value: count, to: month) ?? month }
+
+    private func shift(_ count: Int) {
+        if showsMonth {
+            month = calendar.date(byAdding: .month, value: count, to: month) ?? month
+        } else if let date = CronaCalendarDate.adding(days: count * 7, to: day.selectedDate) {
+            day.select(date)
+        }
+    }
 }

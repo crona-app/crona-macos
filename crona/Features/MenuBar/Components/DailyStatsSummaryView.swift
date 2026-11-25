@@ -6,6 +6,7 @@ struct DailyStatsSummaryView: View {
     let metrics: CronaDailyMetricsDay
     let message: String
     let highRiskCount: Int?
+    var embedded = false
 
     private var stats: DailyStatsPresentation { DailyStatsPresentation(score: score, metrics: metrics) }
     private var scoreTint: Color {
@@ -76,8 +77,10 @@ struct DailyStatsSummaryView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(14)
-        .background(subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 20))
+        .padding(embedded ? 0 : 14)
+        .background {
+            if !embedded { subtleCardBackground(stroke: PopupVisualTheme.border, cornerRadius: 20) }
+        }
     }
 
     private func gauge(

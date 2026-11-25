@@ -129,4 +129,28 @@ final class GlanceTests: DaemonTestCase {
         XCTAssertNotEqual(state.day.selectedDate, "2000-01-01")
     }
 
+    func testEscapeClosesSelectionBeforeDismissingGlance() async throws {
+        let (connection, _) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let state = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+        state.glance.previewIssue = issue
+        XCTAssertTrue(state.glance.hasSelection)
+
+        state.glance.handleEscape()
+
+        XCTAssertFalse(state.glance.hasSelection)
+    }
+
+    func testEscapeClosesOverviewPopoverBeforeTheSelectionInspector() async throws {
+        let (connection, _) = try await issueCreatorConnection()
+        defer { connection.stop() }
+        let state = CompanionAppState(daemonConnection: connection, preferences: isolatedPreferences())
+        state.glance.previewIssue = issue
+        state.glance.showsWellbeingCheckIn = true
+
+        state.glance.handleEscape()
+
+        XCTAssertFalse(state.glance.showsWellbeingCheckIn)
+        XCTAssertTrue(state.glance.hasSelection)
+    }
 }

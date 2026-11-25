@@ -1,67 +1,62 @@
 import SwiftUI
 
 enum GlanceWidget: String, Codable, CaseIterable, Identifiable {
-    case issues, habits, calendar, selection, summary
+    case issues, habits, calendar, selection, summary, wellbeing
     var id: String { rawValue }
+    var isWorkList: Bool { self == .issues || self == .habits }
     var title: String { rawValue == "summary" ? "Day Summary" : rawValue.capitalized }
 }
 
+nonisolated enum GlanceLayout: String, Codable, CaseIterable, Identifiable {
+    case adaptive, singleColumn
+
+    var id: Self { self }
+    var title: String { self == .adaptive ? "Adaptive Grid" : "Single Column" }
+}
+
 struct GlancePreferences: Codable, Equatable {
-    var hidden: Set<GlanceWidget> = []
+    var hidden: Set<GlanceWidget> = [.wellbeing]
+    var layout: GlanceLayout = .adaptive
     var order: [GlanceWidget] = GlanceWidget.allCases
     var startingSection = "planned"
     var unfinishedHabits = false
     var rememberDate = false
     var lastDate: String?
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        hidden = try values.decodeIfPresent(Set<GlanceWidget>.self, forKey: .hidden) ?? []
+        if !values.contains(.layout) { hidden.insert(.wellbeing) }
+        let savedLayout = try values.decodeIfPresent(String.self, forKey: .layout)
+        layout = savedLayout.flatMap(GlanceLayout.init(rawValue:)) ?? .adaptive
+        order = try values.decodeIfPresent([GlanceWidget].self, forKey: .order) ?? GlanceWidget.allCases
+        startingSection = try values.decodeIfPresent(String.self, forKey: .startingSection) ?? startingSection
+        unfinishedHabits = try values.decodeIfPresent(Bool.self, forKey: .unfinishedHabits) ?? false
+        rememberDate = try values.decodeIfPresent(Bool.self, forKey: .rememberDate) ?? false
+        lastDate = try values.decodeIfPresent(String.self, forKey: .lastDate)
+    }
+
     var normalizedOrder: [GlanceWidget] {
         var seen: Set<GlanceWidget> = []
         return (order + GlanceWidget.allCases).filter { seen.insert($0).inserted }
     }
     func visible(_ widget: GlanceWidget) -> Bool { !hidden.contains(widget) }
-}
 
-struct GlanceCustomizationView: View {
-    @ObservedObject var preferences: PreferencesService
-    var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            Text("Choose what you want to see at a glance.").font(.body).foregroundStyle(.secondary)
-            GlanceLayoutPreview(preferences: preferences.preferences.glance)
-            ForEach([true, false], id: \.self) { main in
-                SettingsCard(main ? "Main Column" : "Side Column") {
-                    VStack(spacing: 14) {
-                        ForEach(preferences.preferences.glance.normalizedOrder.filter { main == ([GlanceWidget.issues, .habits].contains($0)) }) { widget in
-                            HStack {
-                                Toggle(widget.title, isOn: Binding(get: { preferences.preferences.glance.visible(widget) }, set: { enabled in
-                                    if enabled { preferences.preferences.glance.hidden.remove(widget) }
-                                    else { preferences.preferences.glance.hidden.insert(widget) }
-                                }))
-                                Spacer()
-                                Button { move(widget, offset: -1, main: main) } label: { Image(systemName: "chevron.up") }.help("Move up")
-                                Button { move(widget, offset: 1, main: main) } label: { Image(systemName: "chevron.down") }.help("Move down")
-                            }
-                        }
-                    }.padding(.vertical, 10)
-                }
-            }
-            SettingsCard("Opening and Lists") {
-                VStack(alignment: .leading, spacing: 18) {
-                    Picker("Starting issue section", selection: $preferences.preferences.glance.startingSection) {
-                        ForEach(["planned", "overdue", "upcoming", "inbox"], id: \.self) { Text($0.capitalized).tag($0) }
-                    }
-                    Toggle("Show only unfinished habits", isOn: $preferences.preferences.glance.unfinishedHabits)
-                    Toggle("Open on the last viewed date", isOn: $preferences.preferences.glance.rememberDate)
-                    Text("Otherwise Glance opens on Today.").foregroundStyle(.secondary)
-                }.padding(.vertical, 10)
-            }
-            Button("Restore defaults") { preferences.preferences.glance = GlancePreferences() }
-        }.font(.body)
-    }
-    private func move(_ widget: GlanceWidget, offset: Int, main: Bool) {
-        var order = preferences.preferences.glance.normalizedOrder
-        let group = order.filter { main == ([GlanceWidget.issues, .habits].contains($0)) }
-        guard let index = group.firstIndex(of: widget), group.indices.contains(index + offset),
-              let source = order.firstIndex(of: widget), let target = order.firstIndex(of: group[index + offset]) else { return }
-        order.swapAt(source, target)
-        preferences.preferences.glance.order = order
+    var visibleWidgets: [GlanceWidget] { normalizedOrder.filter(visible) }
+    var orderedWorkWidgets: [GlanceWidget] { normalizedOrder.filter(\.isWorkList) }
+    var orderedOverviewWidgets: [GlanceWidget] { normalizedOrder.filter { !$0.isWorkList && $0 != .selection } }
+    var workWidgets: [GlanceWidget] { orderedWorkWidgets.filter(visible) }
+    var overviewWidgets: [GlanceWidget] { orderedOverviewWidgets.filter(visible) }
+
+    mutating func move(_ widget: GlanceWidget, by offset: Int) {
+        let group = widget.isWorkList ? orderedWorkWidgets : orderedOverviewWidgets
+        guard let index = group.firstIndex(of: widget), group.indices.contains(index + offset) else { return }
+        var updated = normalizedOrder
+        guard let from = updated.firstIndex(of: widget),
+              let to = updated.firstIndex(of: group[index + offset]) else { return }
+        updated.swapAt(from, to)
+        order = updated
     }
 }

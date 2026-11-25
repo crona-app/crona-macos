@@ -8,6 +8,7 @@ final class GlanceModel: ObservableObject {
     @Published var showsCustomization = false
     @Published var showsSetup = false
     @Published var showsCapture = false
+    @Published var showsWellbeingCheckIn = false
     @Published private(set) var isStarting = false
     @Published private(set) var commandInFlight = false
     @Published private(set) var error: String?
@@ -54,6 +55,7 @@ final class GlanceModel: ObservableObject {
         day.onChange = { [weak self] _ in
             self?.previewIssue = nil
             self?.selectedHabit = nil
+            self?.showsWellbeingCheckIn = false
             self?.appState?.preferences.preferences.glance.lastDate = self?.day.selectedDate
             Task { await self?.refresh() }
         }
@@ -108,9 +110,17 @@ final class GlanceModel: ObservableObject {
         showsCapture.toggle()
     }
 
+    var hasSelection: Bool { previewIssue != nil || selectedHabit != nil }
+
+    func clearSelection() {
+        previewIssue = nil
+        selectedHabit = nil
+    }
+
     /// Escape closes the open card first, then Glance itself.
     func handleEscape() {
         if showsCustomization { showsCustomization = false; return }
+        if showsWellbeingCheckIn { showsWellbeingCheckIn = false; return }
         if let state = appState {
             if state.endSession.isSheetPresented { state.endSession.cancel(); return }
             if state.issueActions.editor != nil { state.issueActions.cancel(); return }
@@ -121,12 +131,17 @@ final class GlanceModel: ObservableObject {
             if state.habitEditor.isPresented { state.habitEditor.cancel(); return }
             if state.popoverDetailsRoute != nil { state.dismissDetails(); return }
         }
-        if showsSetup { showsSetup = false } else if showsCapture { showsCapture = false } else { dismiss() }
+        if showsSetup { showsSetup = false }
+        else if showsCapture { showsCapture = false }
+        else if hasSelection && appState?.preferences.preferences.glance.visible(.selection) == true
+                    && appState?.hasActiveFocusSession == false && !isSelectedDayAway { clearSelection() }
+        else { dismiss() }
     }
 
     func dismiss(restoreFocus: Bool = true) {
         appState?.preferences.preferences.glance.lastDate = day.selectedDate
         showsCustomization = false
+        showsWellbeingCheckIn = false
         generation += 1
         window.dismiss(restoreFocus: restoreFocus)
         isPresented = false
@@ -149,11 +164,6 @@ final class GlanceModel: ObservableObject {
         async let due: Void = habits.refresh(date: date)
         async let metrics: Void = stats.reconcileToDate(date)
         _ = await (issues, due, metrics, sections)
-        guard date == day.selectedDate else { return }
-        if previewIssue == nil && selectedHabit == nil,
-           let activeID = appState?.timerService.snapshot.issueID {
-            previewIssue = self.issues.allIssues.first { $0.id == activeID }
-        }
     }
 
     func prepare(_ issue: DailyFocusIssue? = nil) {

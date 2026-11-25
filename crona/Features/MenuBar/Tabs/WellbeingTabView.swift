@@ -10,6 +10,7 @@ struct WellbeingTabView: View {
     @ObservedObject private var popoverStatsService: PopoverStatsService
     @ObservedObject private var wellbeingService: WellbeingService
     private let historyDate: String?
+    private let embeddedDayIsToday: Bool?
     @ObservedObject private var historyModel: CheckInHistoryModel
     private let onSaved: () -> Void
     @State private var mood = 0
@@ -28,11 +29,13 @@ struct WellbeingTabView: View {
     private let textColumnWidth: CGFloat = 106
 
     init(appState: CompanionAppState, service: WellbeingService? = nil, historyDate: String? = nil,
-         historyModel: CheckInHistoryModel? = nil, onSaved: @escaping () -> Void = {}) {
+         historyModel: CheckInHistoryModel? = nil, onSaved: @escaping () -> Void = {},
+         embeddedDayIsToday: Bool? = nil, stats: PopoverStatsService? = nil) {
         self.appState = appState
-        self.popoverStatsService = appState.popoverStatsService
+        self.popoverStatsService = stats ?? appState.popoverStatsService
         self.wellbeingService = service ?? appState.wellbeingService
         self.historyDate = historyDate
+        self.embeddedDayIsToday = embeddedDayIsToday
         self.historyModel = historyModel ?? appState.checkInHistory
         self.onSaved = onSaved
     }
@@ -41,7 +44,7 @@ struct WellbeingTabView: View {
         VStack(alignment: .leading, spacing: 15) {
             if let historyDate {
                 Text(formattedPopoverDate(historyDate, appState: appState)).font(.headline)
-            } else {
+            } else if embeddedDayIsToday == nil {
                 PopoverDayHeader(appState: appState, libraryDestination: .checkIns)
             }
             if let entry = wellbeingService.snapshot.checkIn {
@@ -121,7 +124,7 @@ struct WellbeingTabView: View {
         .onDisappear { feedbackDismissTask?.cancel() }
     }
 
-    private var isHistorical: Bool { historyDate != nil || !appState.day.isToday }
+    private var isHistorical: Bool { historyDate != nil || !(embeddedDayIsToday ?? appState.day.isToday) }
 
     private var canSave: Bool {
         (historyDate == nil || historyModel.mutationsAllowed)
@@ -129,6 +132,7 @@ struct WellbeingTabView: View {
             && mood > 0
             && energy > 0
             && !wellbeingService.snapshot.isSaving
+            && (embeddedDayIsToday == nil || (!wellbeingService.snapshot.isLoading && !wellbeingService.snapshot.date.isEmpty))
             && currentRequest != baselineRequest
     }
 
@@ -160,6 +164,7 @@ struct WellbeingTabView: View {
     }
 
 
+    @ViewBuilder
     private func ratingRow(
         title: String,
         subtitle: String,
@@ -167,7 +172,7 @@ struct WellbeingTabView: View {
         value: Binding<Int>,
         tint: Color
     ) -> some View {
-        HStack(spacing: leadingRailSpacing) {
+        let heading = HStack(spacing: leadingRailSpacing) {
             Image(systemName: symbol)
                 .frame(width: leadingRailWidth)
                 .foregroundStyle(PopupVisualTheme.primaryText.opacity(0.68))
@@ -181,7 +186,8 @@ struct WellbeingTabView: View {
                     .lineLimit(1)
             }
             .frame(width: textColumnWidth, alignment: .leading)
-            Spacer(minLength: 0)
+        }
+        let ratings = HStack(spacing: leadingRailSpacing) {
             ForEach(1...5, id: \.self) { rating in
                 Button { value.wrappedValue = rating } label: {
                     Text("\(rating)")
@@ -194,7 +200,24 @@ struct WellbeingTabView: View {
                 .accessibilityAddTraits(value.wrappedValue == rating ? .isSelected : [])
             }
         }
-        .padding(.horizontal, 12)
+        let inline = HStack(spacing: leadingRailSpacing) {
+            heading
+            Spacer(minLength: 0)
+            ratings
+        }
+        if embeddedDayIsToday != nil {
+            ViewThatFits(in: .horizontal) {
+                inline
+                VStack(alignment: .leading, spacing: 8) {
+                    heading
+                    ratings
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 12)
+        } else {
+            inline.padding(.horizontal, 12)
+        }
     }
 
     private func durationInput(

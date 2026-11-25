@@ -14,8 +14,9 @@ final class WellbeingService: ObservableObject {
     private let daemonConnection: DaemonConnectionService
     @Published private(set) var snapshot = WellbeingSnapshot()
 
-    init(daemonConnection: DaemonConnectionService) {
+    init(daemonConnection: DaemonConnectionService, selectedDate: String? = nil) {
         self.daemonConnection = daemonConnection
+        self.selectedDate = selectedDate
     }
 
     /// The shared popover day; nil follows the daemon's current date.

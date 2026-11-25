@@ -26,58 +26,73 @@ struct GlanceDayPanes: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let visible = preferences.preferences.glance.normalizedOrder.filter { preferences.preferences.glance.visible($0) }
-            let main = visible.filter { $0 == .issues || $0 == .habits }
-            let side = visible.filter { $0 != .issues && $0 != .habits }
-            if state.hasActiveFocusSession {
-                GlanceSessionRowLayout(sideWidth: GlanceLayoutMetrics.sideWidth(geometry.size.width),
-                    availableHeight: geometry.size.height) {
-                    GlanceActiveSessionView(state: state)
-                    if geometry.size.width >= 1000 && geometry.size.height >= 600
-                        && (preferences.preferences.glance.visible(.calendar) || preferences.preferences.glance.visible(.summary)) {
-                        VStack(spacing: 20) {
-                            if preferences.preferences.glance.visible(.calendar) { calendar(compact: geometry.size.height < 820) }
-                            if preferences.preferences.glance.visible(.summary) { summary }
-                        }.frame(width: GlanceLayoutMetrics.sideWidth(geometry.size.width))
-                    }
-                }
-            } else if visible.isEmpty {
+            let layout = preferences.preferences.glance
+            if layout.workWidgets.isEmpty && layout.overviewWidgets.isEmpty && !state.hasActiveFocusSession {
                 VStack(spacing: 16) {
-                    Text("Choose widgets to make Glance yours.")
-                    Button("Customize Glance") { model.showsCustomization = true }
-                }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Button("Choose Panes") { model.showsCustomization = true }
+                        .buttonStyle(GlanceButtonStyle())
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
-                    if geometry.size.width >= 800 {
-                        HStack(alignment: .top, spacing: 20) {
-                            if !main.isEmpty { column(main, height: geometry.size.height) }
-                            if !side.isEmpty {
-                                column(side, height: geometry.size.height)
-                                    .frame(maxWidth: main.isEmpty ? .infinity : GlanceLayoutMetrics.sideWidth(geometry.size.width))
+                    VStack(alignment: .leading, spacing: 20) {
+                        if state.hasActiveFocusSession {
+                            GlanceActiveSessionView(state: state)
+                                .frame(height: min(520, max(320, geometry.size.height * 0.65)))
+                        }
+                        if !layout.overviewWidgets.isEmpty {
+                            GlancePaneGridLayout(layout: layout.layout) {
+                                ForEach(layout.overviewWidgets) { widget in
+                                    overviewPane(widget)
+                                }
                             }
                         }
-                    } else { column(main + side, height: geometry.size.height) }
+                        if !state.hasActiveFocusSession && !layout.workWidgets.isEmpty {
+                            GlancePaneGridLayout(layout: layout.layout) {
+                                ForEach(layout.workWidgets) { widget in
+                                    if widget == .issues { issuePane } else { habitPane }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.bottom, 12)
                 }
             }
         }
     }
 
-    private func column(_ widgets: [GlanceWidget], height: CGFloat) -> some View {
-        VStack(spacing: 20) {
-            ForEach(widgets) { widget in
-                switch widget {
-                case .issues: issuePane.frame(height: GlanceLayoutMetrics.height(.issues, availableHeight: height))
-                case .habits: habitPane.frame(height: GlanceLayoutMetrics.height(.habits, availableHeight: height))
-                case .calendar: calendar(compact: height < 820)
-                case .selection: preview.frame(height: GlanceLayoutMetrics.height(.selection, availableHeight: height))
-                case .summary: summary
+    @ViewBuilder private func overviewPane(_ widget: GlanceWidget) -> some View {
+        switch widget {
+        case .calendar:
+            pane("Calendar") {
+                GlanceCalendarPane(day: day, stats: stats,
+                    today: state.daemonConnection.currentDate.isEmpty ? DailyFocusService.todayString() : state.daemonConnection.currentDate,
+                    settings: state.coreSettingsService.settings)
+            }
+        case .summary:
+            pane("Day Summary") {
+                if stats.snapshot.date == day.selectedDate,
+                   let score = stats.snapshot.focusScore, let metrics = stats.snapshot.todayMetrics {
+                    DailyStatsSummaryView(score: score, metrics: metrics,
+                        message: stats.snapshot.scoreMessage, highRiskCount: nil, embedded: true)
+                } else if stats.snapshot.isLoading {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Text("No summary available").font(.subheadline).foregroundStyle(.secondary)
                 }
             }
-        }.frame(maxWidth: .infinity)
+        case .wellbeing:
+            pane("Wellbeing") {
+                GlanceWellbeingPane(state: state, day: day, stats: stats, showsCheckIn: $model.showsWellbeingCheckIn)
+                    .id(day.selectedDate)
+            }
+        case .issues, .habits, .selection:
+            EmptyView()
+        }
     }
 
     private var issuePane: some View {
-        pane("", flexible: true) {
+        pane("") {
             HStack(spacing: 8) {
                 Text("Issues").font(.headline)
                 Spacer()
@@ -86,39 +101,52 @@ struct GlanceDayPanes: View {
             DailySectionPicker(dailyIssues: issues)
             if issues.isLoading { ProgressView().controlSize(.small) }
             if let error = issues.errorMessage { Text(error).foregroundStyle(.red).font(.caption) }
-            ScrollView {
-                LazyVStack(spacing: 10) {
-                    ForEach(issues.sections.issues(in: issues.section)) { issue in
-                        FocusIssueRow(appState: state, issue: issue,
-                            isInbox: issues.section == .inbox,
-                            onDetails: { if preferences.preferences.glance.visible(.selection) { model.previewIssue = issue; model.selectedHabit = nil } else { state.openIssueDetails(issue); state.detailBrowser.open(issue: issue, section: issues.section) } },
-                            beforeAction: { handoff {} }, actionsEnabled: day.isToday,
-                            onStart: { model.prepare(issue) })
-                            .overlay(RoundedRectangle(cornerRadius: 18).stroke(
-                                model.previewIssue?.id == issue.id ? PopupVisualTheme.semantic(.focus).opacity(0.6) : .clear))
-                    }
-                    if issues.sections.issues(in: issues.section).isEmpty { Text("No issues in this section").foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 100) }
-                }
+            let visibleIssues = issues.sections.issues(in: issues.section)
+            workList(visibleIssues, emptyMessage: "No issues in this section") { issue in
+                FocusIssueRow(appState: state, issue: issue,
+                    isInbox: issues.section == .inbox,
+                    onDetails: { if preferences.preferences.glance.visible(.selection) { model.previewIssue = issue; model.selectedHabit = nil } else { state.openIssueDetails(issue); state.detailBrowser.open(issue: issue, section: issues.section) } },
+                    beforeAction: { handoff {} }, actionsEnabled: day.isToday,
+                    onStart: { model.prepare(issue) })
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(
+                        model.previewIssue?.id == issue.id ? PopupVisualTheme.semantic(.focus).opacity(0.6) : .clear))
+                    .modifier(GlancePointerPopover(
+                        isPresented: selectionPresentation { model.previewIssue?.id == issue.id }
+                    ) { selectionInspector })
             }
         }
     }
 
     private var habitPane: some View {
-        pane("", flexible: true) {
+        pane("") {
             HStack {
                 Text("Habits · \(habits.snapshot.items.count)").font(.headline)
                 Spacer()
                 TagFilterMenu(pane: .habits, tagsModel: tags)
             }
             if let error = habits.snapshot.lastRefreshError { Text(error).font(.caption).foregroundStyle(.red) }
+            let visibleHabits = habits.snapshot.date == day.selectedDate
+                ? habits.snapshot.filtered(by: tags.filter(for: .habits), known: tags.knownNames).items.filter {
+                    !preferences.preferences.glance.unfinishedHabits || (!$0.completed && $0.status != "failed")
+                } : []
+            workList(visibleHabits, emptyMessage: "No habits in this view", row: habitRow)
+        }
+    }
+
+    @ViewBuilder private func workList<Item: Identifiable, Row: View>(
+        _ items: [Item], emptyMessage: String, @ViewBuilder row: @escaping (Item) -> Row
+    ) -> some View {
+        if items.isEmpty {
+            Text(emptyMessage).font(.subheadline).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.vertical, 16)
+        } else if items.count > 7 {
             ScrollView {
-                LazyVStack(spacing: 10) {
-                    ForEach(habits.snapshot.date == day.selectedDate ? habits.snapshot.filtered(by: tags.filter(for: .habits), known: tags.knownNames).items.filter { !preferences.preferences.glance.unfinishedHabits || (!$0.completed && $0.status != "failed") } : []) { habit in
-                        habitRow(habit)
-                    }
-                    if habits.snapshot.items.isEmpty { Text("No habits due").foregroundStyle(.secondary) }
-                }
+                LazyVStack(spacing: 8) { ForEach(items, content: row) }
             }
+            .frame(height: 470)
+        } else {
+            VStack(spacing: 8) { ForEach(items, content: row) }
         }
     }
 
@@ -140,6 +168,21 @@ struct GlanceDayPanes: View {
                             editTags: { if day.isToday { handoff { state.tagEditor.present(.habit(id: habit.id, name: habit.name), tags: habit.tags) } } },
                             deleteHabit: { if day.isToday { handoff { state.habitEditor.presentDelete(for: habit) } } },
                             isReadOnly: !day.isToday, selectsOnRowTap: true)
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(
+                model.selectedHabit?.id == habit.id ? PopupVisualTheme.semantic(.focus).opacity(0.6) : .clear))
+            .modifier(GlancePointerPopover(
+                isPresented: selectionPresentation { model.selectedHabit?.id == habit.id }
+            ) { selectionInspector })
+    }
+
+    private func selectionPresentation(matches: @escaping () -> Bool) -> Binding<Bool> {
+        Binding(
+            get: { preferences.preferences.glance.visible(.selection) && matches() },
+            set: { isPresented in
+                // A dismissal from the previous row must leave the new selection intact.
+                if !isPresented && matches() { model.clearSelection() }
+            }
+        )
     }
 
     private func beginLog(_ habit: HabitRowModel) {
@@ -148,22 +191,28 @@ struct GlanceDayPanes: View {
         loggingHabitID = habit.id
     }
 
-    private func calendar(compact: Bool) -> some View {
-        pane("Calendar") {
-            GlanceCalendarPane(day: day, stats: stats,
-                today: state.daemonConnection.currentDate.isEmpty ? DailyFocusService.todayString() : state.daemonConnection.currentDate,
-                settings: state.coreSettingsService.settings, compact: compact)
-        }
-    }
-
-    private var preview: some View {
-        pane("Selection", flexible: true) {
+    private var selectionInspector: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Selection").font(.headline)
+                Spacer()
+                Button { model.clearSelection() } label: {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Close selection")
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) { previewContent }
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if !day.isToday { Button("Return to Today for actions") { day.showToday() }.buttonStyle(GlanceButtonStyle()) }
+            .frame(maxHeight: 300)
+            if !day.isToday {
+                Button("Return to Today") { day.showToday() }.buttonStyle(GlanceButtonStyle())
+            }
         }
+        .padding(20)
+        .frame(width: 360)
     }
 
     @ViewBuilder private var previewContent: some View {
@@ -179,7 +228,12 @@ struct GlanceDayPanes: View {
                 .font(.caption)
             TagChipsView(tags: issue.tags, tagsModel: tags)
             if day.isToday {
-                Button { model.prepare(issue) } label: { Label("Focus on this issue", systemImage: "play.fill") }
+                Button {
+                    model.clearSelection()
+                    model.prepare(issue)
+                } label: {
+                    Label("Focus on this issue", systemImage: "play.fill")
+                }
                     .buttonStyle(GlanceButtonStyle(prominent: true))
             }
         } else if let habit = model.selectedHabit {
@@ -196,20 +250,14 @@ struct GlanceDayPanes: View {
                 .buttonStyle(GlanceButtonStyle(prominent: true))
                 .disabled(habits.actionInFlightHabitID != nil)
             }
-        } else { Text("Select an issue or habit to see its details.").foregroundStyle(.secondary) }
-    }
-
-    private var summary: some View {
-        pane("Day Summary") {
-            if stats.snapshot.date == day.selectedDate, let score = stats.snapshot.focusScore, let metrics = stats.snapshot.todayMetrics {
-                DailyStatsSummaryView(score: score, metrics: metrics, message: stats.snapshot.scoreMessage, highRiskCount: nil)
-            } else if stats.snapshot.isLoading { ProgressView() }
-            else { Text("No summary available").foregroundStyle(.secondary) }
         }
     }
 
     private func complete(_ habit: HabitRowModel) {
-        if habit.targetMinutes != nil { handoff { state.openHabitDetails(habit) } }
+        if habit.targetMinutes != nil {
+            model.clearSelection()
+            handoff { state.openHabitDetails(habit) }
+        }
         else { Task { await habits.complete(habit) } }
     }
 
@@ -218,25 +266,30 @@ struct GlanceDayPanes: View {
         action()
     }
 
-    private func pane<Content: View>(_ title: String, flexible: Bool = false, @ViewBuilder content: () -> Content) -> some View {
+    private func pane<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             if !title.isEmpty { Text(title).font(.headline) }
             content()
-        }.padding(18)
-            .frame(maxWidth: .infinity, maxHeight: flexible ? .infinity : nil, alignment: .topLeading)
-            .modifier(GlancePaneSurface())
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .modifier(GlancePaneSurface())
     }
 }
 
 private struct GlancePaneSurface: ViewModifier {
     @ObservedObject private var glass = SystemGlassSettings.shared
-    @ViewBuilder func body(content: Content) -> some View {
-        if glass.reduceTransparency {
-            content.background(PopupVisualTheme.popoverBackground, in: RoundedRectangle(cornerRadius: 22))
-        } else if #available(macOS 26.0, *) {
-            content.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 22))
-        } else {
-            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22))
-        }
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 18)
+        content
+            .background {
+                if glass.reduceTransparency {
+                    shape.fill(PopupVisualTheme.popoverBackground)
+                } else {
+                    shape.fill(.regularMaterial)
+                }
+            }
+            .overlay { shape.strokeBorder(PopupVisualTheme.surfaceStroke, lineWidth: 1) }
     }
 }

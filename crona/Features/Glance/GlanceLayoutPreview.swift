@@ -1,16 +1,16 @@
 import AppKit
 import SwiftUI
 
-/// Shared dimensions keep the miniature and the live widget columns in proportion.
 enum GlanceLayoutMetrics {
-    static func sideWidth(_ width: CGFloat) -> CGFloat { max(340, width * 0.34) }
-    static func height(_ widget: GlanceWidget, availableHeight: CGFloat) -> CGFloat {
+    static let workspaceWidth: CGFloat = 1520
+
+    static func previewHeight(_ widget: GlanceWidget) -> CGFloat {
         switch widget {
-        case .issues: return max(320, (availableHeight - 20) / 2)
-        case .habits: return max(300, (availableHeight - 20) / 2)
-        case .selection: return 260
-        case .calendar: return availableHeight < 820 ? 160 : 390
-        case .summary: return 250
+        case .issues, .habits: 260
+        case .calendar: 132
+        case .wellbeing: 108
+        case .summary: 232
+        case .selection: 0
         }
     }
 }
@@ -24,16 +24,11 @@ struct GlanceLayoutPreview: View {
 
     var body: some View {
         let size = screenSize
-        let width = min(1800, size.width) - 48
-        let height = max(300, size.height - 160)
-        let visible = preferences.normalizedOrder.filter(preferences.visible)
-        let main = visible.filter { $0 == .issues || $0 == .habits }
-        let side = visible.filter { $0 != .issues && $0 != .habits }
-        let columnHeight: ([GlanceWidget]) -> CGFloat = { widgets in
-            widgets.reduce(0) { $0 + GlanceLayoutMetrics.height($1, availableHeight: height) } + CGFloat(max(0, widgets.count - 1)) * 20
-        }
-        let contentHeight = width >= 800 ? max(columnHeight(main), columnHeight(side)) : columnHeight(main + side)
-        let canvasHeight = max(height, contentHeight) + 96
+        let width = min(GlanceLayoutMetrics.workspaceWidth, size.width - 48)
+        let groups = [preferences.overviewWidgets, preferences.workWidgets].filter { !$0.isEmpty }
+        let contentHeight = groups.map { height(of: $0, width: width) }.reduce(0, +)
+            + CGFloat(max(0, groups.count - 1)) * 20
+        let canvasHeight = max(100, contentHeight) + 108
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Layout Preview").font(.body.weight(.medium))
@@ -51,19 +46,17 @@ struct GlanceLayoutPreview: View {
                         Image(systemName: "plus")
                         Image(systemName: "xmark")
                     }.frame(height: 40)
-                    if visible.isEmpty {
-                        Text("Choose widgets to make Glance yours.")
-                            .frame(maxWidth: .infinity, minHeight: height)
-                    } else if width >= 800 {
-                        HStack(alignment: .top, spacing: 20) {
-                            if !main.isEmpty { column(main, height: height) }
-                            if !side.isEmpty {
-                                column(side, height: height)
-                                    .frame(width: main.isEmpty ? width : GlanceLayoutMetrics.sideWidth(width))
+                    if groups.isEmpty {
+                        Text("Choose Panes").frame(maxWidth: .infinity)
+                    } else {
+                        ForEach(groups, id: \.self) { widgets in
+                            GlancePaneGridLayout(layout: preferences.layout) {
+                                ForEach(widgets) { widget in
+                                    previewPane(widget)
+                                }
                             }
                         }
-                    } else { column(main + side, height: height) }
-                    Spacer(minLength: 0)
+                    }
                 }
                 .padding(24)
                 .frame(width: width + 48, height: canvasHeight, alignment: .top)
@@ -72,28 +65,31 @@ struct GlanceLayoutPreview: View {
             }
             .aspectRatio((width + 48) / canvasHeight, contentMode: .fit)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Glance layout preview: " + visible.map(\.title).joined(separator: ", "))
-            Text("Proportions reflect your display. Sample content illustrates each widget.")
-                .font(.caption).foregroundStyle(.secondary)
+            .accessibilityLabel("Glance layout preview: " + groups.flatMap { $0 }.map(\.title).joined(separator: ", "))
         }
     }
 
-    private func column(_ widgets: [GlanceWidget], height: CGFloat) -> some View {
-        VStack(spacing: 20) {
-            ForEach(widgets) { widget in
-                VStack(alignment: .leading, spacing: 16) {
-                    Text(widget.title).font(.headline)
-                    illustration(widget)
-                    Spacer(minLength: 0)
-                }
-                .padding(18)
-                .frame(maxWidth: .infinity)
-                .frame(height: GlanceLayoutMetrics.height(widget, availableHeight: height))
-                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 22))
-                .overlay(RoundedRectangle(cornerRadius: 22).stroke(.secondary.opacity(0.2)))
-                .clipped()
-            }
-        }.frame(maxWidth: .infinity)
+    private func height(of widgets: [GlanceWidget], width: CGFloat) -> CGFloat {
+        let counts = GlancePaneGridLayout.rowCounts(paneCount: widgets.count, width: width, layout: preferences.layout)
+        var index = 0
+        let heights = counts.map { count in
+            defer { index += count }
+            return widgets[index..<(index + count)].map(GlanceLayoutMetrics.previewHeight).max() ?? 0
+        }
+        return GlancePaneGridLayout.totalHeight(heights)
+    }
+
+    private func previewPane(_ widget: GlanceWidget) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(widget.title).font(.headline)
+            illustration(widget)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(minHeight: GlanceLayoutMetrics.previewHeight(widget))
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 18))
+        .clipped()
     }
 
     @ViewBuilder private func illustration(_ widget: GlanceWidget) -> some View {
@@ -112,29 +108,31 @@ struct GlanceLayoutPreview: View {
                 }.padding(14).background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
             }
         case .calendar:
-            Text("‹                   This month                   ›").font(.subheadline)
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 14) {
-                ForEach(1..<(screenSize.height - 160 < 820 ? 8 : 36), id: \.self) { day in
-                    Text("\((day - 1) % 31 + 1)").font(.caption)
-                        .frame(width: 24, height: 24)
-                        .background(day == 4 ? Color.accentColor : .clear, in: Circle())
+            Text("November 2026").font(.subheadline)
+            HStack {
+                ForEach(22...28, id: \.self) { day in
+                    Text("\(day)").font(.caption)
+                        .frame(maxWidth: .infinity)
                 }
             }
         case .selection:
-            Text("Selected issue or habit").font(.title3.weight(.semibold))
-            Text("Description, tags, progress, and actions appear here.").foregroundStyle(.secondary)
-            Label("Start focus", systemImage: "play.fill").padding(10).background(.secondary.opacity(0.12), in: Capsule())
+            EmptyView()
+        case .wellbeing:
+            Text("No check-in yet").foregroundStyle(.secondary)
         case .summary:
             HStack {
                 ForEach(["Score", "Worked", "Issues", "Habits"], id: \.self) { title in
-                    VStack(spacing: 10) {
-                        Circle().trim(from: 0, to: 0.7).stroke(.green, lineWidth: 5).frame(width: 42, height: 42)
+                    VStack(spacing: 4) {
+                        ZStack(alignment: .bottom) {
+                            Circle().trim(from: 0.5, to: 1)
+                                .stroke(.secondary.opacity(0.35), lineWidth: 4)
+                                .frame(width: 48, height: 48)
+                            Text("0").font(.headline)
+                        }
                         Text(title).font(.caption)
                     }.frame(maxWidth: .infinity)
                 }
             }
-            Divider()
-            Text("Sessions                  Average                  Breaks").font(.caption).foregroundStyle(.secondary)
         }
     }
 }

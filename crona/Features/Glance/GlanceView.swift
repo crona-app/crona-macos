@@ -45,7 +45,6 @@ struct GlanceView: View {
             GlanceHeader(state: appState, model: model)
             if !appState.hasActiveFocusSession && day.isToday && !model.isSelectedDayAway {
                 HStack {
-                    Text("Ready to focus").foregroundStyle(.secondary)
                     Spacer()
                     Button {
                         Task { await model.setAwayMode(true) }
@@ -55,7 +54,7 @@ struct GlanceView: View {
                     .buttonStyle(GlanceButtonStyle())
                     .disabled(!model.canChangeAwayMode || coreSettings.isSaving)
                     Button { model.prepare() } label: { Label("Quick Session", systemImage: "timer") }
-                        .buttonStyle(GlanceButtonStyle())
+                        .buttonStyle(GlanceButtonStyle(prominent: true))
                 }
             }
             if appState.daemonConnection.connectionState != .connected {
@@ -76,7 +75,10 @@ struct GlanceView: View {
                 GlanceDayPanes(state: appState, model: model, day: day,
                     issues: model.issues, habits: model.habits, stats: model.stats)
             }
-        }.padding(24).frame(maxWidth: 1800).frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: GlanceLayoutMetrics.workspaceWidth)
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder private var card: some View {
