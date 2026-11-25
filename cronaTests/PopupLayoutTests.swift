@@ -12,6 +12,13 @@ final class PopupLayoutTests: DaemonTestCase {
         XCTAssertTrue(behavior.contains(.stationary))
     }
 
+    func testBreakScreensCanJoinOtherAppsFullScreenSpaces() {
+        let behavior = WindowService.breakScreenCollectionBehavior
+
+        XCTAssertTrue(behavior.contains([.canJoinAllSpaces, .canJoinAllApplications, .fullScreenAuxiliary]))
+        XCTAssertTrue(behavior.contains([.stationary, .ignoresCycle]))
+    }
+
     func testWindowServiceAppliesOnlyDistinctActivationPolicies() {
         var appliedPolicies: [NSApplication.ActivationPolicy] = []
         let service = WindowService { policy in

@@ -39,6 +39,10 @@ final class WindowService {
         .stationary,
     ]
 
+    static let breakScreenCollectionBehavior: NSWindow.CollectionBehavior = [
+        .canJoinAllSpaces, .fullScreenAuxiliary, .canJoinAllApplications, .stationary, .ignoresCycle,
+    ]
+
     private let activationPolicyApplier: @MainActor (NSApplication.ActivationPolicy) -> Void
     private var lastAppliedActivationPolicy: NSApplication.ActivationPolicy?
     private weak var appState: CompanionAppState?
@@ -422,23 +426,23 @@ final class WindowService {
     }
 
     private func reconcileTransientPopupsForActiveSpace() {
-        var panels: [NSPanel] = [
+        let panels: [NSPanel] = [
             hardLimitPanel,
             inactivityPanel,
             smartPauseResumePanel,
             hardLimitWarningPanel,
         ].compactMap { $0 }
-        panels.append(contentsOf: breakScreenPanels.values.map { $0 as NSPanel })
-        #if DEBUG
-            if let developerBreakScreenPanel {
-                panels.append(developerBreakScreenPanel)
-            }
-        #endif
-
         for panel in panels where panel.isVisible {
-            panel.collectionBehavior = Self.transientPopupCollectionBehavior
             panel.orderFrontRegardless()
         }
+        for panel in breakScreenPanels.values {
+            panel.orderFrontRegardless()
+        }
+        #if DEBUG
+            if let developerBreakScreenPanel, developerBreakScreenPanel.isVisible {
+                developerBreakScreenPanel.orderFrontRegardless()
+            }
+        #endif
     }
 
     func showBreakScreens() {
@@ -495,7 +499,6 @@ final class WindowService {
                 }
             }
             if isPrimary, !wasVisible {
-                NSApp.activate()
                 panel.makeKeyAndOrderFront(nil)
             }
         }
@@ -546,7 +549,6 @@ final class WindowService {
                 context.timingFunction = CAMediaTimingFunction(name: .easeOut)
                 panel.animator().alphaValue = 1
             }
-            NSApp.activate()
             panel.makeKeyAndOrderFront(nil)
         }
 
@@ -564,12 +566,13 @@ final class WindowService {
     ) -> BreakScreenPanel {
         let panel = BreakScreenPanel(
             contentRect: .zero,
-            styleMask: [.borderless, .fullSizeContentView],
+            styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
+        panel.isFloatingPanel = true
         panel.level = .screenSaver
-        panel.collectionBehavior = Self.transientPopupCollectionBehavior
+        panel.collectionBehavior = Self.breakScreenCollectionBehavior
         panel.hidesOnDeactivate = false
         panel.isOpaque = true
         panel.backgroundColor = .black
@@ -587,12 +590,13 @@ final class WindowService {
         ) -> DeveloperBreakScreenPanel {
             let panel = DeveloperBreakScreenPanel(
                 contentRect: .zero,
-                styleMask: [.borderless, .fullSizeContentView],
+                styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
                 backing: .buffered,
                 defer: false
             )
+            panel.isFloatingPanel = true
             panel.level = .screenSaver
-            panel.collectionBehavior = Self.transientPopupCollectionBehavior
+            panel.collectionBehavior = Self.breakScreenCollectionBehavior
             panel.hidesOnDeactivate = false
             panel.isOpaque = true
             panel.backgroundColor = .black
