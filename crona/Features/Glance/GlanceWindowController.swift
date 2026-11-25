@@ -12,7 +12,11 @@ protocol GlanceWindowPresenting: AnyObject {
 final class GlanceWindowController: GlanceWindowPresenting {
     private var panel: GlancePanel?
     var isVisible: Bool { panel?.isVisible == true }
-    private var previousApp: NSRunningApplication?
+    static let overlayCollectionBehavior: NSWindow.CollectionBehavior = [
+        .canJoinAllSpaces, .fullScreenAuxiliary, .canJoinAllApplications, .stationary, .ignoresCycle,
+    ]
+
+    private var spaceObserver: NSObjectProtocol?
     private var displayID: CGDirectDisplayID?
     private var screenObserver: NSObjectProtocol?
     private var monitor: Any?
@@ -20,16 +24,16 @@ final class GlanceWindowController: GlanceWindowPresenting {
 
     func show(appState: CompanionAppState, model: GlanceModel) -> Bool {
         guard let screen = NSScreen.screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }) ?? NSScreen.main else { return false }
-        previousApp = NSWorkspace.shared.frontmostApplication
         displayID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
-        let panel = GlancePanel(contentRect: screen.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        let panel = GlancePanel(contentRect: screen.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.title = "Glance"
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
         panel.backgroundColor = .clear
         panel.isOpaque = false
-        panel.level = .floating
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.isFloatingPanel = true
+        panel.level = .statusBar
+        panel.collectionBehavior = Self.overlayCollectionBehavior
         let host = NSHostingView(rootView: Self.rootView(appState: appState, model: model, screen: screen))
         host.autoresizingMask = [.width, .height]
         hostingView = host
@@ -47,6 +51,11 @@ final class GlanceWindowController: GlanceWindowPresenting {
                 self.hostingView?.rootView = Self.rootView(appState: appState, model: model, screen: screen)
             }
         }
+        spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.panel?.orderFrontRegardless() }
+        }
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak model, weak panel] event in
             guard event.keyCode == 53, event.window === panel else { return event }
             // The capture editor handles its own Escape (autocomplete first, then closing the card).
@@ -55,7 +64,6 @@ final class GlanceWindowController: GlanceWindowPresenting {
             return nil
         }
         panel.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
         return true
     }
 
@@ -87,7 +95,7 @@ final class GlanceWindowController: GlanceWindowPresenting {
                    trailing: max(0, frame.maxX - visibleFrame.maxX))
     }
 
-    func dismiss(restoreFocus: Bool) {
+    func dismiss(restoreFocus _: Bool) {
         panel?.orderOut(nil)
         panel = nil
         hostingView = nil
@@ -95,11 +103,12 @@ final class GlanceWindowController: GlanceWindowPresenting {
         screenObserver = nil
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
-        if restoreFocus { previousApp?.activate() }
-        previousApp = nil
+        if let spaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver) }
+        spaceObserver = nil
     }
 
     isolated deinit {
+        if let spaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver) }
         if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
         if let monitor { NSEvent.removeMonitor(monitor) }
     }

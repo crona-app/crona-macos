@@ -5,6 +5,12 @@ import XCTest
 
 @MainActor
 final class GlanceScreenInsetsTests: XCTestCase {
+    func testOverlayCanJoinOtherAppsFullScreenSpaces() {
+        let behavior = GlanceWindowController.overlayCollectionBehavior
+        XCTAssertTrue(behavior.contains([.canJoinAllSpaces, .fullScreenAuxiliary, .canJoinAllApplications]))
+        XCTAssertTrue(behavior.contains([.stationary, .ignoresCycle]))
+    }
+
     func testReservesMenuBarAndBottomDockOnOffsetDisplay() {
         let insets = GlanceWindowController.contentInsets(
             frame: NSRect(x: -1600, y: 100, width: 1600, height: 1000),
