@@ -18,6 +18,40 @@ final class AlertTests: DaemonTestCase {
         XCTAssertFalse(CompanionAlertRouting.isCompanionOwned(kind: "checkin.reminder"))
     }
 
+    func testCompanionOwnedAlertsPlayRequestedSoundBeforeAcknowledging() async throws {
+        for kind in ["timer.work_complete", "timer.break_complete", "timer.break_deferral_warning"] {
+            for requested in [true, false] {
+                for playbackSucceeded in [true, false] {
+                    let transport = CapturingDaemonTransport(
+                        responseData: Data(#"{"id":"response-1","result":{"ok":true}}"#.utf8)
+                    )
+                    var playedPresets: [String?] = []
+                    let service = NotificationService(soundPlayer: { preset in
+                        XCTAssertNil(transport.requestData, "Playback must precede acknowledgement")
+                        playedPresets.append(preset)
+                        return playbackSucceeded
+                    })
+                    let delivery = CronaAlertDelivery(
+                        id: "timer-alert",
+                        alert: CronaAlertRequest(kind: kind, title: "Timer", subtitle: nil,
+                            body: "Boundary", urgency: "normal", iconEnabled: true,
+                            soundPreset: "soft_bell", playSound: true),
+                        deliverNotification: true, playSound: requested, actions: nil
+                    )
+                    await service.handle(delivery, client: CronaDaemonClient(transport: transport))
+                    XCTAssertEqual(playedPresets.count, requested ? 1 : 0, kind)
+                    if requested { XCTAssertEqual(playedPresets.first ?? nil, "soft_bell") }
+                    let data = try XCTUnwrap(transport.requestData)
+                    let request = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+                    let ack = try XCTUnwrap(request["params"] as? [String: Any])
+                    XCTAssertEqual(ack["notificationAccepted"] as? Bool, true)
+                    XCTAssertEqual(ack["soundAccepted"] as? Bool,
+                        !requested || playbackSucceeded, kind)
+                }
+            }
+        }
+    }
+
     func testBreakDeferralPolicyRequiresRecentActivity() {
         var preferences = CompanionPreferences()
         preferences.breakScreenActivityExtensionSeconds = 60

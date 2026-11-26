@@ -106,6 +106,7 @@ final class NotificationService: NSObject, ObservableObject, UNUserNotificationC
     private var daemonStateCancellables: Set<AnyCancellable> = []
     private var appActivationObserver: NSObjectProtocol?
     private var activeSound: NSSound?
+    private let soundPlayer: ((String?) -> Bool)?
     private var onOpenCrona: (() -> Void)?
     private var onOpenTUI: (() -> Void)?
     private var onAdvanceTimer: ((String) -> Void)?
@@ -118,7 +119,8 @@ final class NotificationService: NSObject, ObservableObject, UNUserNotificationC
     @Published private(set) var deliveryState: NativeAlertDeliveryState = .unavailable
     @Published private(set) var lastErrorDescription: String?
 
-    init(center: UNUserNotificationCenter = .current()) {
+    init(center: UNUserNotificationCenter = .current(), soundPlayer: ((String?) -> Bool)? = nil) {
+        self.soundPlayer = soundPlayer
         self.center = center
         super.init()
         center.delegate = self
@@ -324,22 +326,24 @@ final class NotificationService: NSObject, ObservableObject, UNUserNotificationC
         }
     }
 
-    private func handle(_ delivery: CronaAlertDelivery, client: CronaDaemonClient) async {
+    func handle(_ delivery: CronaAlertDelivery, client: CronaDaemonClient) async {
         var notificationAccepted = !delivery.deliverNotification
         var soundAccepted = !delivery.playSound
         let breakDeferralAction = action(for: delivery)
         let silence = shouldSilenceAlert?(delivery.alert.kind) == true
         let notificationCenterCanPlaySound = soundSetting == .enabled
 
-        // These alerts are handled by the companion whenever it is connected.
-        // Acknowledge them without opening the app, playing a second sound, or
-        // asking the daemon to use osascript/terminal-notifier as a fallback.
+        // Timer presentation is handled elsewhere in the companion, but this
+        // delivery owns its sound even while a timer overlay is visible.
         if CompanionAlertRouting.isCompanionOwned(kind: delivery.alert.kind) {
+            if delivery.playSound {
+                soundAccepted = playSound(for: delivery.alert.soundPreset)
+            }
             await acknowledge(
                 delivery: delivery,
                 client: client,
                 notificationAccepted: true,
-                soundAccepted: true,
+                soundAccepted: soundAccepted,
                 action: breakDeferralAction
             )
             return
@@ -581,6 +585,7 @@ final class NotificationService: NSObject, ObservableObject, UNUserNotificationC
     }
 
     private func playSound(for preset: String?) -> Bool {
+        if let soundPlayer { return soundPlayer(preset) }
         guard let url = soundURL(for: preset) else { return false }
         activeSound?.stop()
         activeSound = NSSound(contentsOf: url, byReference: true)
