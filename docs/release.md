@@ -61,15 +61,9 @@ Generate the Sparkle key pair once with Sparkle's `generate_keys` tool. Store th
 
 ## 1.1.0 beta preparation
 
-The metadata for `v1.1.0-beta.7` is set, with marketing version `1.1.0`, build `25`, and semantic release version `1.1.0-beta.7`. It requires daemon protocol `1.7`, unchanged from beta.6.
+The next tag is `v1.1.0-beta.8`. Xcode uses marketing version `1.1.0` and build `26` for the app and test targets. The release workflow injects `1.1.0-beta.8` as the semantic release version from the tag. Build `26` follows beta.7's build `25` to preserve Sparkle appcast ordering.
 
-Release notes are prepared in [`docs/release-notes/v1.1.0-beta.7.md`](release-notes/v1.1.0-beta.7.md), with a matching changelog entry. The changelog entry is dated 2026-11-19.
-
-Project metadata uses build `25` for the app and test targets.
-
-Build numbers continue across marketing versions: 1.0.0 used build `18`; 1.1.0 betas 1 through 6 used builds `19` through `24`. Build `25` continues that sequence to preserve Sparkle appcast ordering.
-
-The Debug unit suite passed all 492 tests during development. Release-optimized validation also passed all 492 tests with parallel testing disabled. The initial parallel run exceeded the socket-timeout test’s three-second deadline; that test passed in isolation and in the complete serial run. Memory savings have not been quantified in a before/after Release measurement.
+See the [beta.8 release notes](release-notes/v1.1.0-beta.8.md) and [changelog](changelog.md). Daemon protocol compatibility remains at `1.7`. The fix for extending a Pomodoro after its final break requires a daemon build that includes the timer fix.
 
 ## Cutting a Release
 

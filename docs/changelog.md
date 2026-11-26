@@ -4,6 +4,25 @@ All notable changes to **Crona for macOS** are documented here.
 
 ## Unreleased
 
+## [1.1.0-beta.8] - 2026-11-26
+
+### Added
+
+- Add an optional Wellbeing pane with the selected day's check-in status and an on-demand check-in form.
+- Add Away Mode to Glance. Mark today as away or turn off manual Away Mode from Glance. The Away screen replaces Issues and Habits on rest days and recorded away days.
+
+### Changed
+
+- Reorganize Glance into an overview and a work area with adaptive rows, a single-column option, and a live Settings preview. The overview keeps the Day Summary gauges visible and opens Calendar in week view with an expandable month.
+- Open issue and habit details in an on-demand Selection popover beside the pointer. Keyboard selection anchors the popover to the selected row.
+- Redesign Away settings with weekday buttons and a calendar for scheduling one-off dates. The scheduled list shows today and future dates and preserves past entries in storage.
+
+### Fixed
+
+- Show the updated break countdown in the cursor notice, HUD, menu bar, Now popover, and Glance after a break is deferred.
+- Keep Glance and Break Screen visible across macOS Spaces, including eligible full-screen Spaces.
+- Play requested timer boundary and pre-break warning sounds. If local playback fails, allow the daemon to try its fallback.
+
 ## [1.1.0-beta.7] - 2026-11-19
 
 ### Added
